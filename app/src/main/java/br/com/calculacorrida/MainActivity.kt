@@ -54,7 +54,7 @@ class MainActivity : Activity() {
         }
         page.addView(brand)
         page.addView(TextView(this).apply {
-            text = "DECIDA MELHOR. DIRIJA COM MAIS CONTROLE."
+            text = "INTELIGÊNCIA PARA CADA CORRIDA"
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
@@ -63,21 +63,21 @@ class MainActivity : Activity() {
 
         val hero = card()
         hero.addView(TextView(this).apply {
-            text = "ANÁLISE DE CORRIDAS"
+            text = "SEU PAINEL DE CORRIDAS"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(green)
             setTypeface(null, Typeface.BOLD)
         })
         hero.addView(TextView(this).apply {
-            text = "Uber e 99"
+            text = "Mais clareza. Mais controle."
             textSize = 27f
             setTextColor(white)
             setTypeface(null, Typeface.BOLD)
             setPadding(0, dp(5), 0, dp(4))
         })
         hero.addView(TextView(this).apply {
-            text = "O app mostra uma estimativa da oferta e classifica o resultado. Não aceita nem recusa corridas."
+            text = "Veja quanto a corrida rende por quilômetro e por hora. Você decide; o app não aceita nem recusa ofertas."
             textSize = 13f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -103,6 +103,20 @@ class MainActivity : Activity() {
         statusCard.addView(overlayStatus)
         statusCard.addView(accessibilityStatus)
         page.addView(statusCard, marginParams(bottom = 14))
+        val sizeCard = card()
+        sizeCard.addView(TextView(this).apply { text = "TAMANHO DA ETIQUETA"; textSize = 11f; letterSpacing = .08f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
+        val sizeValue = TextView(this).apply { textSize = 14f; setTextColor(green); setTypeface(null, Typeface.BOLD); setPadding(0, dp(7), 0, dp(2)) }
+        sizeCard.addView(sizeValue)
+        sizeCard.addView(TextView(this).apply { text = "Ajuste o tamanho da etiqueta sobre a oferta. O padrão é compacto."; textSize = 12f; setTextColor(muted) })
+        val sizeSeek = SeekBar(this).apply { max = 45; progress = (prefs.getInt("overlay_scale", 85) - 65).coerceIn(0, 45); progressTintList = android.content.res.ColorStateList.valueOf(green); thumbTintList = android.content.res.ColorStateList.valueOf(green) }
+        sizeValue.text = "Tamanho: ${prefs.getInt("overlay_scale", 85)}%"
+        sizeSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) { val value = 65 + progress; sizeValue.text = "Tamanho: ${value}%"; if (fromUser) prefs.edit().putInt("overlay_scale", value).apply() }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) { Toast.makeText(this@MainActivity, "Tamanho salvo para a próxima oferta.", Toast.LENGTH_SHORT).show() }
+        })
+        sizeCard.addView(sizeSeek)
+        page.addView(sizeCard, marginParams(bottom = 14))
 
         val limits = card()
         limits.addView(TextView(this).apply {
