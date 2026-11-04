@@ -23,20 +23,20 @@ class MainActivity : Activity() {
     private lateinit var minKm: EditText
     private lateinit var minHour: EditText
 
-    private val bg = Color.rgb(5, 5, 7)
-    private val panel = Color.rgb(22, 20, 20)
-    private val field = Color.rgb(13, 12, 12)
-    private val white = Color.rgb(244, 248, 252)
-    private val muted = Color.rgb(157, 174, 191)
-    private val green = Color.rgb(255, 125, 25)
+    private val bg = Color.rgb(246, 246, 244)
+    private val panel = Color.WHITE
+    private val field = Color.rgb(250, 250, 250)
+    private val white = Color.rgb(32, 32, 32)
+    private val muted = Color.rgb(133, 133, 133)
+    private val green = Color.rgb(25, 145, 112)
     private val red = Color.rgb(224, 50, 50)
-    private val blue = Color.rgb(232, 91, 25)
+    private val blue = Color.rgb(25, 145, 112)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
-        window.decorView.systemUiVisibility = 0
+        window.statusBarColor = Color.rgb(246, 246, 244)
+        window.navigationBarColor = Color.WHITE
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
 
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val page = LinearLayout(this).apply {
@@ -54,7 +54,7 @@ class MainActivity : Activity() {
         }
         page.addView(brand)
         page.addView(TextView(this).apply {
-            text = "INTELIGÊNCIA PARA CADA CORRIDA"
+            text = "SEU ASSISTENTE DE CORRIDAS"
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
@@ -63,21 +63,21 @@ class MainActivity : Activity() {
 
         val hero = card()
         hero.addView(TextView(this).apply {
-            text = "SEU PAINEL DE CORRIDAS"
+            text = "BEM-VINDO AO CALCULA CORRIDA"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(green)
             setTypeface(null, Typeface.BOLD)
         })
         hero.addView(TextView(this).apply {
-            text = "Mais clareza. Mais controle."
+            text = "Escolha melhor. Ganhe mais."
             textSize = 27f
             setTextColor(white)
             setTypeface(null, Typeface.BOLD)
             setPadding(0, dp(5), 0, dp(4))
         })
         hero.addView(TextView(this).apply {
-            text = "Veja quanto a corrida rende por quilômetro e por hora. Você decide; o app não aceita nem recusa ofertas."
+            text = "Análise automática de ofertas da Uber e 99, direto na tela enquanto você dirige."
             textSize = 13f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -86,7 +86,7 @@ class MainActivity : Activity() {
 
         val statusCard = card()
         statusCard.addView(TextView(this).apply {
-            text = "STATUS DO APLICATIVO"
+            text = "ATIVIDADE DO APLICATIVO"
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
@@ -103,6 +103,21 @@ class MainActivity : Activity() {
         statusCard.addView(overlayStatus)
         statusCard.addView(accessibilityStatus)
         page.addView(statusCard, marginParams(bottom = 14))
+        val traffic = card()
+        traffic.addView(TextView(this).apply { text = "SEMÁFORO DE VALORES"; textSize = 16f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
+        traffic.addView(TextView(this).apply { text = "Classificação automática das ofertas"; textSize = 12f; setTextColor(muted); setPadding(0, dp(4), 0, dp(13)) })
+        val bands = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun addBand(title: String, color: Int) {
+            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(5), dp(12), dp(5), dp(12)); background = rounded(Color.rgb(248, 248, 248), 12) }
+            item.addView(TextView(this).apply { text = "●"; textSize = 19f; gravity = Gravity.CENTER; setTextColor(color) })
+            item.addView(TextView(this).apply { text = title; textSize = 11f; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD); setTextColor(color) })
+            bands.addView(item, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(3); rightMargin = dp(3) })
+        }
+        addBand("RUIM", Color.rgb(205, 55, 55))
+        addBand("ANALISAR", Color.rgb(205, 140, 20))
+        addBand("BOA", Color.rgb(30, 155, 90))
+        traffic.addView(bands)
+        page.addView(traffic, marginParams(bottom = 14))
         val sizeCard = card()
         sizeCard.addView(TextView(this).apply { text = "TAMANHO DA ETIQUETA"; textSize = 11f; letterSpacing = .08f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
         val sizeValue = TextView(this).apply { textSize = 14f; setTextColor(green); setTypeface(null, Typeface.BOLD); setPadding(0, dp(7), 0, dp(2)) }
@@ -156,14 +171,14 @@ class MainActivity : Activity() {
 
         val permissions = card()
         permissions.addView(TextView(this).apply {
-            text = "CONFIGURAÇÃO INICIAL"
+            text = "PERMISSÕES E CONEXÃO"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(white)
             setTypeface(null, Typeface.BOLD)
         })
         permissions.addView(TextView(this).apply {
-            text = "Libere as duas permissões para o indicador aparecer sobre o Uber ou a 99."
+            text = "Ative as permissões para o semáforo aparecer sobre os aplicativos."
             textSize = 12f
             setTextColor(muted)
             setPadding(0, dp(5), 0, dp(12))
@@ -202,7 +217,7 @@ class MainActivity : Activity() {
         page.addView(permissions, marginParams(bottom = 14))
 
         page.addView(TextView(this).apply {
-            text = "IMPORTANTE  •  Os valores são estimativas brutas e não descontam combustível, manutenção, pedágios ou taxas. A leitura automática depende dos dados que Uber e 99 disponibilizam ao Android; ainda precisa ser validada em ofertas reais."
+            text = "O Calcula Corrida apenas analisa as informações visíveis da oferta. Não aceita nem recusa corridas."
             textSize = 11f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
