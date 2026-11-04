@@ -3,6 +3,7 @@ package br.com.calculacorrida
 import android.app.Activity
 import android.os.Bundle
 import android.content.Intent
+import android.content.ComponentName
 import android.provider.Settings
 import android.net.Uri
 import android.graphics.Color
@@ -22,13 +23,14 @@ class MainActivity : Activity() {
     private lateinit var minKm: EditText
     private lateinit var minHour: EditText
 
-    private val bg = Color.rgb(10, 18, 29)
-    private val panel = Color.rgb(20, 33, 49)
-    private val field = Color.rgb(12, 24, 38)
+    private val bg = Color.rgb(5, 5, 7)
+    private val panel = Color.rgb(22, 20, 20)
+    private val field = Color.rgb(13, 12, 12)
     private val white = Color.rgb(244, 248, 252)
     private val muted = Color.rgb(157, 174, 191)
-    private val green = Color.rgb(33, 190, 112)
-    private val blue = Color.rgb(49, 117, 175)
+    private val green = Color.rgb(255, 125, 25)
+    private val red = Color.rgb(224, 50, 50)
+    private val blue = Color.rgb(232, 91, 25)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -161,8 +163,18 @@ class MainActivity : Activity() {
             }
         }
         permissions.addView(overlayButton, marginParams(bottom = 9))
-        val accessButton = actionButton("2  •  ATIVAR LEITURA DE OFERTAS", Color.rgb(43, 59, 78))
-        accessButton.setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        val accessButton = actionButton("2  •  ATIVAR LEITURA DE OFERTAS", Color.rgb(184, 48, 38))
+        accessButton.setOnClickListener {
+            val component = ComponentName(this, OfferAccessibilityService::class.java)
+            try {
+                val detailIntent = Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+                    .putExtra("android.provider.extra.ACCESSIBILITY_SERVICE_COMPONENT_NAME", component.flattenToString())
+                startActivity(detailIntent)
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            Toast.makeText(this, "Na lista, abra Calcula Corrida e ligue a chave.", Toast.LENGTH_LONG).show()
+        }
         permissions.addView(accessButton)
         page.addView(permissions, marginParams(bottom = 14))
 
@@ -253,7 +265,7 @@ class MainActivity : Activity() {
             status.text = if (overlayAllowed) "Permissões: janela flutuante autorizada" else "Permissões: falta liberar a janela flutuante"
             overlayStatus.text = if (overlayAllowed) "✓  Janela flutuante autorizada" else "○  Janela flutuante não autorizada"
             val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-                ?.contains(packageName) == true
+                ?.contains(ComponentName(this, OfferAccessibilityService::class.java).flattenToString()) == true
             accessibilityStatus.text = if (enabled) "✓  Leitura de ofertas ativada" else "○  Leitura de ofertas ainda desativada"
             overlayStatus.setTextColor(if (overlayAllowed) green else muted)
             accessibilityStatus.setTextColor(if (enabled) green else muted)
