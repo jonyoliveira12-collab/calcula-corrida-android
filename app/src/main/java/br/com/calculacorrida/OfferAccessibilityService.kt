@@ -13,6 +13,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.PixelFormat
 import android.view.View
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
@@ -42,16 +43,55 @@ class OfferAccessibilityService : AccessibilityService() {
                 gravity = Gravity.CENTER
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(235, 91, 35)); setStroke(dp(2), Color.WHITE) }
                 isClickable = true
-                setOnClickListener {
-                    val intent = packageManager.getLaunchIntentForPackage(packageName)
-                    intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    if (intent != null) startActivity(intent)
-                }
+                contentDescription = "Botão CC. Arraste para mover ou toque para abrir o aplicativo."
             }
             val t = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
-            val p = WindowManager.LayoutParams(dp(46), dp(46), t, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT)
-            p.gravity = Gravity.TOP or Gravity.RIGHT
-            p.x = dp(8); p.y = dp(220)
+            val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val p = WindowManager.LayoutParams(
+                dp(46), dp(46), t,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            p.gravity = Gravity.TOP or Gravity.LEFT
+            p.x = prefs.getInt("bubble_x", dp(8)).coerceAtLeast(0)
+            p.y = prefs.getInt("bubble_y", dp(220)).coerceAtLeast(0)
+            var downX = 0f
+            var downY = 0f
+            var initialX = p.x
+            var initialY = p.y
+            var moved = false
+            v.setOnTouchListener { view, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX; downY = event.rawY
+                        initialX = p.x; initialY = p.y; moved = false
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = (event.rawX - downX).toInt()
+                        val dy = (event.rawY - downY).toInt()
+                        if (kotlin.math.abs(dx) > dp(4) || kotlin.math.abs(dy) > dp(4)) moved = true
+                        if (moved) {
+                            p.x = (initialX + dx).coerceIn(0, (resources.displayMetrics.widthPixels - dp(46)).coerceAtLeast(0))
+                            p.y = (initialY + dy).coerceIn(0, (resources.displayMetrics.heightPixels - dp(46)).coerceAtLeast(0))
+                            try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view, p) } catch (_: Exception) {}
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (moved) {
+                            prefs.edit().putInt("bubble_x", p.x).putInt("bubble_y", p.y).apply()
+                        } else {
+                            val intent = packageManager.getLaunchIntentForPackage(packageName)
+                            intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            if (intent != null) startActivity(intent)
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> true
+                    else -> false
+                }
+            }
             try { (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, p); bubble = v } catch (_: Exception) { }
         }
     }
@@ -87,7 +127,6 @@ class OfferAccessibilityService : AccessibilityService() {
         // Faz OCR em intervalos curtos e só mostra o semáforo quando encontrar dados reais.
         showDiagnostic("UBER/99 ATIVO • AGUARDANDO OFERTA")
         readOfferByScreenshot()
-        calculateAndShow(offer, findFareBounds(root))
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?) {
