@@ -5,31 +5,258 @@ import android.os.Bundle
 import android.content.Intent
 import android.provider.Settings
 import android.net.Uri
-import android.widget.*
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.content.Context
+import android.text.InputType
+import android.widget.*
 
 class MainActivity : Activity() {
     private lateinit var status: TextView
+    private lateinit var overlayStatus: TextView
+    private lateinit var accessibilityStatus: TextView
+    private lateinit var minKm: EditText
+    private lateinit var minHour: EditText
+
+    private val bg = Color.rgb(10, 18, 29)
+    private val panel = Color.rgb(20, 33, 49)
+    private val field = Color.rgb(12, 24, 38)
+    private val white = Color.rgb(244, 248, 252)
+    private val muted = Color.rgb(157, 174, 191)
+    private val green = Color.rgb(33, 190, 112)
+    private val blue = Color.rgb(49, 117, 175)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val prefs=getSharedPreferences("settings",MODE_PRIVATE)
-        val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(28,36,28,28); setBackgroundColor(Color.rgb(244,247,250)) }
-        root.addView(TextView(this).apply { text="CALCULA CORRIDA"; textSize=25f; setTextColor(Color.rgb(20,42,62)); setTypeface(null,Typeface.BOLD) })
-        root.addView(TextView(this).apply { text="Análise automática de ofertas • Uber e 99"; textSize=14f; setTextColor(Color.DKGRAY); setPadding(0,8,0,24) })
-        status=TextView(this).apply { textSize=14f; setTextColor(Color.DKGRAY) }; root.addView(status)
-        val minKm=EditText(this).apply { hint="Mínimo por km (ex.: 1,80)"; inputType=8194; setText(prefs.getFloat("min_per_km",1.80f).toString()) }
-        val minHour=EditText(this).apply { hint="Mínimo por hora (ex.: 35)"; inputType=8194; setText(prefs.getFloat("min_per_hour",35f).toString()) }
-        root.addView(minKm); root.addView(minHour)
-        root.addView(Button(this).apply { text="SALVAR MEUS LIMITES"; setOnClickListener {
-            val km=minKm.text.toString().replace(",",".").toFloatOrNull(); val hour=minHour.text.toString().replace(",",".").toFloatOrNull()
-            if(km==null||hour==null||km<=0||hour<=0) Toast.makeText(this@MainActivity,"Informe valores válidos.",Toast.LENGTH_SHORT).show()
-            else { prefs.edit().putFloat("min_per_km",km).putFloat("min_per_hour",hour).apply(); Toast.makeText(this@MainActivity,"Limites salvos!",Toast.LENGTH_SHORT).show() }
-        } })
-        root.addView(Button(this).apply { text="1. AUTORIZAR JANELA FLUTUANTE"; setOnClickListener { if(!Settings.canDrawOverlays(this@MainActivity)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName"))) } })
-        root.addView(Button(this).apply { text="2. ATIVAR LEITURA DE OFERTAS"; setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } })
-        root.addView(TextView(this).apply { text="A leitura depende de autorização do Android e de os aplicativos exporem os textos da oferta. O app apenas calcula: não aceita, recusa nem toca nos botões do Uber ou da 99. Valores brutos, sem descontos."; textSize=12f; setTextColor(Color.DKGRAY); setPadding(0,22,0,0) })
-        setContentView(ScrollView(this).apply { addView(root) })
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        window.decorView.systemUiVisibility = 0
+
+        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(30))
+            setBackgroundColor(bg)
+        }
+
+        val brand = TextView(this).apply {
+            text = "CALCULA CORRIDA"
+            textSize = 23f
+            letterSpacing = .07f
+            setTextColor(white)
+            setTypeface(null, Typeface.BOLD)
+        }
+        page.addView(brand)
+        page.addView(TextView(this).apply {
+            text = "DECIDA MELHOR. DIRIJA COM MAIS CONTROLE."
+            textSize = 10f
+            letterSpacing = .08f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(18))
+        })
+
+        val hero = card()
+        hero.addView(TextView(this).apply {
+            text = "ANÁLISE DE CORRIDAS"
+            textSize = 11f
+            letterSpacing = .08f
+            setTextColor(green)
+            setTypeface(null, Typeface.BOLD)
+        })
+        hero.addView(TextView(this).apply {
+            text = "Uber e 99"
+            textSize = 27f
+            setTextColor(white)
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, dp(5), 0, dp(4))
+        })
+        hero.addView(TextView(this).apply {
+            text = "O app mostra uma estimativa da oferta e classifica o resultado. Não aceita nem recusa corridas."
+            textSize = 13f
+            setTextColor(muted)
+            setLineSpacing(dp(3).toFloat(), 1f)
+        })
+        page.addView(hero, marginParams(bottom = 14))
+
+        val statusCard = card()
+        statusCard.addView(TextView(this).apply {
+            text = "STATUS DO APLICATIVO"
+            textSize = 10f
+            letterSpacing = .08f
+            setTextColor(muted)
+            setTypeface(null, Typeface.BOLD)
+        })
+        status = TextView(this).apply {
+            textSize = 14f
+            setTextColor(white)
+            setPadding(0, dp(9), 0, 0)
+        }
+        statusCard.addView(status)
+        overlayStatus = statusLine("Janela flutuante: verificando…")
+        accessibilityStatus = statusLine("Leitura das ofertas: ative nas configurações")
+        statusCard.addView(overlayStatus)
+        statusCard.addView(accessibilityStatus)
+        page.addView(statusCard, marginParams(bottom = 14))
+
+        val limits = card()
+        limits.addView(TextView(this).apply {
+            text = "SEUS LIMITES"
+            textSize = 11f
+            letterSpacing = .08f
+            setTextColor(white)
+            setTypeface(null, Typeface.BOLD)
+        })
+        limits.addView(TextView(this).apply {
+            text = "Defina quanto deseja receber, no mínimo."
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(10))
+        })
+        minKm = numberField("Valor mínimo por quilômetro", prefs.getFloat("min_per_km", 1.80f).toString())
+        minHour = numberField("Valor mínimo por hora", prefs.getFloat("min_per_hour", 35f).toString())
+        limits.addView(fieldLabel("MÍNIMO POR KM"))
+        limits.addView(minKm, marginParams(bottom = 10))
+        limits.addView(fieldLabel("MÍNIMO POR HORA"))
+        limits.addView(minHour)
+        val save = actionButton("SALVAR MEUS LIMITES", green)
+        limits.addView(save, marginParams(top = 14))
+        save.setOnClickListener {
+            val km = minKm.text.toString().replace(",", ".").toFloatOrNull()
+            val hour = minHour.text.toString().replace(",", ".").toFloatOrNull()
+            if (km == null || hour == null || km <= 0 || hour <= 0) {
+                Toast.makeText(this, "Informe valores válidos.", Toast.LENGTH_SHORT).show()
+            } else {
+                prefs.edit().putFloat("min_per_km", km).putFloat("min_per_hour", hour).apply()
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(minHour.windowToken, 0)
+                Toast.makeText(this, "Limites salvos!", Toast.LENGTH_SHORT).show()
+            }
+        }
+        page.addView(limits, marginParams(bottom = 14))
+
+        val permissions = card()
+        permissions.addView(TextView(this).apply {
+            text = "CONFIGURAÇÃO INICIAL"
+            textSize = 11f
+            letterSpacing = .08f
+            setTextColor(white)
+            setTypeface(null, Typeface.BOLD)
+        })
+        permissions.addView(TextView(this).apply {
+            text = "Libere as duas permissões para o indicador aparecer sobre o Uber ou a 99."
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(12))
+        })
+        val overlayButton = actionButton("1  •  PERMITIR JANELA FLUTUANTE", blue)
+        overlayButton.setOnClickListener {
+            if (!Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            } else {
+                Toast.makeText(this, "Janela flutuante já autorizada.", Toast.LENGTH_SHORT).show()
+            }
+        }
+        permissions.addView(overlayButton, marginParams(bottom = 9))
+        val accessButton = actionButton("2  •  ATIVAR LEITURA DE OFERTAS", Color.rgb(43, 59, 78))
+        accessButton.setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        permissions.addView(accessButton)
+        page.addView(permissions, marginParams(bottom = 14))
+
+        page.addView(TextView(this).apply {
+            text = "IMPORTANTE  •  Os valores são estimativas brutas e não descontam combustível, manutenção, pedágios ou taxas. A leitura automática depende dos dados que Uber e 99 disponibilizam ao Android; ainda precisa ser validada em ofertas reais."
+            textSize = 11f
+            setTextColor(muted)
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setPadding(dp(3), dp(2), dp(3), dp(12))
+        })
+
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(bg)
+            isFillViewport = true
+            addView(page)
+        })
     }
-    override fun onResume(){ super.onResume(); if(::status.isInitialized) status.text=if(Settings.canDrawOverlays(this)) "Janela flutuante autorizada. Ative também a leitura nas configurações de acessibilidade." else "Falta conceder a permissão de janela flutuante." }
+
+    private fun card(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(17), dp(17), dp(17), dp(17))
+        background = rounded(panel, 18)
+    }
+
+    private fun fieldLabel(value: String) = TextView(this).apply {
+        text = value
+        textSize = 10f
+        letterSpacing = .07f
+        setTextColor(muted)
+        setTypeface(null, Typeface.BOLD)
+        setPadding(dp(2), 0, 0, dp(6))
+    }
+
+    private fun numberField(label: String, value: String) = EditText(this).apply {
+        hint = label
+        setSingleLine(true)
+        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        textSize = 17f
+        setTextColor(white)
+        setHintTextColor(Color.rgb(111, 130, 149))
+        setPadding(dp(13), dp(12), dp(13), dp(12))
+        setText(value.replace(".", ","))
+        background = rounded(field, 11, Color.rgb(48, 67, 87))
+    }
+
+    private fun actionButton(label: String, color: Int) = Button(this).apply {
+        text = label
+        textSize = 12f
+        letterSpacing = .02f
+        setTextColor(Color.WHITE)
+        setTypeface(null, Typeface.BOLD)
+        isAllCaps = false
+        background = rounded(color, 11)
+        minHeight = dp(50)
+        setPadding(dp(12), dp(8), dp(12), dp(8))
+        stateListAnimator = null
+    }
+
+    private fun statusLine(value: String) = TextView(this).apply {
+        text = "•  $value"
+        textSize = 12f
+        setTextColor(muted)
+        setPadding(0, dp(6), 0, 0)
+    }
+
+    private fun rounded(color: Int, radius: Int, stroke: Int? = null): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            if (stroke != null) setStroke(dp(1), stroke)
+        }
+
+    private fun marginParams(bottom: Int = 0, top: Int = 0): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            if (bottom > 0) bottomMargin = dp(bottom)
+            if (top > 0) topMargin = dp(top)
+        }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    override fun onResume() {
+        super.onResume()
+        if (::status.isInitialized) {
+            val overlayAllowed = Settings.canDrawOverlays(this)
+            status.text = if (overlayAllowed) "Permissões: janela flutuante autorizada" else "Permissões: falta liberar a janela flutuante"
+            overlayStatus.text = if (overlayAllowed) "✓  Janela flutuante autorizada" else "○  Janela flutuante não autorizada"
+            val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+                ?.contains(packageName) == true
+            accessibilityStatus.text = if (enabled) "✓  Leitura de ofertas ativada" else "○  Leitura de ofertas ainda desativada"
+            overlayStatus.setTextColor(if (overlayAllowed) green else muted)
+            accessibilityStatus.setTextColor(if (enabled) green else muted)
+        }
+    }
 }
