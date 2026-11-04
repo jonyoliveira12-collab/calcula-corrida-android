@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs";
+import crypto from "crypto";
 
 const app = express();
 app.use(express.json({ limit: "64kb" }));
@@ -86,6 +88,38 @@ app.post("/v1/analyze", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "analysis_failed" });
+  }
+});
+
+// Save email and password (passwords are not stored raw).
+app.post('/v1/credentials', async (req, res) => {
+  try {
+    const { email, password } = req.body ?? {};
+    if (typeof email !== 'string' || !email.includes('@')) return res.status(400).json({ error: 'invalid_email' });
+    if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: 'invalid_password', message: 'password must have at least 6 characters' });
+
+    // Derive a secure hash with random salt using scrypt
+    const salt = crypto.randomBytes(16);
+    const derived = crypto.scryptSync(password, salt, 64);
+    const record = { email, salt: salt.toString('hex'), hash: derived.toString('hex'), createdAt: new Date().toISOString() };
+
+    const filePath = new URL('./credentials.json', import.meta.url).pathname;
+    let list = [];
+    try {
+      const raw = await fs.promises.readFile(filePath, 'utf8');
+      list = JSON.parse(raw) || [];
+      if (!Array.isArray(list)) list = [];
+    } catch (e) {
+      // file may not exist yet; ignore
+    }
+    list.push(record);
+    await fs.promises.writeFile(filePath, JSON.stringify(list, null, 2), 'utf8');
+
+    // Do not return password or hashes to the client
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Failed to save credentials:', err && err.message);
+    res.status(500).json({ error: 'save_failed' });
   }
 });
 
