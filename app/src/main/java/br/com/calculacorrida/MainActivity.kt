@@ -15,6 +15,7 @@ import android.view.View
 import android.content.Context
 import android.text.InputType
 import android.widget.*
+import android.os.Build
 
 class MainActivity : Activity() {
     private val bg = Color.rgb(12, 12, 13)
@@ -117,7 +118,11 @@ class MainActivity : Activity() {
         val aiSwitch = Switch(this).apply {
             isChecked = prefs.getBoolean("copilot_enabled", true)
             buttonTintList = android.content.res.ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("copilot_enabled", checked).apply() }
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("copilot_enabled", checked).apply()
+                sendBroadcast(Intent("br.com.calculacorrida.ACTION_FEATURES_CHANGED"))
+                if (checked) ensureOverlayPermission()
+            }
         }
         copilotRow.addView(aiSwitch)
         copilot.addView(copilotRow)
@@ -131,7 +136,15 @@ class MainActivity : Activity() {
         val trafficSwitch = Switch(this).apply {
             isChecked = prefs.getBoolean("traffic_enabled", true)
             buttonTintList = android.content.res.ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("traffic_enabled", checked).apply() }
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("traffic_enabled", checked).apply()
+                sendBroadcast(Intent("br.com.calculacorrida.ACTION_FEATURES_CHANGED"))
+                if (checked) {
+                    ensureOverlayPermission()
+                    ensureAccessibilityPermission()
+                    ensureNotificationPermission()
+                }
+            }
         }
         trafficRow.addView(trafficSwitch)
         traffic.addView(trafficRow)
@@ -217,16 +230,10 @@ class MainActivity : Activity() {
         content.addView(limits)
         val permissions = card()
         permissions.addView(label("PERMISSÕES DO ANDROID", 11f, gold, true))
-        permissions.addView(action("PERMITIR SOBREPOSIÇÃO", false) {
-            if (!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            else toast("Sobreposição já autorizada.")
-        })
-        permissions.addView(action("ATIVAR LEITURA DE OFERTAS", false) {
-            val component = ComponentName(this, OfferAccessibilityService::class.java)
-            try {
-                startActivity(Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").putExtra("android.provider.extra.ACCESSIBILITY_SERVICE_COMPONENT_NAME", component.flattenToString()))
-            } catch (_: Exception) { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-        })
+        permissions.addView(action("PERMITIR SOBREPOSIÇÃO (BOLINHA CC)", false) { ensureOverlayPermission() })
+        permissions.addView(action("PERMITIR NOTIFICAÇÕES", false) { ensureNotificationPermission() })
+        permissions.addView(action("ATIVAR LEITURA DE OFERTAS (ACESSIBILIDADE)", false) { ensureAccessibilityPermission() })
+        permissions.addView(label("O semáforo precisa da leitura de ofertas ativada. O copiloto controla a bolinha CC e a análise flutuante.", 11f, muted, false, 5, 0))
         permissions.addView(action("AJUSTAR TAMANHO DA ETIQUETA", false) {
             val seek = SeekBar(this).apply {
                 max = 45
@@ -244,6 +251,30 @@ class MainActivity : Activity() {
             addView(label("SOBRE O JHONDRIVER", 11f, gold, true))
             addView(label("Versão inicial • Análise de ofertas Uber e 99. Sem câmera.", 12f, muted, false, 0, 0))
         }, margin(0, 10))
+    }
+
+
+    private fun ensureOverlayPermission() {
+        if (!Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        } else toast("Permissão de sobreposição já autorizada.")
+    }
+
+    private fun ensureAccessibilityPermission() {
+        val component = ComponentName(this, OfferAccessibilityService::class.java)
+        try {
+            startActivity(Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+                .putExtra("android.provider.extra.ACCESSIBILITY_SERVICE_COMPONENT_NAME", component.flattenToString()))
+        } catch (_: Exception) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 701)
+        } else toast("Permissão de notificações já autorizada.")
     }
 
     private fun rangeColumn(title: String, color: Int, km: String, hour: String): LinearLayout {
