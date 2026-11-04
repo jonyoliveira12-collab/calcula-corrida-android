@@ -58,26 +58,99 @@ class MainActivity : Activity() {
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
-            setPadding(0, dp(5), 0, dp(18))
+            setPadding(0, dp(5), 0, dp(14))
         })
+
+        // Dashboard principal redesenhado: identidade preta e dourada, com métricas em destaque.
+        val dashboard = card().apply {
+            background = rounded(Color.rgb(17, 16, 14), 20, Color.rgb(112, 83, 35))
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+        }
+        val dashboardHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        dashboardHeader.addView(TextView(this).apply {
+            text = "PAINEL DO MOTORISTA"
+            textSize = 11f
+            letterSpacing = .09f
+            setTextColor(muted)
+            setTypeface(null, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        dashboardHeader.addView(TextView(this).apply {
+            text = "●  PRONTO"
+            textSize = 10f
+            setTextColor(Color.rgb(75, 190, 125))
+            setTypeface(null, Typeface.BOLD)
+            setPadding(dp(9), dp(6), dp(9), dp(6))
+            background = rounded(Color.rgb(20, 48, 35), 20)
+        })
+        dashboard.addView(dashboardHeader)
+        dashboard.addView(TextView(this).apply {
+            text = "Seu desempenho começa aqui"
+            textSize = 21f
+            setTextColor(white)
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, dp(16), 0, dp(3))
+        })
+        dashboard.addView(TextView(this).apply {
+            text = "Resumo das suas corridas"
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, 0, 0, dp(15))
+        })
+        val metrics = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun metric(label: String, value: String, suffix: String) {
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10), dp(12), dp(8), dp(12))
+                background = rounded(Color.rgb(27, 25, 21), 13)
+            }
+            box.addView(TextView(this).apply {
+                text = label
+                textSize = 9f
+                setTextColor(muted)
+                setTypeface(null, Typeface.BOLD)
+            })
+            box.addView(TextView(this).apply {
+                text = value
+                textSize = 18f
+                setTextColor(Color.rgb(226, 183, 94))
+                setTypeface(null, Typeface.BOLD)
+                setPadding(0, dp(6), 0, 0)
+            })
+            box.addView(TextView(this).apply {
+                text = suffix
+                textSize = 9f
+                setTextColor(muted)
+            })
+            metrics.addView(box, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                leftMargin = dp(3); rightMargin = dp(3)
+            })
+        }
+        metric("GANHOS HOJE", "R$ 0,00", "Aguardando dados")
+        metric("POR HORA", "R$ 0,00", "Média atual")
+        metric("CORRIDAS", "0", "Hoje")
+        dashboard.addView(metrics)
+        page.addView(dashboard, marginParams(bottom = 14))
 
         val hero = card()
         hero.addView(TextView(this).apply {
-            text = "SEU PAINEL DE CORRIDAS"
+            text = "ANÁLISE INTELIGENTE"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(green)
             setTypeface(null, Typeface.BOLD)
         })
         hero.addView(TextView(this).apply {
-            text = "Mais clareza. Mais controle."
+            text = "Cada corrida sob controle."
             textSize = 27f
             setTextColor(white)
             setTypeface(null, Typeface.BOLD)
             setPadding(0, dp(5), 0, dp(4))
         })
         hero.addView(TextView(this).apply {
-            text = "Analise ofertas da Uber e 99 em tempo real e acompanhe seus resultados em um só lugar."
+            text = "Veja valor por KM, ganhos por hora e classificação da oferta em uma etiqueta compacta sobre o aplicativo."
             textSize = 13f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -104,7 +177,7 @@ class MainActivity : Activity() {
         statusCard.addView(accessibilityStatus)
         page.addView(statusCard, marginParams(bottom = 14))
         val traffic = card()
-        traffic.addView(TextView(this).apply { text = "SEU SEMÁFORO DE CORRIDAS"; textSize = 16f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
+        traffic.addView(TextView(this).apply { text = "CLASSIFICAÇÃO DAS OFERTAS"; textSize = 16f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
         traffic.addView(TextView(this).apply { text = "Classificação automática das ofertas"; textSize = 12f; setTextColor(muted); setPadding(0, dp(4), 0, dp(13)) })
         val bands = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun addBand(title: String, color: Int) {
@@ -135,7 +208,7 @@ class MainActivity : Activity() {
 
         val limits = card()
         limits.addView(TextView(this).apply {
-            text = "SUAS METAS DE RENTABILIDADE"
+            text = "META DE GANHO POR CORRIDA"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(white)
@@ -171,7 +244,7 @@ class MainActivity : Activity() {
 
         val permissions = card()
         permissions.addView(TextView(this).apply {
-            text = "CONEXÃO E PERMISSÕES"
+            text = "CENTRAL DE CONEXÃO"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(white)
