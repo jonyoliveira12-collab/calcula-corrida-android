@@ -26,3 +26,12 @@ jobs:
           name: jhondriver-feature-controls-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Package complete Android project
+        run: |
+          zip -r JHONDRIVER-projeto-completo.zip . \
+            -x ".git/*" "**/.gradle/*" "**/build/*"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JHONDRIVER-projeto-completo
+          path: JHONDRIVER-projeto-completo.zip
+          if-no-files-found: error
