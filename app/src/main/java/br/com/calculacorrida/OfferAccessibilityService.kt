@@ -34,6 +34,12 @@ class OfferAccessibilityService : AccessibilityService() {
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(235, 91, 35)); setStroke(dp(2), Color.WHITE) }
+                isClickable = true
+                setOnClickListener {
+                    val intent = packageManager.getLaunchIntentForPackage(packageName)
+                    intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    if (intent != null) startActivity(intent)
+                }
             }
             val t = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
             val p = WindowManager.LayoutParams(dp(46), dp(46), t, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT)
