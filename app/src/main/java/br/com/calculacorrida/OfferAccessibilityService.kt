@@ -125,7 +125,6 @@ class OfferAccessibilityService : AccessibilityService() {
         }
         // Estar online no app não significa que uma oferta chegou.
         // Faz OCR em intervalos curtos e só mostra o semáforo quando encontrar dados reais.
-        showDiagnostic("UBER/99 ATIVO • AGUARDANDO OFERTA")
         readOfferByScreenshot()
     }
 
@@ -136,14 +135,14 @@ class OfferAccessibilityService : AccessibilityService() {
             prefs.getFloat("min_per_km", 1.80f).toDouble(),
             prefs.getFloat("min_per_hour", 35f).toDouble()
         ) ?: run {
-            showDiagnostic("OFERTA LIDA • DADOS INCOMPLETOS")
+            hideOverlay()
             return
         }
         showOffer(result, offer.passengerRating, anchor)
     }
 
     private fun readOfferByScreenshot() {
-        if (Build.VERSION.SDK_INT < 30) { showDiagnostic("OCR exige Android 11 ou superior"); return }
+        if (Build.VERSION.SDK_INT < 30) { hideOverlay(); return }
         val now = SystemClock.elapsedRealtime()
         if (now - lastOcrAt < 1500L) return
         lastOcrAt = now
@@ -155,7 +154,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 recognizer.process(InputImage.fromBitmap(bmp, 0))
                     .addOnSuccessListener { vision ->
                         val parsed = OfferTextParser.parse(vision.text)
-                        if (parsed == null) { showDiagnostic("UBER/99 ATIVO • AGUARDANDO OFERTA") }
+                        if (parsed == null) { hideOverlay() }
                         else {
                             val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
                             calculateAndShow(parsed, null)
@@ -237,12 +236,50 @@ class OfferAccessibilityService : AccessibilityService() {
             val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
             val params = WindowManager.LayoutParams(
                 dp(overlayWidth), ViewGroup.LayoutParams.WRAP_CONTENT, type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             )
             params.gravity = Gravity.TOP or Gravity.LEFT
-            params.x = dp(12)
-            params.y = dp(150)
+            params.x = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("offer_tag_x", dp(12)).coerceAtLeast(0)
+            params.y = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("offer_tag_y", dp(150)).coerceAtLeast(0)
+            var downX = 0f
+            var downY = 0f
+            var startX = params.x
+            var startY = params.y
+            var moved = false
+            view.setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX
+                        downY = event.rawY
+                        startX = params.x
+                        startY = params.y
+                        moved = false
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = (event.rawX - downX).toInt()
+                        val dy = (event.rawY - downY).toInt()
+                        if (kotlin.math.abs(dx) > dp(5) || kotlin.math.abs(dy) > dp(5)) moved = true
+                        if (moved) {
+                            params.x = (startX + dx).coerceIn(0, (resources.displayMetrics.widthPixels - v.width).coerceAtLeast(0))
+                            params.y = (startY + dy).coerceIn(0, (resources.displayMetrics.heightPixels - v.height).coerceAtLeast(0))
+                            try { wm.updateViewLayout(v, params) } catch (_: Exception) {}
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (moved) {
+                            getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+                                .putInt("offer_tag_x", params.x).putInt("offer_tag_y", params.y).apply()
+                        } else {
+                            hideOverlay()
+                        }
+                        true
+                    }
+                    else -> true
+                }
+            }
             wm.addView(view, params)
             overlay = view
             overlayParams = params
@@ -253,9 +290,11 @@ class OfferAccessibilityService : AccessibilityService() {
             params.width = dp(overlayWidth)
             overlay?.textSize = 13f * scale
             overlay?.setPadding((13 * scale).toInt(), (10 * scale).toInt(), (13 * scale).toInt(), (10 * scale).toInt())
-            val desiredX = anchor.left.coerceIn(0, (screenWidth - dp(overlayWidth)).coerceAtLeast(0))
-            params.x = desiredX
-            params.y = (anchor.top - dp(118)).coerceAtLeast(dp(55))
+            val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            if (!prefs.contains("offer_tag_x")) {
+                params.x = anchor.left.coerceIn(0, (screenWidth - dp(overlayWidth)).coerceAtLeast(0))
+                params.y = (anchor.top - dp(118)).coerceAtLeast(dp(55))
+            }
             try { wm.updateViewLayout(overlay, params) } catch (_: Exception) {}
         }
         return overlay
@@ -275,7 +314,7 @@ class OfferAccessibilityService : AccessibilityService() {
             setStroke(dp(3), color)
         }
         view.background = accent
-        view.text = "$label\nR$ %.2f  •  R$ %.2f/km\n%.0f min  •  R$ %.2f/h  •  Nota %s".format(
+        view.text = "× FECHAR   •   $label\nR$ %.2f  •  R$ %.2f/km\n%.0f min  •  R$ %.2f/h  •  Nota %s".format(
             r.fare, r.perKm, r.minutes, r.perHour, rating
         )
         view.visibility = View.VISIBLE
