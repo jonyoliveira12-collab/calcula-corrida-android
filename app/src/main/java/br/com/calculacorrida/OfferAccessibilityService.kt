@@ -75,16 +75,22 @@ class OfferAccessibilityService : AccessibilityService() {
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
-        if (screenText.isBlank()) return
-        if (screenText == lastText) return
-        lastText = screenText
-
-        val offer = OfferTextParser.parse(screenText)
-        if (offer == null) {
-            showDiagnostic("OFERTA DETECTADA • ANALISANDO TELA")
-            readOfferByScreenshot()
-            return
+        if (screenText.isNotBlank() && screenText != lastText) {
+            lastText = screenText
+            val offer = OfferTextParser.parse(screenText)
+            if (offer != null) {
+                calculateAndShow(offer, findFareBounds(root))
+                return
+            }
         }
+        // Estar online no app não significa que uma oferta chegou.
+        // Faz OCR em intervalos curtos e só mostra o semáforo quando encontrar dados reais.
+        showDiagnostic("UBER/99 ATIVO • AGUARDANDO OFERTA")
+        readOfferByScreenshot()
+        calculateAndShow(offer, findFareBounds(root))
+    }
+
+    private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?) {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val result = TripCalculator.calculate(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
@@ -94,7 +100,6 @@ class OfferAccessibilityService : AccessibilityService() {
             showDiagnostic("OFERTA LIDA • DADOS INCOMPLETOS")
             return
         }
-        val anchor = findFareBounds(root)
         showOffer(result, offer.passengerRating, anchor)
     }
 
@@ -111,11 +116,10 @@ class OfferAccessibilityService : AccessibilityService() {
                 recognizer.process(InputImage.fromBitmap(bmp, 0))
                     .addOnSuccessListener { vision ->
                         val parsed = OfferTextParser.parse(vision.text)
-                        if (parsed == null) { showDiagnostic("OFERTA VISÍVEL • TEXTO NÃO RECONHECIDO") }
+                        if (parsed == null) { showDiagnostic("UBER/99 ATIVO • AGUARDANDO OFERTA") }
                         else {
                             val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
-                            val calc = TripCalculator.calculate(parsed.fare, parsed.pickupKm, parsed.tripKm, parsed.minutes, pref.getFloat("min_per_km", 1.80f).toDouble(), pref.getFloat("min_per_hour", 35f).toDouble())
-                            if (calc == null) showDiagnostic("DADOS INCOMPLETOS NA OFERTA") else showOffer(calc, parsed.passengerRating, null)
+                            calculateAndShow(parsed, null)
                         }
                     }
                     .addOnFailureListener { showDiagnostic("ERRO NO OCR DA OFERTA") }
