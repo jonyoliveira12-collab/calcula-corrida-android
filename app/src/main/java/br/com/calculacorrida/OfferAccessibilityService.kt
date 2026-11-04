@@ -38,7 +38,8 @@ class OfferAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        if (Settings.canDrawOverlays(this) && bubble == null) {
+        val featurePrefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        if (Settings.canDrawOverlays(this) && bubble == null && featurePrefs.getBoolean("copilot_enabled", true)) {
             val v = TextView(this).apply {
                 text = "CC"
                 textSize = 12f
@@ -109,7 +110,15 @@ class OfferAccessibilityService : AccessibilityService() {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("copilot_enabled", true) || !prefs.getBoolean("traffic_enabled", true)) {
+        val copilotEnabled = prefs.getBoolean("copilot_enabled", true)
+        val trafficEnabled = prefs.getBoolean("traffic_enabled", true)
+        if (!copilotEnabled) {
+            bubble?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
+            bubble = null
+        } else if (bubble == null && Settings.canDrawOverlays(this)) {
+            onServiceConnected()
+        }
+        if (!trafficEnabled) {
             hideOverlay()
             return
         }
