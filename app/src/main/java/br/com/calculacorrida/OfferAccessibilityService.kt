@@ -161,11 +161,11 @@ class OfferAccessibilityService : AccessibilityService() {
                 recognizer.process(InputImage.fromBitmap(bmp, 0))
                     .addOnSuccessListener { vision ->
                         val parsed = OfferTextParser.parse(vision.text)
-                        if (parsed == null) { hideOverlay() }
-                        else {
-                            val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
+                        if (parsed != null) {
                             calculateAndShow(parsed, null)
                         }
+                        // Se a oferta deixar de aparecer na tela, mantém o último resultado
+                        // visível até o motorista tocar em × FECHAR.
                     }
                     .addOnFailureListener { showDiagnostic("ERRO NO OCR DA OFERTA") }
                     .addOnCompleteListener { bmp.recycle() }
