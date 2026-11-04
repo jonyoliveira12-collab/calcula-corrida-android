@@ -57,7 +57,8 @@ class OfferAccessibilityService : AccessibilityService() {
             return
         }
         lastPackage = pkg
-        val root = rootInActiveWindow ?: return
+        // In split-screen, rootInActiveWindow may belong to Maps. Search the driver's own window.
+        val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow ?: return
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
@@ -67,7 +68,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
         val offer = OfferTextParser.parse(screenText)
         if (offer == null) {
-            hideOverlay()
+            showDiagnostic("UBER/99 DETECTADO • LENDO OFERTA")
             return
         }
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -75,9 +76,34 @@ class OfferAccessibilityService : AccessibilityService() {
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
             prefs.getFloat("min_per_km", 1.80f).toDouble(),
             prefs.getFloat("min_per_hour", 35f).toDouble()
-        ) ?: return
+        ) ?: run {
+            showDiagnostic("OFERTA LIDA • DADOS INCOMPLETOS")
+            return
+        }
         val anchor = findFareBounds(root)
         showOffer(result, offer.passengerRating, anchor)
+    }
+
+    private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
+        return try {
+            windows.firstNotNullOfOrNull { window ->
+                val candidate = window.root ?: return@firstNotNullOfOrNull null
+                val rootPackage = candidate.packageName?.toString()?.lowercase().orEmpty()
+                if (rootPackage == pkg.lowercase() || isSupportedDriverApp(rootPackage)) candidate
+                else { candidate.recycle(); null }
+            }
+        } catch (_: Exception) { null }
+    }
+
+    private fun showDiagnostic(message: String) {
+        val view = ensureOverlay(null) ?: return
+        view.background = GradientDrawable().apply {
+            setColor(Color.rgb(24, 24, 26))
+            cornerRadius = dp(12).toFloat()
+            setStroke(dp(2), Color.rgb(218, 166, 67))
+        }
+        view.text = message
+        view.visibility = View.VISIBLE
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
