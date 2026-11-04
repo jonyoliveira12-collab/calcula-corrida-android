@@ -16,6 +16,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
+import android.graphics.Bitmap
+import android.os.SystemClock
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class OfferAccessibilityService : AccessibilityService() {
     private var overlay: TextView? = null
@@ -23,6 +28,8 @@ class OfferAccessibilityService : AccessibilityService() {
     private var lastText = ""
     private var lastPackage = ""
     private var bubble: TextView? = null
+    private var lastOcrAt = 0L
+    private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -74,7 +81,8 @@ class OfferAccessibilityService : AccessibilityService() {
 
         val offer = OfferTextParser.parse(screenText)
         if (offer == null) {
-            showDiagnostic("UBER/99 DETECTADO • LENDO OFERTA")
+            showDiagnostic("OFERTA DETECTADA • ANALISANDO TELA")
+            readOfferByScreenshot()
             return
         }
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -88,6 +96,33 @@ class OfferAccessibilityService : AccessibilityService() {
         }
         val anchor = findFareBounds(root)
         showOffer(result, offer.passengerRating, anchor)
+    }
+
+    private fun readOfferByScreenshot() {
+        if (Build.VERSION.SDK_INT < 30) { showDiagnostic("OCR exige Android 11 ou superior"); return }
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastOcrAt < 1500L) return
+        lastOcrAt = now
+        takeScreenshot(android.view.Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
+            override fun onSuccess(result: ScreenshotResult) {
+                val bmp = try { Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Exception) { null }
+                result.hardwareBuffer.close()
+                if (bmp == null) { showDiagnostic("FALHA AO CAPTURAR TELA"); return }
+                recognizer.process(InputImage.fromBitmap(bmp, 0))
+                    .addOnSuccessListener { vision ->
+                        val parsed = OfferTextParser.parse(vision.text)
+                        if (parsed == null) { showDiagnostic("OFERTA VISÍVEL • TEXTO NÃO RECONHECIDO") }
+                        else {
+                            val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
+                            val calc = TripCalculator.calculate(parsed.fare, parsed.pickupKm, parsed.tripKm, parsed.minutes, pref.getFloat("min_per_km", 1.80f).toDouble(), pref.getFloat("min_per_hour", 35f).toDouble())
+                            if (calc == null) showDiagnostic("DADOS INCOMPLETOS NA OFERTA") else showOffer(calc, parsed.passengerRating, null)
+                        }
+                    }
+                    .addOnFailureListener { showDiagnostic("ERRO NO OCR DA OFERTA") }
+                    .addOnCompleteListener { bmp.recycle() }
+            }
+            override fun onFailure(errorCode: Int) { showDiagnostic("CAPTURA NÃO AUTORIZADA: " + errorCode) }
+        })
     }
 
     private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
@@ -214,6 +249,7 @@ class OfferAccessibilityService : AccessibilityService() {
         overlayParams = null
         bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         bubble = null
+        try { recognizer.close() } catch (_: Exception) { }
         super.onDestroy()
     }
 }
