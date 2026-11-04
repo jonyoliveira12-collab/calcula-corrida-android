@@ -19,6 +19,8 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -30,6 +32,8 @@ class OfferAccessibilityService : AccessibilityService() {
     private var lastPackage = ""
     private var bubble: TextView? = null
     private var lastOcrAt = 0L
+    private val overlayHandler = Handler(Looper.getMainLooper())
+    private var dismissOverlayTask: Runnable? = null
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     override fun onServiceConnected() {
@@ -79,7 +83,9 @@ class OfferAccessibilityService : AccessibilityService() {
                         true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (moved) {
+                        if (closeTap && !moved) {
+                            hideOverlay()
+                        } else if (moved) {
                             prefs.edit().putInt("bubble_x", p.x).putInt("bubble_y", p.y).apply()
                         } else {
                             val intent = packageManager.getLaunchIntentForPackage(packageName)
@@ -247,6 +253,7 @@ class OfferAccessibilityService : AccessibilityService() {
             var startX = params.x
             var startY = params.y
             var moved = false
+            var closeTap = false
             view.setOnTouchListener { v, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
@@ -255,6 +262,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         startX = params.x
                         startY = params.y
                         moved = false
+                        closeTap = event.x >= v.width - dp(78) && event.y <= dp(44)
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -318,9 +326,17 @@ class OfferAccessibilityService : AccessibilityService() {
             r.fare, r.perKm, r.minutes, r.perHour, rating
         )
         view.visibility = View.VISIBLE
+        dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
+        val dismiss = Runnable { hideOverlay() }
+        dismissOverlayTask = dismiss
+        overlayHandler.postDelayed(dismiss, 3000L)
     }
 
-    private fun hideOverlay() { overlay?.visibility = View.GONE }
+    private fun hideOverlay() {
+        dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
+        dismissOverlayTask = null
+        overlay?.visibility = View.GONE
+    }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onInterrupt() { hideOverlay() }
