@@ -1,6 +1,7 @@
 package br.com.calculacorrida
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.content.Intent
 import android.content.ComponentName
@@ -232,10 +233,11 @@ class MainActivity : Activity() {
                 progress = (prefs.getInt("overlay_scale", 85) - 65).coerceIn(0, 45)
             }
             val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(8)); addView(label("Tamanho da etiqueta", 13f, white, true)); addView(seek) }
-            AlertDialogBuilder.show(this, box, "Salvar") {
-                prefs.edit().putInt("overlay_scale", 65 + seek.progress).apply()
-                toast("Tamanho salvo.")
-            }
+            AlertDialog.Builder(this).setTitle("Tamanho da etiqueta").setView(box)
+                .setPositiveButton("Salvar") { _, _ ->
+                    prefs.edit().putInt("overlay_scale", 65 + seek.progress).apply()
+                    toast("Tamanho salvo.")
+                }.setNegativeButton("Cancelar", null).show()
         })
         content.addView(permissions, margin(0, 10))
         content.addView(card().apply {
