@@ -23,20 +23,20 @@ class MainActivity : Activity() {
     private lateinit var minKm: EditText
     private lateinit var minHour: EditText
 
-    private val bg = Color.rgb(246, 246, 244)
-    private val panel = Color.WHITE
-    private val field = Color.rgb(250, 250, 250)
-    private val white = Color.rgb(32, 32, 32)
-    private val muted = Color.rgb(133, 133, 133)
-    private val green = Color.rgb(25, 145, 112)
+    private val bg = Color.rgb(7, 7, 9)
+    private val panel = Color.rgb(22, 22, 25)
+    private val field = Color.rgb(12, 12, 14)
+    private val white = Color.rgb(250, 247, 238)
+    private val muted = Color.rgb(166, 158, 143)
+    private val green = Color.rgb(218, 166, 67)
     private val red = Color.rgb(224, 50, 50)
-    private val blue = Color.rgb(25, 145, 112)
+    private val blue = Color.rgb(178, 126, 35)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(246, 246, 244)
-        window.navigationBarColor = Color.WHITE
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        window.decorView.systemUiVisibility = 0
 
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val page = LinearLayout(this).apply {
@@ -46,7 +46,7 @@ class MainActivity : Activity() {
         }
 
         val brand = TextView(this).apply {
-            text = "CALCULA CORRIDA"
+            text = "JHONDRIVER"
             textSize = 23f
             letterSpacing = .07f
             setTextColor(white)
@@ -54,7 +54,7 @@ class MainActivity : Activity() {
         }
         page.addView(brand)
         page.addView(TextView(this).apply {
-            text = "SEU ASSISTENTE DE CORRIDAS"
+            text = "INTELIGÊNCIA PARA MOTORISTAS"
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
@@ -63,7 +63,7 @@ class MainActivity : Activity() {
 
         val hero = card()
         hero.addView(TextView(this).apply {
-            text = "BEM-VINDO AO CALCULA CORRIDA"
+            text = "BEM-VINDO AO JHONDRIVER"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(green)
@@ -77,7 +77,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(5), 0, dp(4))
         })
         hero.addView(TextView(this).apply {
-            text = "Análise automática de ofertas da Uber e 99, direto na tela enquanto você dirige."
+            text = "Análise inteligente de ofertas da Uber e 99, direto na tela enquanto você dirige."
             textSize = 13f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -108,7 +108,7 @@ class MainActivity : Activity() {
         traffic.addView(TextView(this).apply { text = "Classificação automática das ofertas"; textSize = 12f; setTextColor(muted); setPadding(0, dp(4), 0, dp(13)) })
         val bands = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun addBand(title: String, color: Int) {
-            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(5), dp(12), dp(5), dp(12)); background = rounded(Color.rgb(248, 248, 248), 12) }
+            val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(5), dp(12), dp(5), dp(12)); background = rounded(Color.rgb(31, 29, 25), 12) }
             item.addView(TextView(this).apply { text = "●"; textSize = 19f; gravity = Gravity.CENTER; setTextColor(color) })
             item.addView(TextView(this).apply { text = title; textSize = 11f; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD); setTextColor(color) })
             bands.addView(item, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(3); rightMargin = dp(3) })
@@ -255,7 +255,7 @@ class MainActivity : Activity() {
         setHintTextColor(Color.rgb(111, 130, 149))
         setPadding(dp(13), dp(12), dp(13), dp(12))
         setText(value.replace(".", ","))
-        background = rounded(field, 11, Color.rgb(48, 67, 87))
+        background = rounded(field, 11, Color.rgb(151, 111, 43))
     }
 
     private fun actionButton(label: String, color: Int) = Button(this).apply {
