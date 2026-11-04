@@ -19,8 +19,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
 import android.graphics.Bitmap
 import android.os.SystemClock
-import android.os.Handler
-import android.os.Looper
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -32,8 +30,6 @@ class OfferAccessibilityService : AccessibilityService() {
     private var lastPackage = ""
     private var bubble: TextView? = null
     private var lastOcrAt = 0L
-    private val overlayHandler = Handler(Looper.getMainLooper())
-    private var dismissOverlayTask: Runnable? = null
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     override fun onServiceConnected() {
@@ -109,7 +105,9 @@ class OfferAccessibilityService : AccessibilityService() {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("copilot_enabled", true) || !prefs.getBoolean("traffic_enabled", true)) {
+        val copilotEnabled = prefs.getBoolean("copilot_enabled", true)
+        val trafficEnabled = prefs.getBoolean("traffic_enabled", true)
+        if (!copilotEnabled && !trafficEnabled) {
             hideOverlay()
             return
         }
@@ -265,7 +263,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         startX = params.x
                         startY = params.y
                         moved = false
-                        closeTap = event.x >= v.width - dp(78) && event.y <= dp(44)
+                        closeTap = event.x <= dp(92) && event.y <= dp(44)
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -283,7 +281,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         if (moved) {
                             getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
                                 .putInt("offer_tag_x", params.x).putInt("offer_tag_y", params.y).apply()
-                        } else {
+                        } else if (closeTap) {
                             hideOverlay()
                         }
                         true
@@ -312,6 +310,9 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun showOffer(r: TripResult, passengerRating: String?, anchor: Rect?) {
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val copilotEnabled = prefs.getBoolean("copilot_enabled", true)
+        val trafficEnabled = prefs.getBoolean("traffic_enabled", true)
         val (label, color) = when (r.rating) {
             Rating.GOOD -> Pair("VERDE  •  CORRIDA BOA", Color.rgb(25, 145, 76))
             Rating.REVIEW -> Pair("AMARELO  •  ANALISAR", Color.rgb(205, 132, 0))
@@ -319,25 +320,24 @@ class OfferAccessibilityService : AccessibilityService() {
         }
         val rating = passengerRating ?: "Não disponível"
         val view = ensureOverlay(anchor) ?: return
-        val accent = GradientDrawable().apply {
+        val accentColor = if (trafficEnabled) color else Color.rgb(218, 166, 67)
+        view.background = GradientDrawable().apply {
             setColor(Color.rgb(18, 18, 20))
             cornerRadius = dp(12).toFloat()
-            setStroke(dp(3), color)
+            setStroke(dp(3), accentColor)
         }
-        view.background = accent
-        view.text = "× FECHAR   •   $label\nR$ %.2f  •  R$ %.2f/km\n%.0f min  •  R$ %.2f/h  •  Nota %s".format(
-            r.fare, r.perKm, r.minutes, r.perHour, rating
-        )
+        val lines = mutableListOf("× FECHAR")
+        if (trafficEnabled) lines.add(label)
+        lines.add("R$ %.2f  •  R$ %.2f/km".format(r.fare, r.perKm))
+        if (copilotEnabled) {
+            lines.add("%.0f min  •  R$ %.2f/h".format(r.minutes, r.perHour))
+            lines.add("Nota: $rating")
+        }
+        view.text = lines.joinToString("\n")
         view.visibility = View.VISIBLE
-        dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
-        val dismiss = Runnable { hideOverlay() }
-        dismissOverlayTask = dismiss
-        overlayHandler.postDelayed(dismiss, 3000L)
     }
 
     private fun hideOverlay() {
-        dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
-        dismissOverlayTask = null
         overlay?.visibility = View.GONE
     }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
