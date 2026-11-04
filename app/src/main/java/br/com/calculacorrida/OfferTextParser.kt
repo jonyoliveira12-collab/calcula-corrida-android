@@ -11,28 +11,35 @@ object OfferTextParser {
 
     fun parse(raw: String): ParsedOffer? {
         val text = raw.lowercase()
+            .replace('\u00a0', ' ')
             .replace("，", ",")
-            .replace("\\u00a0", " ")
 
-        val fareMatch = Regex("""(?:r\\$|\\$)\\s*([0-9]+(?:[.,][0-9]{1,2})?)""")
-            .find(text) ?: return null
-        val fare = fareMatch.groupValues[1].replace(",", ".").toDoubleOrNull() ?: return null
+        val fare = Regex("""(?:r\$|\$)\s*([0-9]+(?:[.,][0-9]{1,2})?)""")
+            .find(text)?.groupValues?.get(1)?.replace(",", ".")?.toDoubleOrNull()
+            ?: return null
 
-        val km = Regex("""([0-9]+(?:[.,][0-9]+)?)\\s*(?:km|quil[oô]metros?)""")
+        val km = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*(?:km|quil[oô]metros?)""")
             .findAll(text)
             .mapNotNull { it.groupValues[1].replace(",", ".").toDoubleOrNull() }
             .toList()
+        if (km.isEmpty()) return null
 
-        val minutes = Regex("""([0-9]+)\\s*(?:min|minuto|minutos)""")
+        val minuteValues = Regex("""([0-9]+)\s*(?:min|minuto|minutos)""")
             .findAll(text)
             .mapNotNull { it.groupValues[1].toDoubleOrNull() }
-            .firstOrNull() ?: return null
+            .toList()
+        if (minuteValues.isEmpty()) return null
 
-        if (km.isEmpty()) return null
-        val pickup = if (km.size >= 2) km[0] else 0.0
-        val trip = if (km.size >= 2) km[1] else km[0]
-        val rating = Regex("""(?:nota|avalia[cç][aã]o|rating)\\s*[:：]?\\s*([0-5][.,][0-9]{1,2})""")
+        // In the offer card, pickup and trip legs are listed separately; sum them.
+        val pickup = if (km.size >= 2) km.first() else 0.0
+        val trip = if (km.size >= 2) km.drop(1).sum() else km.first()
+        val totalMinutes = minuteValues.sum()
+
+        val rating = Regex("""(?:★|⭐)\s*([0-5][.,][0-9]{1,2})""")
             .find(text)?.groupValues?.get(1)?.replace(",", ".")
-        return ParsedOffer(fare, pickup, trip, minutes, rating)
+            ?: Regex("""(?:nota|avaliação|rating)\s*[:：]?\s*([0-5][.,][0-9]{1,2})""")
+                .find(text)?.groupValues?.get(1)?.replace(",", ".")
+
+        return ParsedOffer(fare, pickup, trip, totalMinutes, rating)
     }
 }
