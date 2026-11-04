@@ -18,18 +18,26 @@ import android.view.ViewGroup
 class OfferAccessibilityService : AccessibilityService() {
     private var overlay: TextView? = null
     private var lastText = ""
-    private val allowedPackages = setOf("com.ubercab", "com.didiglobal.passenger", "com.app99")
+    // Aceita somente pacotes cujo identificador indique Uber Driver ou 99.
+    // Os identificadores podem variar conforme a versão/região do aplicativo.
+    private fun isSupportedDriverApp(pkg: String): Boolean {
+        val p = pkg.lowercase()
+        return p.contains("uber") || p.contains("didiglobal") || p.contains("app99") || p.contains("99taxi")
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg !in allowedPackages) { hideOverlay(); return }
+        if (!isSupportedDriverApp(pkg)) { hideOverlay(); return }
         val root = rootInActiveWindow ?: return
         val text = StringBuilder()
         collectText(root,text)
         val screenText = text.toString()
         if (screenText == lastText || screenText.isBlank()) return
         lastText = screenText
-        val offer = OfferTextParser.parse(screenText) ?: run { hideOverlay(); return }
+        val offer = OfferTextParser.parse(screenText) ?: run {
+            hideOverlay()
+            return
+        }
         val prefs = getSharedPreferences("settings",Context.MODE_PRIVATE)
         val result = TripCalculator.calculate(offer.fare,offer.pickupKm,offer.tripKm,offer.minutes,prefs.getFloat("min_per_km",1.80f).toDouble(),prefs.getFloat("min_per_hour",35f).toDouble()) ?: return
         showOverlay(result)
