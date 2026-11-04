@@ -20,9 +20,14 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Show project files
-        run: find . -maxdepth 5 -type f | sort
-      - name: Build debug APK with diagnostics
-        run: gradle --no-daemon --stacktrace assembleDebug
+        run: find . -maxdepth 8 -type f | sort
+      - name: Build APK and print diagnostics
+        run: |
+          set +e
+          gradle --no-daemon --stacktrace --info assembleDebug > build.log 2>&1
+          result=$?
+          tail -n 240 build.log
+          exit $result
       - uses: actions/upload-artifact@v4
         if: success()
         with:
