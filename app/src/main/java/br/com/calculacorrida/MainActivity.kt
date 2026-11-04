@@ -280,7 +280,7 @@ class MainActivity : Activity() {
         orientation = LinearLayout.VERTICAL; setPadding(dp(15), dp(15), dp(15), dp(15))
         background = rounded(panel, 17, Color.rgb(55, 46, 32))
     }
-    private fun label(text: String, size: Float, color: Int, bold: Boolean, top: Int = 0, bottom: Int = 0) = TextView(this).apply {
+    private fun label(text: String, size: Float, color: Int, bold: Boolean = false, top: Int = 0, bottom: Int = 0) = TextView(this).apply {
         this.text = text; textSize = size; setTextColor(color); if (bold) setTypeface(null, Typeface.BOLD)
         if (top != 0 || bottom != 0) setPadding(0, dp(top), 0, dp(bottom))
     }
