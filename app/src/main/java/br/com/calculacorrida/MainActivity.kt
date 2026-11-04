@@ -41,7 +41,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(30))
+            setPadding(dp(16), dp(18), dp(16), dp(30))
             setBackgroundColor(bg)
         }
 
@@ -63,6 +63,7 @@ class MainActivity : Activity() {
 
         // Dashboard principal redesenhado: identidade preta e dourada, com métricas em destaque.
         val dashboard = card().apply {
+            id = View.generateViewId()
             background = rounded(Color.rgb(17, 16, 14), 20, Color.rgb(112, 83, 35))
             setPadding(dp(18), dp(18), dp(18), dp(18))
         }
@@ -176,7 +177,7 @@ class MainActivity : Activity() {
         statusCard.addView(overlayStatus)
         statusCard.addView(accessibilityStatus)
         page.addView(statusCard, marginParams(bottom = 14))
-        val traffic = card()
+        val traffic = card().apply { id = View.generateViewId() }
         traffic.addView(TextView(this).apply { text = "CLASSIFICAÇÃO DAS OFERTAS"; textSize = 16f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
         traffic.addView(TextView(this).apply { text = "Classificação automática das ofertas"; textSize = 12f; setTextColor(muted); setPadding(0, dp(4), 0, dp(13)) })
         val bands = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -206,7 +207,7 @@ class MainActivity : Activity() {
         sizeCard.addView(sizeSeek)
         page.addView(sizeCard, marginParams(bottom = 14))
 
-        val limits = card()
+        val limits = card().apply { id = View.generateViewId() }
         limits.addView(TextView(this).apply {
             text = "META DE GANHO POR CORRIDA"
             textSize = 11f
@@ -242,7 +243,7 @@ class MainActivity : Activity() {
         }
         page.addView(limits, marginParams(bottom = 14))
 
-        val permissions = card()
+        val permissions = card().apply { id = View.generateViewId() }
         permissions.addView(TextView(this).apply {
             text = "CENTRAL DE CONEXÃO"
             textSize = 11f
@@ -297,11 +298,58 @@ class MainActivity : Activity() {
             setPadding(dp(3), dp(2), dp(3), dp(12))
         })
 
-        setContentView(ScrollView(this).apply {
+        val scroll = ScrollView(this).apply {
             setBackgroundColor(bg)
             isFillViewport = true
+            clipToPadding = false
             addView(page)
-        })
+        }
+
+        val bottomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(8), dp(5), dp(8))
+            background = rounded(Color.rgb(15, 15, 17), 18, Color.rgb(75, 58, 31))
+        }
+        fun navItem(label: String, symbol: String, target: View) {
+            val item = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(3), dp(5), dp(3), dp(5))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    scroll.post { scroll.smoothScrollTo(0, target.top.coerceAtLeast(0)) }
+                }
+            }
+            item.addView(TextView(this).apply {
+                text = symbol
+                textSize = 19f
+                gravity = Gravity.CENTER
+                setTextColor(Color.rgb(218, 166, 67))
+            })
+            item.addView(TextView(this).apply {
+                text = label
+                textSize = 9f
+                gravity = Gravity.CENTER
+                setTextColor(muted)
+                setTypeface(null, Typeface.BOLD)
+            })
+            bottomBar.addView(item, LinearLayout.LayoutParams(0, dp(48), 1f))
+        }
+        navItem("INÍCIO", "⌂", dashboard)
+        navItem("ANÁLISE", "◉", traffic)
+        navItem("METAS", "◎", limits)
+        navItem("AJUSTES", "⚙", permissions)
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(bg)
+            setPadding(dp(8), dp(4), dp(8), dp(6))
+            addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(bottomBar, marginParams(top = 5))
+        }
+        setContentView(root)
     }
 
     private fun card(): LinearLayout = LinearLayout(this).apply {
