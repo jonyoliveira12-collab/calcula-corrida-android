@@ -180,6 +180,8 @@ class OfferAccessibilityService : AccessibilityService() {
         overlay?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         overlay = null
         overlayParams = null
+        bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
+        bubble = null
         super.onDestroy()
     }
 }
