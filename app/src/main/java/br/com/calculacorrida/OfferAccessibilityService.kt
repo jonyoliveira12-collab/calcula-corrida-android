@@ -83,9 +83,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (closeTap && !moved) {
-                            hideOverlay()
-                        } else if (moved) {
+                        if (moved) {
                             prefs.edit().putInt("bubble_x", p.x).putInt("bubble_y", p.y).apply()
                         } else {
                             val intent = packageManager.getLaunchIntentForPackage(packageName)
@@ -110,6 +108,11 @@ class OfferAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("copilot_enabled", true) || !prefs.getBoolean("traffic_enabled", true)) {
+            hideOverlay()
+            return
+        }
         if (!isSupportedDriverApp(pkg)) {
             if (lastPackage.isNotEmpty()) hideOverlay()
             lastPackage = ""
