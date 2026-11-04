@@ -22,6 +22,26 @@ class OfferAccessibilityService : AccessibilityService() {
     private var overlayParams: WindowManager.LayoutParams? = null
     private var lastText = ""
     private var lastPackage = ""
+    private var bubble: TextView? = null
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        if (Settings.canDrawOverlays(this) && bubble == null) {
+            val v = TextView(this).apply {
+                text = "CC"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(235, 91, 35)); setStroke(dp(2), Color.WHITE) }
+            }
+            val t = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
+            val p = WindowManager.LayoutParams(dp(46), dp(46), t, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT)
+            p.gravity = Gravity.TOP or Gravity.RIGHT
+            p.x = dp(8); p.y = dp(220)
+            try { (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, p); bubble = v } catch (_: Exception) { }
+        }
+    }
 
     private fun isSupportedDriverApp(pkg: String): Boolean {
         val p = pkg.lowercase()
