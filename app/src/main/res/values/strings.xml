@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Calcula Corrida</string>
+    <string name="app_name">JHONDRIVER</string>
     <string name="accessibility_description">Lê textos acessíveis de ofertas Uber e 99 para estimar valores. Não aceita nem recusa corridas.</string>
 </resources>
