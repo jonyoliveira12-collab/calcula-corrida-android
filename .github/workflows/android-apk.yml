@@ -19,9 +19,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build debug APK
-        run: gradle assembleDebug
+      - name: Show project files
+        run: find . -maxdepth 5 -type f | sort
+      - name: Build debug APK with diagnostics
+        run: gradle --no-daemon --stacktrace assembleDebug
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: calcula-corrida-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
