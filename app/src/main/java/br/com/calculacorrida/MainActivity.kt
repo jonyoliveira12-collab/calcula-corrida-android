@@ -190,6 +190,15 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Na lista, abra Calcula Corrida e ligue a chave.", Toast.LENGTH_LONG).show()
         }
         permissions.addView(accessButton)
+        val notificationButton = actionButton("3  •  PERMITIR NOTIFICAÇÕES", Color.rgb(65, 65, 70))
+        notificationButton.setOnClickListener {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 303)
+            } else {
+                Toast.makeText(this, "Notificações disponíveis nesta versão do Android.", Toast.LENGTH_SHORT).show()
+            }
+        }
+        permissions.addView(notificationButton, marginParams(top = 9))
         page.addView(permissions, marginParams(bottom = 14))
 
         page.addView(TextView(this).apply {
