@@ -88,12 +88,14 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun ensureOverlay(anchor: Rect?): TextView? {
         if (!Settings.canDrawOverlays(this)) return null
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val scale = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("overlay_scale", 85).coerceIn(65, 110) / 100f
+        val overlayWidth = (310 * scale).toInt().coerceIn(220, 340)
         if (overlay == null) {
             val view = TextView(this).apply {
                 setTextColor(Color.WHITE)
-                textSize = 13f
+                textSize = 13f * scale
                 setTypeface(null, Typeface.BOLD)
-                setPadding(dp(13), dp(10), dp(13), dp(10))
+                setPadding((13 * scale).toInt(), (10 * scale).toInt(), (13 * scale).toInt(), (10 * scale).toInt())
                 maxLines = 5
                 background = GradientDrawable().apply {
                     setColor(Color.rgb(18, 18, 20))
@@ -104,7 +106,7 @@ class OfferAccessibilityService : AccessibilityService() {
             }
             val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
             val params = WindowManager.LayoutParams(
-                dp(310), ViewGroup.LayoutParams.WRAP_CONTENT, type,
+                dp(overlayWidth), ViewGroup.LayoutParams.WRAP_CONTENT, type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             )
@@ -118,7 +120,10 @@ class OfferAccessibilityService : AccessibilityService() {
         val params = overlayParams
         if (anchor != null && params != null) {
             val screenWidth = resources.displayMetrics.widthPixels
-            val desiredX = anchor.left.coerceIn(0, (screenWidth - dp(310)).coerceAtLeast(0))
+            params.width = dp(overlayWidth)
+            overlay?.textSize = 13f * scale
+            overlay?.setPadding((13 * scale).toInt(), (10 * scale).toInt(), (13 * scale).toInt(), (10 * scale).toInt())
+            val desiredX = anchor.left.coerceIn(0, (screenWidth - dp(overlayWidth)).coerceAtLeast(0))
             params.x = desiredX
             params.y = (anchor.top - dp(118)).coerceAtLeast(dp(55))
             try { wm.updateViewLayout(overlay, params) } catch (_: Exception) {}
