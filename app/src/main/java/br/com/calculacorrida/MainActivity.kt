@@ -54,7 +54,7 @@ class MainActivity : Activity() {
         }
         page.addView(brand)
         page.addView(TextView(this).apply {
-            text = "INTELIGÊNCIA PARA MOTORISTAS"
+            text = "INTELIGÊNCIA PARA CADA CORRIDA"
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
@@ -63,21 +63,21 @@ class MainActivity : Activity() {
 
         val hero = card()
         hero.addView(TextView(this).apply {
-            text = "BEM-VINDO AO JHONDRIVER"
+            text = "SEU PAINEL DE CORRIDAS"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(green)
             setTypeface(null, Typeface.BOLD)
         })
         hero.addView(TextView(this).apply {
-            text = "Escolha melhor. Ganhe mais."
+            text = "Mais clareza. Mais controle."
             textSize = 27f
             setTextColor(white)
             setTypeface(null, Typeface.BOLD)
             setPadding(0, dp(5), 0, dp(4))
         })
         hero.addView(TextView(this).apply {
-            text = "Análise inteligente de ofertas da Uber e 99, direto na tela enquanto você dirige."
+            text = "Analise ofertas da Uber e 99 em tempo real e acompanhe seus resultados em um só lugar."
             textSize = 13f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -86,7 +86,7 @@ class MainActivity : Activity() {
 
         val statusCard = card()
         statusCard.addView(TextView(this).apply {
-            text = "ATIVIDADE DO APLICATIVO"
+            text = "STATUS DO JHONDRIVER"
             textSize = 10f
             letterSpacing = .08f
             setTextColor(muted)
@@ -104,7 +104,7 @@ class MainActivity : Activity() {
         statusCard.addView(accessibilityStatus)
         page.addView(statusCard, marginParams(bottom = 14))
         val traffic = card()
-        traffic.addView(TextView(this).apply { text = "SEMÁFORO DE VALORES"; textSize = 16f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
+        traffic.addView(TextView(this).apply { text = "SEU SEMÁFORO DE CORRIDAS"; textSize = 16f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
         traffic.addView(TextView(this).apply { text = "Classificação automática das ofertas"; textSize = 12f; setTextColor(muted); setPadding(0, dp(4), 0, dp(13)) })
         val bands = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun addBand(title: String, color: Int) {
@@ -119,7 +119,7 @@ class MainActivity : Activity() {
         traffic.addView(bands)
         page.addView(traffic, marginParams(bottom = 14))
         val sizeCard = card()
-        sizeCard.addView(TextView(this).apply { text = "TAMANHO DA ETIQUETA"; textSize = 11f; letterSpacing = .08f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
+        sizeCard.addView(TextView(this).apply { text = "ETIQUETA FLUTUANTE"; textSize = 11f; letterSpacing = .08f; setTextColor(white); setTypeface(null, Typeface.BOLD) })
         val sizeValue = TextView(this).apply { textSize = 14f; setTextColor(green); setTypeface(null, Typeface.BOLD); setPadding(0, dp(7), 0, dp(2)) }
         sizeCard.addView(sizeValue)
         sizeCard.addView(TextView(this).apply { text = "Ajuste o tamanho da etiqueta sobre a oferta. O padrão é compacto."; textSize = 12f; setTextColor(muted) })
@@ -135,7 +135,7 @@ class MainActivity : Activity() {
 
         val limits = card()
         limits.addView(TextView(this).apply {
-            text = "SEUS LIMITES"
+            text = "SUAS METAS DE RENTABILIDADE"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(white)
@@ -171,7 +171,7 @@ class MainActivity : Activity() {
 
         val permissions = card()
         permissions.addView(TextView(this).apply {
-            text = "PERMISSÕES E CONEXÃO"
+            text = "CONEXÃO E PERMISSÕES"
             textSize = 11f
             letterSpacing = .08f
             setTextColor(white)
@@ -217,7 +217,7 @@ class MainActivity : Activity() {
         page.addView(permissions, marginParams(bottom = 14))
 
         page.addView(TextView(this).apply {
-            text = "O Calcula Corrida apenas analisa as informações visíveis da oferta. Não aceita nem recusa corridas."
+            text = "JHONDRIVER • Análise assistida de ofertas. O aplicativo não aceita nem recusa corridas."
             textSize = 11f
             setTextColor(muted)
             setLineSpacing(dp(3).toFloat(), 1f)
