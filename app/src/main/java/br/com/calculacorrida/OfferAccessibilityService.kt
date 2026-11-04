@@ -41,7 +41,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(235, 91, 35)); setStroke(dp(2), Color.WHITE) }
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(218, 166, 67)); setStroke(dp(2), Color.WHITE) }
                 isClickable = true
                 contentDescription = "Botão CC. Arraste para mover ou toque para abrir o aplicativo."
             }
@@ -230,7 +230,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 background = GradientDrawable().apply {
                     setColor(Color.rgb(18, 18, 20))
                     cornerRadius = dp(12).toFloat()
-                    setStroke(dp(2), Color.rgb(235, 91, 35))
+                    setStroke(dp(2), Color.rgb(218, 166, 67))
                 }
                 elevation = dp(8).toFloat()
             }
