@@ -64,7 +64,6 @@
         android:backgroundTint="#000000"
         android:textColor="#FFD700"
         android:layout_marginTop="8dp"
-        android:strokeColor="#FFD700"
-        android:strokeWidth="1dp" />
+        android:backgroundTint="#292929" />
 
 </LinearLayout>
