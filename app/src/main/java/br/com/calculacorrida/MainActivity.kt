@@ -177,9 +177,9 @@ class MainActivity : Activity() {
         bands.addView(bhead)
         bands.addView(label("Confira os valores de cada faixa.", 12f, muted, false, 0, 10))
         val table = horizontal()
-        table.addView(rangeColumn("RUIM", red, "< " + money(prefs.getFloat("min_per_km", 1.8f)), "< " + money(prefs.getFloat("min_per_hour", 35f))), weight())
+        table.addView(rangeColumn("RUIM", red, "< " + money(prefs.getFloat("min_per_km", 1.8f)), "< " + money(prefs.getFloat("min_per_hour", 50f))), weight())
         table.addView(rangeColumn("ATENÇÃO", amber, money(prefs.getFloat("min_per_km", 1.8f)) + " a " + money(prefs.getFloat("min_per_km", 1.8f) * 1.15f), "Meta próxima"), weight())
-        table.addView(rangeColumn("ACEITAR", green, "≥ " + money(prefs.getFloat("min_per_km", 1.8f)), "≥ " + money(prefs.getFloat("min_per_hour", 35f))), weight())
+        table.addView(rangeColumn("ACEITAR", green, "≥ " + money(prefs.getFloat("min_per_km", 1.8f)), "≥ " + money(prefs.getFloat("min_per_hour", 50f))), weight())
         bands.addView(table)
         bands.addView(label("R$/km          R$/hora", 10f, muted, false, 0, 0))
         content.addView(bands, margin(0, 10))
@@ -256,7 +256,7 @@ class MainActivity : Activity() {
         limits.addView(label("SUAS METAS", 11f, gold, true))
 
         limits.addView(settingRow("R$/km mínimo", money(prefs.getFloat("min_per_km", 1.8f))))
-        limits.addView(settingRow("R$/hora mínimo", money(prefs.getFloat("min_per_hour", 35f))))
+        limits.addView(settingRow("R$/hora mínimo", money(prefs.getFloat("min_per_hour", 50f))))
         limits.addView(settingRow("Custo R$/km (combustível)", money(prefs.getFloat("cost_per_km", 0.65f))))
 
         limits.addView(label("OPÇÕES DA TAG", 11f, gold, true, 14, 0))
