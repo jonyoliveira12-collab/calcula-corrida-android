@@ -151,7 +151,10 @@ class OfferAccessibilityService : AccessibilityService() {
         val result = TripCalculator.calculate(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
             prefs.getFloat("min_per_km", 1.80f).toDouble(),
-            prefs.getFloat("min_per_hour", 35f).toDouble()
+            prefs.getFloat("min_per_hour", 50f).toDouble(),
+            offer.passengerRating?.toDoubleOrNull(),
+            prefs.getFloat("min_rating", 4.80f).toDouble(),
+            prefs.getFloat("good_rating", 4.90f).toDouble()
         ) ?: run {
             hideOverlay()
             return
@@ -326,7 +329,7 @@ class OfferAccessibilityService : AccessibilityService() {
             Rating.REVIEW -> Pair("AMARELO  •  ANALISAR", Color.rgb(205, 132, 0))
             Rating.BAD -> Pair("VERMELHO  •  CORRIDA RUIM", Color.rgb(190, 40, 40))
         }
-        val rating = passengerRating ?: "Não disponível"
+        val rating = passengerRating?.let { "⭐ $it" } ?: "Não identificada"
         val view = ensureOverlay(anchor) ?: return
         val accent = GradientDrawable().apply {
             setColor(Color.rgb(18, 18, 20))
