@@ -1,4 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -7,10 +9,10 @@
     <application
         android:allowBackup="false"
         android:label="JHONDRIVER"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/AppTheme">
 
-        <activity
-            android:name=".LoginActivity"
+        <!-- Tela de Login (Inicial) -->
+        <activity android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -18,14 +20,16 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".MainActivity"
+        <!-- Tela Principal -->
+        <activity android:name=".MainActivity"
             android:exported="false" />
 
+        <!-- Serviço de Acessibilidade -->
         <service
             android:name=".OfferAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
+            android:exported="true"
+            android:label="JHONDRIVER - Leitura de ofertas">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService"/>
             </intent-filter>
@@ -34,4 +38,5 @@
                 android:resource="@xml/accessibility_service_config"/>
         </service>
     </application>
+
 </manifest>
