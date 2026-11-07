@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.view.View
 import android.content.Context
 import android.widget.*
+import android.app.AlertDialog
 import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
@@ -89,6 +90,7 @@ class MainActivity : Activity() {
             "Início" -> buildHome()
             "Histórico" -> buildHistory()
             "Finanças" -> buildFinances()
+            "Semáforo" -> buildTrafficSettings()
             else -> buildProfile()
         }
         bottom.removeAllViews()
@@ -177,9 +179,9 @@ class MainActivity : Activity() {
         bands.addView(bhead)
         bands.addView(label("Confira os valores de cada faixa.", 12f, muted, false, 0, 10))
         val table = horizontal()
-        table.addView(rangeColumn("RUIM", red, "< " + money(prefs.getFloat("bad_per_km", 1.5f)), "< " + money(prefs.getFloat("min_per_hour", 50f))), weight())
-        table.addView(rangeColumn("ATENÇÃO", amber, money(prefs.getFloat("bad_per_km", 1.5f)) + " a " + money(prefs.getFloat("min_per_km", 1.8f)), money(prefs.getFloat("min_per_hour", 50f)) + " a " + money(prefs.getFloat("good_per_hour", 60f))), weight())
-        table.addView(rangeColumn("ACEITAR", green, "≥ " + money(prefs.getFloat("min_per_km", 1.8f)), "≥ " + money(prefs.getFloat("good_per_hour", 60f))), weight())
+        table.addView(rangeColumn(prefs.getString("label_bad", "Vixe não dá") ?: "Vixe não dá", red, "< " + money(prefs.getFloat("bad_per_km", 1.5f)), "< " + money(prefs.getFloat("min_per_hour", 50f))), weight())
+        table.addView(rangeColumn(prefs.getString("label_review", "Hum, talvez") ?: "Hum, talvez", amber, money(prefs.getFloat("bad_per_km", 1.5f)) + " a " + money(prefs.getFloat("min_per_km", 1.8f)), money(prefs.getFloat("min_per_hour", 50f)) + " a " + money(prefs.getFloat("good_per_hour", 60f))), weight())
+        table.addView(rangeColumn(prefs.getString("label_good", "Bora carai") ?: "Bora carai", green, "≥ " + money(prefs.getFloat("min_per_km", 1.8f)), "≥ " + money(prefs.getFloat("good_per_hour", 60f))), weight())
         bands.addView(table)
         bands.addView(label("R$/km          R$/hora", 10f, muted, false, 0, 0))
         content.addView(bands, margin(0, 10))
@@ -203,6 +205,64 @@ class MainActivity : Activity() {
             }
         })
         content.addView(perms, margin(0, 10))
+    }
+
+    private fun buildTrafficSettings() {
+        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+        content.addView(label("Configurar semáforo", 24f, white, true, 5, 2))
+        content.addView(label("Ajuste os limites e os nomes de cada faixa.", 13f, muted, false, 0, 14))
+        val labels = card()
+        labels.addView(label("NOMES DAS FAIXAS", 11f, gold, true))
+        fun editLabel(title: String, key: String, defaultValue: String) {
+            val row = horizontal()
+            row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(action(prefs.getString(key, defaultValue) ?: defaultValue, false) {
+                val input = EditText(this).apply { setText(prefs.getString(key, defaultValue) ?: defaultValue); setSingleLine(true) }
+                AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar", null)
+                    .setPositiveButton("Salvar") { _, _ ->
+                        val value = input.text.toString().trim()
+                        if (value.isNotEmpty()) prefs.edit().putString(key, value).apply()
+                        showTab("Semáforo")
+                    }.show()
+            })
+            row.setPadding(0, dp(8), 0, dp(8))
+            labels.addView(row)
+        }
+        editLabel("Faixa vermelha", "label_bad", "Vixe não dá")
+        editLabel("Faixa amarela", "label_review", "Hum, talvez")
+        editLabel("Faixa verde", "label_good", "Bora carai")
+        content.addView(labels, margin(0, 10))
+        val limits = card()
+        limits.addView(label("LIMITES DE CLASSIFICAÇÃO", 11f, gold, true))
+        fun editNumber(title: String, key: String, defaultValue: Float, prefix: String = "R$ ") {
+            val row = horizontal()
+            row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(action(prefix + money(prefs.getFloat(key, defaultValue)), false) {
+                val input = EditText(this).apply {
+                    inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                    setText(prefs.getFloat(key, defaultValue).toString())
+                    setSingleLine(true)
+                }
+                AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar", null)
+                    .setPositiveButton("Salvar") { _, _ ->
+                        val value = input.text.toString().replace(",", ".").toFloatOrNull()
+                        if (value != null && value >= 0f) prefs.edit().putFloat(key, value).apply()
+                        showTab("Semáforo")
+                    }.show()
+            })
+            row.setPadding(0, dp(8), 0, dp(8))
+            limits.addView(row)
+        }
+        editNumber("R$/km — faixa vermelha", "bad_per_km", 1.50f)
+        editNumber("R$/km — mínimo verde", "min_per_km", 1.80f)
+        editNumber("R$/hora — mínimo vermelho", "min_per_hour", 50f)
+        editNumber("R$/hora — mínimo verde", "good_per_hour", 60f)
+        editNumber("Nota mínima do passageiro", "min_rating", 4.80f, "")
+        editNumber("Nota para faixa verde", "good_rating", 4.90f, "")
+        editNumber("Valor mínimo da corrida", "min_fare", 10f)
+        editNumber("Lucro líquido mínimo", "min_profit", 0f)
+        content.addView(limits, margin(0, 10))
+        content.addView(action("VOLTAR AO INÍCIO", false) { showTab("Início") })
     }
 
     private fun buildHistory() {
