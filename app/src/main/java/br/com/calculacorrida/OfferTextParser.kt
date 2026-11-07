@@ -51,12 +51,14 @@ object OfferTextParser {
                 totalMinutes = summary.first
             } else {
                 // Cartões como o da 99: embarque + viagem aparecem em linhas separadas.
-                pickupKm = legs.first().second
-                tripKm = legs.drop(1).sumOf { it.second }
-                totalMinutes = legs.sumOf { it.first }
                 if (legs.size == 1) {
                     pickupKm = 0.0
                     tripKm = legs.first().second
+                    totalMinutes = legs.first().first
+                } else {
+                    pickupKm = legs.first().second
+                    tripKm = legs.drop(1).sumOf { it.second }
+                    totalMinutes = legs.sumOf { it.first }
                 }
             }
         } else {
