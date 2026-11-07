@@ -2,7 +2,7 @@ package br.com.calculacorrida
 
 import java.text.Normalizer
 
-/** Extrai preço, distância, duração e nota do texto da oferta (acessibilidade/OCR). */
+/** Extrai os dados principais do cartão de oferta (acessibilidade/OCR). */
 object OfferTextParser {
     data class ParsedOffer(
         val fare: Double,
@@ -19,42 +19,40 @@ object OfferTextParser {
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\n', ' '), Normalizer.Form.NFKC)
-        val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
 
+        val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
         val distances = distanceRegex.findAll(text)
             .mapNotNull { toNumber(it.groupValues[1]) }
             .toList()
-        if (distances.isEmpty()) return null
+        val durations = minuteRegex.findAll(text)
+            .mapNotNull { it.groupValues[1].toDoubleOrNull() }
+            .toList()
 
-        // O cartão do Uber mostra primeiro a distância total (ex.: 9,9 km)
-        // e depois os trechos: retirada (7,7 km) + viagem (2,2 km).
-        // Não podemos somar o total novamente com o trecho de retirada.
-        val pickupKm: Double
-        val tripKm: Double
-        when {
-            distances.size >= 3 -> {
-                pickupKm = distances[1]
-                tripKm = distances.drop(2).sum()
-            }
-            distances.size == 2 -> {
-                pickupKm = distances[0]
-                tripKm = distances[1]
-            }
-            else -> {
-                pickupKm = 0.0
-                tripKm = distances[0]
-            }
-        }
-        if (tripKm <= 0.0) return null
+        if (distances.isEmpty() || durations.isEmpty()) return null
 
-        // A primeira duração exibida é o tempo total estimado. As seguintes
-        // podem ser os tempos dos trechos e não devem ser somadas novamente.
-        val minutes = minuteRegex.find(text)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
-        if (minutes <= 0.0) return null
+        /*
+         * No cartão do Uber, a primeira linha-resumo apresenta a distância e
+         * duração totais (ex.: "16 min · 9,9 km"). As linhas abaixo detalham
+         * os trechos (ex.: "11 min (7,7 km)" + "5 min (2,2 km)").
+         * Usar a primeira distância e duração evita somar o resumo novamente
+         * com os trechos, o que inflava o denominador e o tempo.
+         */
+        val totalKm = distances.first()
+        val totalMinutes = durations.first()
+        if (totalKm <= 0.0 || totalMinutes <= 0.0) return null
 
         val rating = Regex("""(?:★|⭐|nota)\s*([0-5](?:[,.][0-9]+)?)""", RegexOption.IGNORE_CASE)
             .find(text)?.groupValues?.get(1)?.replace(',', '.')
-        return ParsedOffer(fare, pickupKm, tripKm, minutes, rating)
+
+        // Representa a distância completa em um único campo para o calculador
+        // não somar novamente retirada + viagem.
+        return ParsedOffer(
+            fare = fare,
+            pickupKm = 0.0,
+            tripKm = totalKm,
+            minutes = totalMinutes,
+            passengerRating = rating
+        )
     }
 
     private fun toNumber(value: String): Double? {
