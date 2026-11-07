@@ -55,7 +55,9 @@ object OfferTextParser {
                 // Cartões como o da 99: primeiro trecho é embarque; os demais são viagem.
                 pickupKm = legs.first().second
                 tripKm = legs.drop(1).sumOf { it.second }
-                totalMinutes = legs.sumOf { it.first }
+                // A etiqueta do Rota Pro usa o tempo do trecho da viagem,
+                // sem somar o tempo de chegada ao passageiro.
+                totalMinutes = legs.drop(1).sumOf { it.first }
             }
         } else {
             val distances = distanceRegex.findAll(text).mapNotNull {
