@@ -6,9 +6,6 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.content.Context
 import android.provider.Settings
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.TextView
@@ -18,18 +15,17 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.view.MotionEvent
+import android.speech.tts.TextToSpeech
 import java.util.Locale
 
 class OfferAccessibilityService : AccessibilityService() {
 
     private var overlay: OverlayView? = null
-    private var overlayParams: WindowManager.LayoutParams? = null
-    private var isOverlayVisible = false
+    private var bubble: TextView? = null
     private var tts: TextToSpeech? = null
+    private var isOverlayVisible = false
     private var voiceEnabled = false
 
-    // Bolha flutuante
-    private var bubble: TextView? = null
     private var lastText = ""
     private var lastPackage = ""
     private var lastProcessTime = 0L
@@ -45,25 +41,25 @@ class OfferAccessibilityService : AccessibilityService() {
         setupBubble()
     }
 
-    // === BOLHA FLUTUANTE "CC" ===
     private fun setupBubble() {
         if (bubble != null) return
         if (!Settings.canDrawOverlays(this)) return
 
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+
         val v = TextView(this).apply {
             text = "CC"
             textSize = 12f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.BLACK)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.rgb(0, 168, 89))
+                setColor(Color.rgb(218, 170, 78))
                 setStroke(dp(2), Color.WHITE)
             }
             isClickable = true
-            contentDescription = "Botão CC. Arraste para mover ou toque para abrir o aplicativo."
+            contentDescription = "Botão CC. Arraste para mover ou toque para abrir."
         }
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -90,8 +86,11 @@ class OfferAccessibilityService : AccessibilityService() {
         v.setOnTouchListener { view, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = event.rawX; downY = event.rawY
-                    initialX = p.x; initialY = p.y; moved = false
+                    downX = event.rawX
+                    downY = event.rawY
+                    initialX = p.x
+                    initialY = p.y
+                    moved = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -126,20 +125,18 @@ class OfferAccessibilityService : AccessibilityService() {
         } catch (_: Exception) {}
     }
 
-    // === VERIFICA APP DE CORRIDA ===
     private fun isSupportedDriverApp(pkg: String): Boolean {
         val p = pkg.lowercase()
-        return p.contains("uber") || p.contains("didiglobal") || p.contains("99") || p.contains("indrive") || p.contains("taxi")
+        return p.contains("uber") || p.contains("didiglobal") ||
+               p.contains("99") || p.contains("indrive") || p.contains("taxi")
     }
 
-    // === EVENTO DE ACESSIBILIDADE ===
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
 
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-        // Verifica se o copilot está ligado (remove traffic_enabled que não existe)
         if (!prefs.getBoolean("copilot_enabled", true)) {
             if (isOverlayVisible) hideOverlay()
             return
@@ -147,10 +144,8 @@ class OfferAccessibilityService : AccessibilityService() {
 
         voiceEnabled = prefs.getBoolean("voice_enabled", false)
 
-        // Garante que a bolha existe
         if (bubble == null) setupBubble()
 
-        // Se não for app de corrida, esconde a tag
         if (!isSupportedDriverApp(pkg)) {
             if (isOverlayVisible) hideOverlay()
             lastPackage = ""
@@ -159,37 +154,29 @@ class OfferAccessibilityService : AccessibilityService() {
 
         if (lastPackage != pkg) {
             lastPackage = pkg
-            lastText = "" // reset ao trocar de app
+            lastText = ""
         }
 
-        // Busca a janela do app de corrida (suporte a tela dividida)
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow ?: return
 
-        // Coleta todo o texto da tela
         val sb = StringBuilder()
         collectText(root, sb)
         val screenText = sb.toString()
 
         if (screenText.isBlank()) return
-
-        // === THROTTLE ===
         if (screenText == lastText) return
+
         val now = System.currentTimeMillis()
         if (now - lastProcessTime < THROTTLE_MS) return
         lastProcessTime = now
         lastText = screenText
 
-        // Faz o parse
         val offer = OfferTextParser.parse(screenText)
         if (offer != null) {
             calculateAndShow(offer, prefs)
-        } else {
-            // Se não achou por texto, não esconde imediatamente
-            // (pode ser tela intermediária)
         }
     }
 
-    // === CÁLCULO E EXIBIÇÃO ===
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, prefs: android.content.SharedPreferences) {
         val minPerKm = prefs.getFloat("min_per_km", 1.80f).toDouble()
         val minPerHour = prefs.getFloat("min_per_hour", 35f).toDouble()
@@ -205,14 +192,12 @@ class OfferAccessibilityService : AccessibilityService() {
             return
         }
 
-        // Status e cor (Rota Pro: verde, amarelo, vermelho)
         val (statusText, statusColor) = when (result.rating) {
-            Rating.GOOD -> Pair("✓ ACEITAR", Color.rgb(0, 168, 89))
-            Rating.REVIEW -> Pair("⚠ ATENÇÃO", Color.rgb(255, 193, 7))
-            Rating.BAD -> Pair("✗ RUIM", Color.rgb(220, 53, 69))
+            Rating.GOOD -> Pair("✓ ACEITAR", Color.rgb(42, 166, 111))
+            Rating.REVIEW -> Pair("⚠ ATENÇÃO", Color.rgb(204, 139, 43))
+            Rating.BAD -> Pair("✗ RUIM", Color.rgb(202, 65, 65))
         }
 
-        // Calcula lucro se ativado
         var profitStr = ""
         if (prefs.getBoolean("show_profit", false) && costPerKm > 0) {
             val totalKm = result.totalKm
@@ -220,13 +205,11 @@ class OfferAccessibilityService : AccessibilityService() {
             profitStr = "${if (profit.toInt() > 0) "+" else ""}${profit.toInt()}%"
         }
 
-        // Voz (TTS)
         if (voiceEnabled) {
             val speech = "$statusText. ${"%.2f".format(result.perKm)} reais por km."
             tts?.speak(speech, TextToSpeech.QUEUE_FLUSH, null, "offer_${System.currentTimeMillis()}")
         }
 
-        // Monta a nota do passageiro
         var ratingDisplay = ""
         if (!offer.passengerRating.isNullOrBlank()) {
             ratingDisplay = offer.passengerRating
@@ -248,7 +231,6 @@ class OfferAccessibilityService : AccessibilityService() {
         )
     }
 
-    // === MOSTRA A TAG NA TELA ===
     private fun showOffer(
         status: String, statusColor: Int, fare: String,
         perKm: String, perHour: String, tripTime: String,
@@ -276,7 +258,6 @@ class OfferAccessibilityService : AccessibilityService() {
         isOverlayVisible = true
     }
 
-    // === CRIA A TAG SE NÃO EXISTIR ===
     private fun ensureOverlay(): OverlayView? {
         if (overlay != null && overlay!!.isAttachedToWindow) return overlay
 
@@ -317,21 +298,18 @@ class OfferAccessibilityService : AccessibilityService() {
         try {
             (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, params)
             overlay = v
-            overlayParams = params
         } catch (e: Exception) {
             return null
         }
         return overlay
     }
 
-    // === ESCONDE A TAG ===
     private fun hideOverlay() {
         overlay?.visibility = View.GONE
         isOverlayVisible = false
         lastText = ""
     }
 
-    // === BUSCA JANELA DO APP DE CORRIDA (SPLIT-SCREEN) ===
     private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
         return try {
             windows.firstNotNullOfOrNull { window ->
@@ -343,7 +321,6 @@ class OfferAccessibilityService : AccessibilityService() {
         } catch (_: Exception) { null }
     }
 
-    // === COLETA TEXTO DA TELA ===
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
         try {
             node.text?.let { out.append(it).append(' ') }
