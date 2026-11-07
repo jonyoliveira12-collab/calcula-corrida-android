@@ -29,7 +29,7 @@
             android:id="@+id/emailInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="E-mail"
+            android:hint="E-mail (ex.: nome@email.com)"
             android:inputType="textEmailAddress"
             android:singleLine="true"
             android:padding="15dp"
