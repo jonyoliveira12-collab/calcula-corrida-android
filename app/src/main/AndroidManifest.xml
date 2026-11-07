@@ -21,7 +21,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Tela Principal (só acessível após login) -->
+        <!-- Tela Principal (só após login) -->
         <activity
             android:name=".MainActivity"
             android:exported="false" />
