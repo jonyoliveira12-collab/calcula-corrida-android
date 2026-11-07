@@ -12,21 +12,20 @@ object OfferTextParser {
         val passengerRating: String?
     )
 
-    private val moneyRegex = Regex("""R\\$\\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]+(?:\\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
-    private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\\s*(km|m)\\b""", RegexOption.IGNORE_CASE)
-    private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\\s*(?:min(?:uto)?s?)\\b""", RegexOption.IGNORE_CASE)
+    private val moneyRegex = Regex("""R\$\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
+    private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE)
+    private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(?:min(?:uto)?s?)\b""", RegexOption.IGNORE_CASE)
 
     // Detecta pares como "1 min (60 m)" e "6 min (3 km)".
-    // Em algumas telas do Uber existe um resumo fora dos parênteses seguido
-    // dos trechos detalhados entre parênteses; nesse caso, usa só o resumo.
+    // Se houver resumo da rota fora dos parênteses, não soma os trechos novamente.
     private val legRegex = Regex(
-        """([0-9]+(?:[,.][0-9]+)?)\\s*min(?:uto)?s?\\s*[·•]?\\s*(\\()?\\s*([0-9]+(?:[,.][0-9]+)?)\\s*(km|m)\\b""",
+        """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*(\()?\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""",
         RegexOption.IGNORE_CASE
     )
 
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
-        val text = Normalizer.normalize(rawText.replace('\\u00A0', ' '), Normalizer.Form.NFKC)
+        val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
         val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
 
         val legs = legRegex.findAll(text).mapNotNull { match ->
@@ -45,21 +44,18 @@ object OfferTextParser {
         if (legs.isNotEmpty()) {
             val summary = legs.firstOrNull { !it.third }
             if (summary != null) {
-                // Resumo total da rota: não somar novamente os trechos.
                 pickupKm = 0.0
                 tripKm = summary.second
                 totalMinutes = summary.first
+            } else if (legs.size == 1) {
+                pickupKm = 0.0
+                tripKm = legs.first().second
+                totalMinutes = legs.first().first
             } else {
-                // Cartões como o da 99: embarque + viagem aparecem em linhas separadas.
-                if (legs.size == 1) {
-                    pickupKm = 0.0
-                    tripKm = legs.first().second
-                    totalMinutes = legs.first().first
-                } else {
-                    pickupKm = legs.first().second
-                    tripKm = legs.drop(1).sumOf { it.second }
-                    totalMinutes = legs.sumOf { it.first }
-                }
+                // Cartões como o da 99: primeiro trecho é embarque; os demais são viagem.
+                pickupKm = legs.first().second
+                tripKm = legs.drop(1).sumOf { it.second }
+                totalMinutes = legs.sumOf { it.first }
             }
         } else {
             val distances = distanceRegex.findAll(text).mapNotNull {
@@ -77,27 +73,25 @@ object OfferTextParser {
 
         if (pickupKm + tripKm <= 0.0 || totalMinutes <= 0.0) return null
 
-        val rating = extractPassengerRating(text)
         return ParsedOffer(
             fare = fare,
             pickupKm = pickupKm,
             tripKm = tripKm,
             minutes = totalMinutes,
-            passengerRating = rating
+            passengerRating = extractPassengerRating(text)
         )
     }
 
     private fun extractPassengerRating(text: String): String? {
-        // Formato com estrela ou rótulo explícito.
         val labeled = Regex(
-            """(?:★|⭐|nota(?:\\s+do\\s+passageiro)?)\\s*[:·-]?\\s*([0-5](?:[,.][0-9]{1,2})?)""",
+            """(?:★|⭐|nota(?:\s+do\s+passageiro)?)\s*[:·-]?\s*([0-5](?:[,.][0-9]{1,2})?)""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (labeled != null) return normalizeRating(labeled)
 
-        // Formato comum na 99: "4,97 · 498 corridas", sem a palavra Nota.
+        // Exemplo da 99: "4,97 · 498 corridas", sem o rótulo Nota.
         val besideTrips = Regex(
-            """([0-5][,.][0-9]{1,2})\\s*(?:[·•|]\\s*)?[0-9]+\\s*corridas?""",
+            """([0-5][,.][0-9]{1,2})\s*(?:[·•|]\s*)?[0-9]+\s*corridas?""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (besideTrips != null) return normalizeRating(besideTrips)
