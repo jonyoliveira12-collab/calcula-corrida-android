@@ -157,8 +157,14 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("traffic_enabled", checked).apply() }
         }
         trafficRow.addView(trafficSwitch)
+        trafficRow.addView(action("⚙", false) { showTab("Semáforo") })
         traffic.addView(trafficRow)
-        traffic.addView(label("RUIM    ATENÇÃO    ACEITAR", 11f, gold, true, 8, 0))
+        traffic.addView(label(
+            prefs.getString("label_bad", "Vixe não dá") + "    " +
+            prefs.getString("label_review", "Hum, talvez") + "    " +
+            prefs.getString("label_good", "Bora carai"),
+            11f, gold, true, 8, 0
+        ))
         content.addView(traffic, margin(0, 10))
 
         // Jornada
