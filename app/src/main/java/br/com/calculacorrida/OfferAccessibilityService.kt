@@ -274,7 +274,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         startX = params.x
                         startY = params.y
                         moved = false
-                        closeTap = event.x >= v.width - dp(78) && event.y <= dp(44)
+                        closeTap = event.y <= dp(42)
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -292,7 +292,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         if (moved) {
                             getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
                                 .putInt("offer_tag_x", params.x).putInt("offer_tag_y", params.y).apply()
-                        } else {
+                        } else if (closeTap) {
                             hideOverlay()
                         }
                         true
@@ -338,10 +338,9 @@ class OfferAccessibilityService : AccessibilityService() {
             r.fare, r.perKm, r.minutes, r.perHour, rating
         )
         view.visibility = View.VISIBLE
+        // A etiqueta permanece visível até o motorista tocar em FECHAR.
         dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
-        val dismiss = Runnable { hideOverlay() }
-        dismissOverlayTask = dismiss
-        overlayHandler.postDelayed(dismiss, 3000L)
+        dismissOverlayTask = null
     }
 
     private fun hideOverlay() {
