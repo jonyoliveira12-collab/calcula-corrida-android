@@ -20,14 +20,37 @@ object OfferTextParser {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\n', ' '), Normalizer.Form.NFKC)
         val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
-        val distances = distanceRegex.findAll(text).mapNotNull { toNumber(it.groupValues[1]) }.toList()
-        if (distances.isEmpty()) return null
-        val minutes = minuteRegex.findAll(text).mapNotNull { it.groupValues[1].toDoubleOrNull() }.sum()
-        if (minutes <= 0.0) return null
 
-        val pickupKm = if (distances.size >= 2) distances[0] else 0.0
-        val tripKm = if (distances.size >= 2) distances[1] else distances[0]
+        val distances = distanceRegex.findAll(text)
+            .mapNotNull { toNumber(it.groupValues[1]) }
+            .toList()
+        if (distances.isEmpty()) return null
+
+        // O cartão do Uber mostra primeiro a distância total (ex.: 9,9 km)
+        // e depois os trechos: retirada (7,7 km) + viagem (2,2 km).
+        // Não podemos somar o total novamente com o trecho de retirada.
+        val pickupKm: Double
+        val tripKm: Double
+        when {
+            distances.size >= 3 -> {
+                pickupKm = distances[1]
+                tripKm = distances.drop(2).sum()
+            }
+            distances.size == 2 -> {
+                pickupKm = distances[0]
+                tripKm = distances[1]
+            }
+            else -> {
+                pickupKm = 0.0
+                tripKm = distances[0]
+            }
+        }
         if (tripKm <= 0.0) return null
+
+        // A primeira duração exibida é o tempo total estimado. As seguintes
+        // podem ser os tempos dos trechos e não devem ser somadas novamente.
+        val minutes = minuteRegex.find(text)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
+        if (minutes <= 0.0) return null
 
         val rating = Regex("""(?:★|⭐|nota)\s*([0-5](?:[,.][0-9]+)?)""", RegexOption.IGNORE_CASE)
             .find(text)?.groupValues?.get(1)?.replace(',', '.')
