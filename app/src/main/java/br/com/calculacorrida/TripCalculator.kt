@@ -21,47 +21,41 @@ object TripCalculator {
         pickupKm: Double,
         tripKm: Double,
         minutes: Double,
-        minPerKm: Double,
-        minPerHour: Double,
+        badPerKm: Double = 1.50,
+        goodPerKm: Double = 1.80,
+        badPerHour: Double = 50.0,
+        goodPerHour: Double = 60.0,
         passengerRating: Double? = null,
         minPassengerRating: Double = 4.80,
         goodPassengerRating: Double = 4.90
     ): TripResult? {
         if (fare <= 0 || pickupKm < 0 || tripKm <= 0 || minutes <= 0) return null
         val totalKm = pickupKm + tripKm
-        if (totalKm <= 0) return null
 
-        // Reproduz a etiqueta do Rota Pro: R$/km e R$/hora consideram
-        // o trecho da viagem. O embarque fica separado no cartão original.
+        // Igual à etiqueta do Rota Pro: indicadores calculados sobre o trecho da viagem.
         val perKm = fare / tripKm
         val perHour = fare * 60.0 / minutes
 
         val lowRating = passengerRating != null && passengerRating < minPassengerRating
-        val goodRating = passengerRating == null || passengerRating >= goodPassengerRating
+        val ratingIsGood = passengerRating == null || passengerRating >= goodPassengerRating
 
         val classification = when {
-            perKm < minPerKm * 0.85 ||
-                perHour < minPerHour * 0.85 ||
-                lowRating -> Rating.BAD
-
-            perKm >= minPerKm &&
-                perHour >= minPerHour &&
-                goodRating -> Rating.GOOD
-
+            perKm < badPerKm || perHour < badPerHour || lowRating -> Rating.BAD
+            perKm >= goodPerKm && perHour >= goodPerHour && ratingIsGood -> Rating.GOOD
             else -> Rating.REVIEW
         }
 
         val reason = when {
-            lowRating -> "Nota do passageiro abaixo do mínimo configurado."
+            lowRating -> "Nota do passageiro abaixo de 4,80."
             passengerRating != null && passengerRating < goodPassengerRating ->
                 "Nota do passageiro na faixa de atenção."
             passengerRating == null ->
-                "Nota do passageiro não identificada; classificação pelos valores e tempo."
+                "Nota não identificada; classificação pelos valores e tempo."
             classification == Rating.GOOD ->
-                "Atinge os mínimos de valor por km, por hora e nota."
+                "Atinge os mínimos de km, hora e nota."
             classification == Rating.REVIEW ->
-                "Está perto dos limites definidos. Avalie as condições."
-            else -> "Fica abaixo de pelo menos um dos limites definidos."
+                "Está na faixa de atenção. Avalie as condições."
+            else -> "Abaixo de pelo menos um dos limites definidos."
         }
 
         return TripResult(
