@@ -7,8 +7,6 @@
     <application
         android:allowBackup="false"
         android:label="JHONDRIVER"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <activity
@@ -27,8 +25,7 @@
         <service
             android:name=".OfferAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true"
-            android:label="JHONDRIVER - Leitura de ofertas">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService"/>
             </intent-filter>
