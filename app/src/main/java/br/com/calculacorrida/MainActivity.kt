@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Build
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
@@ -26,13 +27,6 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = bg
-
-        val session = SessionManager(this)
-        if (!session.isLoggedIn()) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
 
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
 
@@ -180,21 +174,6 @@ class MainActivity : Activity() {
         card.addView(btnOverlay, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(12) })
 
         container.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(20) })
-
-        // BOTÃO SAIR
-        val btnLogout = Button(this).apply {
-            text = "SAIR"
-            textSize = 14f
-            setTextColor(red)
-            typeface = Typeface.DEFAULT_BOLD
-            background = GradientDrawable().apply { setColor(Color.TRANSPARENT) }
-            setOnClickListener {
-                SessionManager(this@MainActivity).logout()
-                startActivity(Intent(this@MainActivity, LoginActivity::class.java))
-                finish()
-            }
-        }
-        container.addView(btnLogout, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
 
         scroll.addView(container)
         root.addView(scroll, LinearLayout.LayoutParams(-1, -1))
