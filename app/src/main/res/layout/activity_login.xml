@@ -36,6 +36,15 @@
             android:textColor="#FFFFFF"
             android:textColorHint="#999999"
             android:backgroundTint="#D4AF37"/>
+        <CheckBox
+            android:id="@+id/rememberEmailCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lembrar meu e-mail neste aparelho"
+            android:textColor="#D4AF37"
+            android:buttonTint="#D4AF37"
+            android:checked="true"
+            android:layout_marginTop="8dp"/>
         <EditText
             android:id="@+id/passwordInput"
             android:layout_width="match_parent"
