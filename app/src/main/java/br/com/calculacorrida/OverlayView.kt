@@ -30,7 +30,7 @@ class OverlayView(context: Context) : FrameLayout(context) {
     private var initialY: Float = 0f
     private var initialTouchX: Float = 0f
     private var initialTouchY: Float = 0f
-    private var layoutParams: WindowManager.LayoutParams? = null
+    private var windowLayoutParams: WindowManager.LayoutParams? = null
 
     init {
         setBackgroundColor(Color.parseColor("#CC000000"))
@@ -111,21 +111,21 @@ class OverlayView(context: Context) : FrameLayout(context) {
         alpha = value
     }
 
-    fun setLayoutParams(params: WindowManager.LayoutParams) {
-        layoutParams = params
+    fun setWindowLayoutParams(params: WindowManager.LayoutParams) {
+        windowLayoutParams = params
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                initialX = layoutParams?.x ?: 0f
-                initialY = layoutParams?.y ?: 0f
+                initialX = windowLayoutParams?.x?.toFloat() ?: 0f
+                initialY = windowLayoutParams?.y?.toFloat() ?: 0f
                 initialTouchX = event.rawX
                 initialTouchY = event.rawY
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                layoutParams?.let { params ->
+                windowLayoutParams?.let { params ->
                     params.x = (initialX + (event.rawX - initialTouchX)).toInt()
                     params.y = (initialY + (event.rawY - initialTouchY)).toInt()
                     val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
