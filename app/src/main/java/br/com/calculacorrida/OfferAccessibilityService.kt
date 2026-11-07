@@ -150,8 +150,10 @@ class OfferAccessibilityService : AccessibilityService() {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val result = TripCalculator.calculate(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
+            prefs.getFloat("bad_per_km", 1.50f).toDouble(),
             prefs.getFloat("min_per_km", 1.80f).toDouble(),
             prefs.getFloat("min_per_hour", 50f).toDouble(),
+            prefs.getFloat("good_per_hour", 60f).toDouble(),
             offer.passengerRating?.toDoubleOrNull(),
             prefs.getFloat("min_rating", 4.80f).toDouble(),
             prefs.getFloat("good_rating", 4.90f).toDouble()
