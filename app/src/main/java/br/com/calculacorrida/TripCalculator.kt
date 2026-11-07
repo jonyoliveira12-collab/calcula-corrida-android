@@ -31,8 +31,9 @@ object TripCalculator {
         val totalKm = pickupKm + tripKm
         if (totalKm <= 0) return null
 
-        // Os dois indicadores usam a rota e o tempo completos, incluindo o embarque.
-        val perKm = fare / totalKm
+        // Reproduz a etiqueta do Rota Pro: R$/km e R$/hora consideram
+        // o trecho da viagem. O embarque fica separado no cartão original.
+        val perKm = fare / tripKm
         val perHour = fare * 60.0 / minutes
 
         val lowRating = passengerRating != null && passengerRating < minPassengerRating
