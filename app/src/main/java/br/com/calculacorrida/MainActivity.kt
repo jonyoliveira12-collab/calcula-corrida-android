@@ -139,7 +139,15 @@ class MainActivity : Activity() {
         val aiSwitch = Switch(this).apply {
             isChecked = prefs.getBoolean("copilot_enabled", false)
             buttonTintList = ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("copilot_enabled", checked).apply() }
+            setOnCheckedChangeListener { _, checked ->
+                if (checked && !ensureRequiredPermissions()) {
+                    isChecked = false
+                    prefs.edit().putBoolean("copilot_enabled", false).apply()
+                } else {
+                    prefs.edit().putBoolean("copilot_enabled", checked).apply()
+                    if (checked) requestAccessibilityIfNeeded()
+                }
+            }
         }
         copilotRow.addView(aiSwitch)
         copilot.addView(copilotRow)
@@ -154,7 +162,15 @@ class MainActivity : Activity() {
         val trafficSwitch = Switch(this).apply {
             isChecked = prefs.getBoolean("traffic_enabled", false)
             buttonTintList = ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("traffic_enabled", checked).apply() }
+            setOnCheckedChangeListener { _, checked ->
+                if (checked && !ensureRequiredPermissions()) {
+                    isChecked = false
+                    prefs.edit().putBoolean("traffic_enabled", false).apply()
+                } else {
+                    prefs.edit().putBoolean("traffic_enabled", checked).apply()
+                    if (checked) requestAccessibilityIfNeeded()
+                }
+            }
         }
         trafficRow.addView(trafficSwitch)
         trafficRow.addView(action("⚙", false) { showTab("Semáforo") })
@@ -211,6 +227,26 @@ class MainActivity : Activity() {
             }
         })
         content.addView(perms, margin(0, 10))
+    }
+
+    private fun ensureRequiredPermissions(): Boolean {
+        if (!Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            Toast.makeText(this, "Autorize aparecer sobre outros aplicativos e volte para ativar.", Toast.LENGTH_LONG).show()
+            return false
+        }
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, "Ative a acessibilidade do JHONDRIVER para analisar as ofertas.", Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return false
+        }
+        return true
+    }
+
+    private fun requestAccessibilityIfNeeded() {
+        if (!isAccessibilityEnabled()) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
     }
 
     private fun buildTrafficSettings() {
