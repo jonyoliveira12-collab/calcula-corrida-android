@@ -217,7 +217,7 @@ class MainActivity : Activity() {
         content.addView(card().apply {
             addView(label("RESUMO DA JORNADA", 11f, gold, true))
             addView(label("Tempo trabalhado: —", 14f, white, false, 0, 8))
-            addView(label("Ofertas analisadas: 0", 14f, white))
+            addView(label("Ofertas analisadas: 0", 14f, white, false))
         }, margin(0, 10))
     }
 
