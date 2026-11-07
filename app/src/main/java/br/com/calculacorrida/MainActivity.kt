@@ -7,6 +7,9 @@ import android.content.Intent
 import android.content.ComponentName
 import android.provider.Settings
 import android.net.Uri
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -29,6 +32,7 @@ class MainActivity : Activity() {
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
     private var selectedTab = "Início"
+    private val PICK_IMAGE_REQUEST = 702
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,6 +114,15 @@ class MainActivity : Activity() {
         metrics.addView(metric("CORRIDAS", "0"), weight())
         welcome.addView(metrics)
         content.addView(welcome, margin(0, 10))
+
+        val printCard = card()
+        printCard.addView(label("ANALISAR PRINT DE CORRIDA", 16f, white, true))
+        printCard.addView(label("Selecione uma captura de tela da Uber ou 99 para calcular a oferta.", 12f, muted, false, 4, 8))
+        printCard.addView(action("ESCOLHER PRINT PARA ANALISAR", true) {
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*"; addCategory(Intent.CATEGORY_OPENABLE) }
+            startActivityForResult(Intent.createChooser(intent, "Escolha o print da corrida"), PICK_IMAGE_REQUEST)
+        })
+        content.addView(printCard, margin(0, 10))
 
         val copilot = card()
         val copilotRow = horizontal()
@@ -253,6 +266,63 @@ class MainActivity : Activity() {
         }, margin(0, 10))
     }
 
+
+
+    @Deprecated("Deprecated in Android API; retained for broad device compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_IMAGE_REQUEST || resultCode != RESULT_OK || data?.data == null) return
+        val imageUri = data.data ?: return
+        try {
+            val image = InputImage.fromFilePath(this, imageUri)
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            Toast.makeText(this, "Lendo o print...", Toast.LENGTH_SHORT).show()
+            recognizer.process(image)
+                .addOnSuccessListener { vision ->
+                    val offer = OfferTextParser.parse(vision.text)
+                    if (offer == null) {
+                        AlertDialog.Builder(this)
+                            .setTitle("Não consegui identificar a oferta")
+                            .setMessage("O print foi lido, mas não encontrei todos os dados necessários. Confira se aparecem valor, duas distâncias (embarque e viagem) e duração.\n\nTexto reconhecido:\n" + vision.text.take(1800))
+                            .setPositiveButton("OK", null).show()
+                    } else {
+                        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+                        val result = TripCalculator.calculate(
+                            offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
+                            prefs.getFloat("min_per_km", 1.8f).toDouble(),
+                            prefs.getFloat("min_per_hour", 35f).toDouble()
+                        )
+                        if (result == null) {
+                            toast("Não foi possível calcular essa oferta.")
+                        } else {
+                            val colorName = when (result.rating) {
+                                Rating.GOOD -> "VERDE — BOA"
+                                Rating.REVIEW -> "AMARELO — ATENÇÃO"
+                                Rating.BAD -> "VERMELHO — RUIM"
+                            }
+                            val rating = offer.passengerRating ?: "Não disponível"
+                            AlertDialog.Builder(this)
+                                .setTitle("Análise do print • $colorName")
+                                .setMessage(
+                                    "Valor: " + String.format(java.util.Locale("pt","BR"), "R$ %.2f", result.fare) +
+                                    "\\nTempo: " + String.format(java.util.Locale("pt","BR"), "%.0f min", result.minutes) +
+                                    "\\nDistância até passageiro: " + String.format(java.util.Locale("pt","BR"), "%.1f km", result.pickupKm) +
+                                    "\\nDistância da viagem: " + String.format(java.util.Locale("pt","BR"), "%.1f km", result.tripKm) +
+                                    "\\nDistância total calculada: " + String.format(java.util.Locale("pt","BR"), "%.1f km", result.totalKm) +
+                                    "\\nR$/km: " + String.format(java.util.Locale("pt","BR"), "%.2f", result.perKm) +
+                                    "\\nR$/hora: " + String.format(java.util.Locale("pt","BR"), "%.2f", result.perHour) +
+                                    "\\nNota: " + rating + "\\n\\n" + result.reason
+                                )
+                                .setPositiveButton("FECHAR", null).show()
+                        }
+                    }
+                }
+                .addOnFailureListener { toast("Erro ao ler a imagem. Tente outro print.") }
+                .addOnCompleteListener { recognizer.close() }
+        } catch (_: Exception) {
+            toast("Não consegui abrir essa imagem.")
+        }
+    }
 
     private fun ensureOverlayPermission() {
         if (!Settings.canDrawOverlays(this)) {
