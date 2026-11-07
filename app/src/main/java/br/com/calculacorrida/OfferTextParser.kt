@@ -2,7 +2,7 @@ package br.com.calculacorrida
 
 import java.text.Normalizer
 
-/** Extrai os dados principais do cartão de oferta (acessibilidade/OCR). */
+/** Lê valores, trechos, duração e nota nas ofertas dos aplicativos de motorista. */
 object OfferTextParser {
     data class ParsedOffer(
         val fare: Double,
@@ -12,47 +12,100 @@ object OfferTextParser {
         val passengerRating: String?
     )
 
-    private val moneyRegex = Regex("""R\$\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
-    private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*km\b""", RegexOption.IGNORE_CASE)
-    private val minuteRegex = Regex("""([0-9]+)\s*(?:min(?:uto)?s?)\b""", RegexOption.IGNORE_CASE)
+    private val moneyRegex = Regex("""R\\$\\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]+(?:\\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
+    private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\\s*(km|m)\\b""", RegexOption.IGNORE_CASE)
+    private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\\s*(?:min(?:uto)?s?)\\b""", RegexOption.IGNORE_CASE)
+
+    // Detecta pares como "1 min (60 m)" e "6 min (3 km)".
+    // Em algumas telas do Uber existe um resumo fora dos parênteses seguido
+    // dos trechos detalhados entre parênteses; nesse caso, usa só o resumo.
+    private val legRegex = Regex(
+        """([0-9]+(?:[,.][0-9]+)?)\\s*min(?:uto)?s?\\s*[·•]?\\s*(\\()?\\s*([0-9]+(?:[,.][0-9]+)?)\\s*(km|m)\\b""",
+        RegexOption.IGNORE_CASE
+    )
 
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
-        val text = Normalizer.normalize(rawText.replace('\n', ' '), Normalizer.Form.NFKC)
-
+        val text = Normalizer.normalize(rawText.replace('\\u00A0', ' '), Normalizer.Form.NFKC)
         val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
-        val distances = distanceRegex.findAll(text)
-            .mapNotNull { toNumber(it.groupValues[1]) }
-            .toList()
-        val durations = minuteRegex.findAll(text)
-            .mapNotNull { it.groupValues[1].toDoubleOrNull() }
-            .toList()
 
-        if (distances.isEmpty() || durations.isEmpty()) return null
+        val legs = legRegex.findAll(text).mapNotNull { match ->
+            val minutes = toNumber(match.groupValues[1]) ?: return@mapNotNull null
+            val distance = toNumber(match.groupValues[3]) ?: return@mapNotNull null
+            val unit = match.groupValues[4].lowercase()
+            val km = if (unit == "m") distance / 1000.0 else distance
+            if (minutes <= 0 || km < 0) null
+            else Triple(minutes, km, match.groupValues[2].isNotEmpty())
+        }.toList()
 
-        /*
-         * No cartão do Uber, a primeira linha-resumo apresenta a distância e
-         * duração totais (ex.: "16 min · 9,9 km"). As linhas abaixo detalham
-         * os trechos (ex.: "11 min (7,7 km)" + "5 min (2,2 km)").
-         * Usar a primeira distância e duração evita somar o resumo novamente
-         * com os trechos, o que inflava o denominador e o tempo.
-         */
-        val totalKm = distances.first()
-        val totalMinutes = durations.first()
-        if (totalKm <= 0.0 || totalMinutes <= 0.0) return null
+        val pickupKm: Double
+        val tripKm: Double
+        val totalMinutes: Double
 
-        val rating = Regex("""(?:★|⭐|nota)\s*([0-5](?:[,.][0-9]+)?)""", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)?.replace(',', '.')
+        if (legs.isNotEmpty()) {
+            val summary = legs.firstOrNull { !it.third }
+            if (summary != null) {
+                // Resumo total da rota: não somar novamente os trechos.
+                pickupKm = 0.0
+                tripKm = summary.second
+                totalMinutes = summary.first
+            } else {
+                // Cartões como o da 99: embarque + viagem aparecem em linhas separadas.
+                pickupKm = legs.first().second
+                tripKm = legs.drop(1).sumOf { it.second }
+                totalMinutes = legs.sumOf { it.first }
+                if (legs.size == 1) {
+                    pickupKm = 0.0
+                    tripKm = legs.first().second
+                }
+            }
+        } else {
+            val distances = distanceRegex.findAll(text).mapNotNull {
+                val value = toNumber(it.groupValues[1]) ?: return@mapNotNull null
+                if (it.groupValues[2].equals("m", true)) value / 1000.0 else value
+            }.toList()
+            val durations = minuteRegex.findAll(text).mapNotNull {
+                toNumber(it.groupValues[1])
+            }.toList()
+            if (distances.isEmpty() || durations.isEmpty()) return null
+            pickupKm = 0.0
+            tripKm = distances.first()
+            totalMinutes = durations.first()
+        }
 
-        // Representa a distância completa em um único campo para o calculador
-        // não somar novamente retirada + viagem.
+        if (pickupKm + tripKm <= 0.0 || totalMinutes <= 0.0) return null
+
+        val rating = extractPassengerRating(text)
         return ParsedOffer(
             fare = fare,
-            pickupKm = 0.0,
-            tripKm = totalKm,
+            pickupKm = pickupKm,
+            tripKm = tripKm,
             minutes = totalMinutes,
             passengerRating = rating
         )
+    }
+
+    private fun extractPassengerRating(text: String): String? {
+        // Formato com estrela ou rótulo explícito.
+        val labeled = Regex(
+            """(?:★|⭐|nota(?:\\s+do\\s+passageiro)?)\\s*[:·-]?\\s*([0-5](?:[,.][0-9]{1,2})?)""",
+            RegexOption.IGNORE_CASE
+        ).find(text)?.groupValues?.get(1)
+        if (labeled != null) return normalizeRating(labeled)
+
+        // Formato comum na 99: "4,97 · 498 corridas", sem a palavra Nota.
+        val besideTrips = Regex(
+            """([0-5][,.][0-9]{1,2})\\s*(?:[·•|]\\s*)?[0-9]+\\s*corridas?""",
+            RegexOption.IGNORE_CASE
+        ).find(text)?.groupValues?.get(1)
+        if (besideTrips != null) return normalizeRating(besideTrips)
+
+        return null
+    }
+
+    private fun normalizeRating(value: String): String? {
+        val number = toNumber(value) ?: return null
+        return if (number in 0.0..5.0) String.format(java.util.Locale.US, "%.2f", number) else null
     }
 
     private fun toNumber(value: String): Double? {
