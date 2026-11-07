@@ -137,7 +137,7 @@ class MainActivity : Activity() {
         copilotRow.addView(iconTile("✧"))
         copilotRow.addView(verticalText("Copiloto", "Análise automática de ofertas"), LinearLayout.LayoutParams(0, -2, 1f))
         val aiSwitch = Switch(this).apply {
-            isChecked = prefs.getBoolean("copilot_enabled", true)
+            isChecked = prefs.getBoolean("copilot_enabled", false)
             buttonTintList = ColorStateList.valueOf(gold)
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("copilot_enabled", checked).apply() }
         }
@@ -152,7 +152,7 @@ class MainActivity : Activity() {
         trafficRow.addView(iconTile("🚦"))
         trafficRow.addView(verticalText("Semáforo de Valores", "Uber • 99 • classificação por faixa"), LinearLayout.LayoutParams(0, -2, 1f))
         val trafficSwitch = Switch(this).apply {
-            isChecked = prefs.getBoolean("traffic_enabled", true)
+            isChecked = prefs.getBoolean("traffic_enabled", false)
             buttonTintList = ColorStateList.valueOf(gold)
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("traffic_enabled", checked).apply() }
         }
