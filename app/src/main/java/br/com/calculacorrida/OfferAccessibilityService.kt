@@ -337,8 +337,8 @@ class OfferAccessibilityService : AccessibilityService() {
             setStroke(dp(3), color)
         }
         view.background = accent
-        view.text = "× FECHAR   •   $label\nR$ %.2f  •  R$ %.2f/km\n%.0f min  •  R$ %.2f/h  •  Nota %s".format(
-            r.fare, r.perKm, r.minutes, r.perHour, rating
+        view.text = "× FECHAR   •   $label\nR$ %.2f  •  R$ %.2f/km\n%.1f min  •  R$ %.2f/h  •  %s\n%s".format(
+            r.fare, r.perKm, r.minutes, r.perHour, rating, r.reason
         )
         view.visibility = View.VISIBLE
         // A etiqueta permanece visível até o motorista tocar em FECHAR.
