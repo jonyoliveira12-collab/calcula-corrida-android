@@ -1,113 +1,131 @@
-package com.jhondriver.calculacorrida
+package br.com.calculacorrida
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.text.TextUtils
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.textfield.TextInputLayout
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 
-class LoginActivity : AppCompatActivity() {
-
-    private lateinit var emailInput: TextInputLayout
-    private lateinit var passwordInput: TextInputLayout
+class LoginActivity : Activity() {
+    private lateinit var emailInput: EditText
+    private lateinit var passwordInput: EditText
     private lateinit var loginButton: Button
     private lateinit var registerButton: Button
     private lateinit var progressBar: ProgressBar
 
-    // Cliente HTTP para fazer as requisições no servidor
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = android.graphics.Color.rgb(10, 10, 10)
         setContentView(R.layout.activity_login)
 
         emailInput = findViewById(R.id.emailInput)
         passwordInput = findViewById(R.id.passwordInput)
         loginButton = findViewById(R.id.loginButton)
         registerButton = findViewById(R.id.registerButton)
-        
-        // Adicionamos uma barra de carregamento para enquanto o servidor responde
-        // (Lembrando de adicionar o ProgressBar no seu activity_login.xml depois)
-        progressBar = ProgressBar(this)
+        progressBar = findViewById(R.id.progressBar)
 
-        loginButton.setOnClickListener {
-            val email = emailInput.editText?.text.toString().trim()
-            val password = passwordInput.editText?.text.toString().trim()
+        val savedToken = getSharedPreferences("auth", MODE_PRIVATE).getString("access_token", null)
+        if (!savedToken.isNullOrBlank()) {
+            openMain()
+            return
+        }
 
-            if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) {
-                Toast.makeText(this, "Preencha e-mail e senha", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+        loginButton.setOnClickListener { authenticate(isRegistration = false) }
+        registerButton.setOnClickListener { authenticate(isRegistration = true) }
+    }
+
+    private fun authenticate(isRegistration: Boolean) {
+        val email = emailInput.text.toString().trim()
+        val password = passwordInput.text.toString()
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            emailInput.error = "Informe um e-mail válido"
+            return
+        }
+        if (password.length < 8) {
+            passwordInput.error = "A senha precisa ter pelo menos 8 caracteres"
+            return
+        }
+        if (SupabaseConfig.PROJECT_URL.contains("SEU-PROJETO") ||
+            SupabaseConfig.PUBLISHABLE_KEY.startsWith("SUA_CHAVE")) {
+            Toast.makeText(this, "Falta configurar o projeto Supabase. Veja SupabaseConfig.kt.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        setLoading(true)
+        thread {
+            var success = false
+            var message = "Não foi possível conectar."
+            var token: String? = null
+            try {
+                val endpoint = if (isRegistration) "/auth/v1/signup"
+                    else "/auth/v1/token?grant_type=password"
+                val body = JSONObject().put("email", email).put("password", password).toString()
+                val connection = (URL(SupabaseConfig.PROJECT_URL.trimEnd('/') + endpoint).openConnection() as HttpURLConnection)
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("apikey", SupabaseConfig.PUBLISHABLE_KEY)
+                connection.setRequestProperty("Authorization", "Bearer " + SupabaseConfig.PUBLISHABLE_KEY)
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                val code = connection.responseCode
+                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                val responseText = stream?.bufferedReader()?.use { it.readText() } ?: "{}"
+                val response = JSONObject(responseText)
+                if (code in 200..299) {
+                    token = response.optString("access_token").takeIf { it.isNotBlank() && it != "null" }
+                    if (isRegistration && token == null) {
+                        success = true
+                        message = "Cadastro criado! Confirme seu e-mail e depois entre."
+                    } else if (token != null) {
+                        success = true
+                        message = "Login realizado!"
+                    } else {
+                        message = "Cadastro recebido. Verifique seu e-mail para confirmar a conta."
+                        success = true
+                    }
+                } else {
+                    message = response.optString("msg",
+                        response.optString("message", response.optString("error_description",
+                            response.optString("error", "Erro HTTP $code"))))
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                message = "Falha de conexão: " + (e.localizedMessage ?: "tente novamente")
             }
 
-            // Desativa o botão e mostra a barra de progresso
-            loginButton.isEnabled = false
-            progressBar.visibility = View.VISIBLE
-
-            // Inicia a chamada ao servidor em segundo plano
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    // TROQUE PELA URL DO SEU SERVIDOR NODE.JS
-                    val serverUrl = "https://SEU_SERVIDOR.com/v1/credentials"
-
-                    val jsonBody = JSONObject()
-                    jsonBody.put("email", email)
-                    jsonBody.put("password", password)
-
-                    val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
-
-                    val request = Request.Builder()
-                        .url(serverUrl)
-                        .post(requestBody)
-                        .build()
-
-                    val response = client.newCall(request).execute()
-                    val responseBody = response.body?.string()
-
-                    withContext(Dispatchers.Main) {
-                        progressBar.visibility = View.GONE
-                        loginButton.isEnabled = true
-
-                        if (response.isSuccessful) {
-                            // Login OK! Vai para a MainActivity
-                            Toast.makeText(this@LoginActivity, "Login realizado!", Toast.LENGTH_SHORT).show()
-                            val intent = Intent(this@LoginActivity, MainActivity::class.java)
-                            startActivity(intent)
-                            finish()
-                        } else {
-                            // Servidor respondeu com erro (ex: senha errada)
-                            Toast.makeText(this@LoginActivity, "Erro: $responseBody", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        progressBar.visibility = View.GONE
-                        loginButton.isEnabled = true
-                        Toast.makeText(this@LoginActivity, "Erro de conexão: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
+            runOnUiThread {
+                setLoading(false)
+                if (success && token != null) {
+                    getSharedPreferences("auth", MODE_PRIVATE).edit()
+                        .putString("access_token", token)
+                        .putString("email", email)
+                        .apply()
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                    openMain()
+                } else {
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                 }
             }
         }
+    }
 
-        registerButton.setOnClickListener {
-            Toast.makeText(this, "Tela de cadastro futura", Toast.LENGTH_SHORT).show()
-        }
+    private fun setLoading(loading: Boolean) {
+        progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        loginButton.isEnabled = !loading
+        registerButton.isEnabled = !loading
+    }
+
+    private fun openMain() {
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
     }
 }
