@@ -20,8 +20,13 @@ object OfferTextParser {
         val rating = ratingMatch?.groupValues?.get(1)
         val trips = ratingMatch?.groupValues?.get(2)?.takeIf { it.isNotBlank() }
 
-        val kmValues = Regex("""([0-9]+(?:\.[0-9]+)?)\s*(?:km|quil[oô]metros?)""")
+        // Prioriza os trechos entre parênteses (ex.: 6 min (3,1 km), 13 min (8 km)),
+        // evitando confundir a distância total do resumo com a distância até o passageiro.
+        val parenthesizedKm = Regex("""\\(\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(?:km|quil[oô]metros?)\\s*\\)""")
             .findAll(text).mapNotNull { it.groupValues[1].toDoubleOrNull() }.filter { it > 0 }.toList()
+        val kmValues = if (parenthesizedKm.size >= 2) parenthesizedKm else
+            Regex("""([0-9]+(?:\\.[0-9]+)?)\\s*(?:km|quil[oô]metros?)""")
+                .findAll(text).mapNotNull { it.groupValues[1].toDoubleOrNull() }.filter { it > 0 }.toList()
         if (kmValues.size < 2) return null
 
         val minuteValues = Regex("""([0-9]+)\s*(?:min|minuto|minutos)""")
