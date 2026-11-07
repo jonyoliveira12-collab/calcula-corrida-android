@@ -30,6 +30,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var loginButton: Button
     private lateinit var registerButton: Button
     private lateinit var progressBar: ProgressBar
+    private lateinit var rememberEmailCheck: android.widget.CheckBox
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val httpClient = OkHttpClient.Builder()
@@ -55,6 +56,10 @@ class LoginActivity : AppCompatActivity() {
         loginButton = findViewById(R.id.loginButton)
         registerButton = findViewById(R.id.registerButton)
         progressBar = findViewById(R.id.progressBar)
+        rememberEmailCheck = findViewById(R.id.rememberEmailCheck)
+        val loginPrefs = getSharedPreferences("login_preferences", MODE_PRIVATE)
+        emailInput.setText(loginPrefs.getString("saved_email", "") ?: "")
+        rememberEmailCheck.isChecked = loginPrefs.getBoolean("remember_email", true)
 
         loginButton.setOnClickListener { authenticate(isRegistration = false) }
         registerButton.setOnClickListener { authenticate(isRegistration = true) }
@@ -63,6 +68,10 @@ class LoginActivity : AppCompatActivity() {
     private fun authenticate(isRegistration: Boolean) {
         val email = emailInput.text?.toString()?.trim().orEmpty()
         val password = passwordInput.text?.toString().orEmpty()
+        getSharedPreferences("login_preferences", MODE_PRIVATE).edit()
+            .putBoolean("remember_email", rememberEmailCheck.isChecked)
+            .putString("saved_email", if (rememberEmailCheck.isChecked) email else "")
+            .apply()
 
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             emailInput.error = "Digite um e-mail válido"
