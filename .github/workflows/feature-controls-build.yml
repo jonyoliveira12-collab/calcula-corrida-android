@@ -2,7 +2,7 @@ name: Build Android APK - feature controls
 on:
   workflow_dispatch:
   push:
-    branches: [ feature/copilot-semaphore-controls ]
+    branches: [ feature/copilot-semaphore-controls, feature/auth-supabase ]
 jobs:
   build:
     runs-on: ubuntu-latest
