@@ -186,8 +186,8 @@ class OfferAccessibilityService : AccessibilityService() {
             .replace(Regex("\\p{Mn}+"), "")
             .lowercase(java.util.Locale.ROOT)
 
-        // O botão de aceite é o sinal de estado mais confiável.
-        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar)\b""")
+        // O cartão do Uber pode usar "Tenho interesse" em vez de "Aceitar".
+        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
             .containsMatchIn(normalized)
         val hasFare = Regex("""r\$\s*[0-9]""").containsMatchIn(normalized)
         val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")
@@ -222,7 +222,7 @@ class OfferAccessibilityService : AccessibilityService() {
             windows.firstNotNullOfOrNull { window ->
                 val candidate = window.root ?: return@firstNotNullOfOrNull null
                 val rootPackage = candidate.packageName?.toString()?.lowercase().orEmpty()
-                if (rootPackage == pkg.lowercase() || driverAppName(rootPackage) != null) candidate
+                if (rootPackage == pkg.lowercase()) candidate
                 else { candidate.recycle(); null }
             }
         } catch (_: Exception) { null }
