@@ -31,6 +31,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var registerButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var rememberEmailCheck: android.widget.CheckBox
+    private lateinit var forgotPasswordText: android.widget.TextView
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val httpClient = OkHttpClient.Builder()
@@ -49,6 +50,11 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Reaproveita a sessão local ao voltar ou abrir novamente o aplicativo.
+        if (sessionManager.isLoggedIn()) {
+            openMain()
+            return
+        }
         setContentView(R.layout.activity_login)
 
         emailInput = findViewById(R.id.emailInput)
@@ -57,6 +63,8 @@ class LoginActivity : AppCompatActivity() {
         registerButton = findViewById(R.id.registerButton)
         progressBar = findViewById(R.id.progressBar)
         rememberEmailCheck = findViewById(R.id.rememberEmailCheck)
+        forgotPasswordText = findViewById(R.id.forgotPasswordText)
+        forgotPasswordText.setOnClickListener { sendPasswordRecovery() }
         val loginPrefs = getSharedPreferences("login_preferences", MODE_PRIVATE)
         emailInput.setText(loginPrefs.getString("saved_email", "") ?: "")
         rememberEmailCheck.isChecked = loginPrefs.getBoolean("remember_email", true)
@@ -104,8 +112,7 @@ class LoginActivity : AppCompatActivity() {
                         if (isRegistration) "Conta criada com sucesso!" else "Login realizado!",
                         Toast.LENGTH_SHORT
                     ).show()
-                    startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                    finish()
+                    openMain()
                 }
             } catch (e: Exception) {
                 val message = e.message?.takeIf { it.isNotBlank() }
@@ -117,6 +124,51 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    private fun openMain() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
+    }
+
+    private fun sendPasswordRecovery() {
+        val email = emailInput.text?.toString()?.trim().orEmpty()
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            emailInput.error = "Digite o e-mail cadastrado para receber o link"
+            emailInput.requestFocus()
+            return
+        }
+        setLoading(true)
+        activityScope.launch {
+            try {
+                withContext(Dispatchers.IO) { callSupabaseRecovery(email) }
+                Toast.makeText(this@LoginActivity, "Se esse e-mail estiver cadastrado, enviaremos um link para redefinir sua senha. Confira também o spam.", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@LoginActivity, e.message ?: "Não foi possível solicitar a recuperação. Tente novamente.", Toast.LENGTH_LONG).show()
+            } finally {
+                setLoading(false)
+            }
+        }
+    }
+
+    private fun callSupabaseRecovery(email: String) {
+        val payload = JSONObject().put("email", email)
+        val request = Request.Builder()
+            .url("$SUPABASE_URL/auth/v1/recover")
+            .addHeader("apikey", SUPABASE_PUBLISHABLE_KEY)
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val json = try { JSONObject(body) } catch (_: Exception) { JSONObject() }
+                val message = json.optString("msg").ifBlank { json.optString("message") }.ifBlank { json.optString("error_description") }.ifBlank { "Não foi possível solicitar a recuperação (HTTP " + response.code + ")." }
+                throw IOException(message)
+            }
+        }
+    }
     private fun callSupabaseAuth(email: String, password: String, isRegistration: Boolean): AuthResult {
         val endpoint = if (isRegistration) {
             "$SUPABASE_URL/auth/v1/signup"
@@ -161,6 +213,8 @@ class LoginActivity : AppCompatActivity() {
         progressBar.visibility = if (loading) View.VISIBLE else View.GONE
         loginButton.isEnabled = !loading
         registerButton.isEnabled = !loading
+        forgotPasswordText.isEnabled = !loading
+        forgotPasswordText.alpha = if (loading) 0.5f else 1f
     }
 
     override fun onDestroy() {
