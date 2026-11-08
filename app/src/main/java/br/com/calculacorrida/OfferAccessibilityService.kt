@@ -19,6 +19,9 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 
 class OfferAccessibilityService : AccessibilityService() {
     // Uma etiqueta independente por aplicativo (Uber, 99 e inDrive).
@@ -28,9 +31,20 @@ class OfferAccessibilityService : AccessibilityService() {
     private val pendingOffers = mutableMapOf<String, PendingOffer>()
     private val acceptedSignatures = mutableMapOf<String, String>()
     private var bubble: TextView? = null
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLost(network: Network) {
+            Handler(Looper.getMainLooper()).post { hideAllOverlays() }
+        }
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            val validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            if (!validated) Handler(Looper.getMainLooper()).post { hideAllOverlays() }
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        NetworkGate.register(this, networkCallback)
         val featurePrefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         if (Settings.canDrawOverlays(this) && bubble == null && featurePrefs.getBoolean("copilot_enabled", false)) {
             val v = TextView(this).apply {
@@ -108,6 +122,10 @@ class OfferAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
+        if (!NetworkGate.isOnline(this)) {
+            hideAllOverlays()
+            return
+        }
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val copilotEnabled = prefs.getBoolean("copilot_enabled", false)
         val trafficEnabled = prefs.getBoolean("traffic_enabled", false)
@@ -332,6 +350,7 @@ class OfferAccessibilityService : AccessibilityService() {
     override fun onInterrupt() { /* Mantém as etiquetas válidas durante interrupções breves. */ }
 
     override fun onDestroy() {
+        NetworkGate.unregister(this, networkCallback)
         overlays.values.forEach { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
         overlays.clear()
         overlayParams.clear()
