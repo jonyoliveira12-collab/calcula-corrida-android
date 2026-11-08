@@ -187,10 +187,10 @@ class OfferAccessibilityService : AccessibilityService() {
             .lowercase(java.util.Locale.ROOT)
 
         // O botão de aceite é o sinal de estado mais confiável.
-        val hasAcceptAction = Regex("""\\b(aceitar|aceite|accept|aceptar)\\b""")
+        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar)\b""")
             .containsMatchIn(normalized)
-        val hasFare = Regex("""r\\$\\s*[0-9]""").containsMatchIn(normalized)
-        val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\\s*(?:min|km)\\b""")
+        val hasFare = Regex("""r\$\s*[0-9]""").containsMatchIn(normalized)
+        val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")
             .findAll(normalized).count() >= 2
 
         return hasAcceptAction && hasFare && hasOfferMetrics
