@@ -192,8 +192,12 @@ class OfferAccessibilityService : AccessibilityService() {
         val hasFare = Regex("""r\$\s*[0-9]""").containsMatchIn(normalized)
         val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")
             .findAll(normalized).count() >= 2
+        val isNavigationOrTrip = listOf(
+            "navegar", "encerrar viagem", "finalizar viagem", "em viagem",
+            "cheguei", "encontro com", "iniciar viagem"
+        ).any { normalized.contains(it) }
 
-        return hasAcceptAction && hasFare && hasOfferMetrics
+        return hasAcceptAction && hasFare && hasOfferMetrics && !isNavigationOrTrip
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
