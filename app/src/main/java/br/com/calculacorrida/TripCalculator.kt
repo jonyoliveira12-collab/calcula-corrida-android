@@ -32,8 +32,9 @@ object TripCalculator {
         if (fare <= 0 || pickupKm < 0 || tripKm <= 0 || minutes <= 0) return null
         val totalKm = pickupKm + tripKm
 
-        // Igual à etiqueta do Rota Pro: indicadores calculados sobre o trecho da viagem.
-        val perKm = fare / tripKm
+        // Indicadores da faixa usam o percurso total exibido na oferta:
+        // distância de chegada ao passageiro + distância da viagem.
+        val perKm = fare / totalKm
         val perHour = fare * 60.0 / minutes
 
         val lowRating = passengerRating != null && passengerRating < minPassengerRating
