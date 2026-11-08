@@ -18,15 +18,15 @@ import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
 
-    private val bg = Color.rgb(12, 12, 13)
-    private val panel = Color.rgb(25, 24, 22)
-    private val gold = Color.rgb(218, 170, 78)
+    private val bg = Color.rgb(7, 9, 13)
+    private val panel = Color.rgb(19, 21, 25)
+    private val gold = Color.rgb(235, 184, 76)
     private val white = Color.rgb(247, 244, 237)
     private val muted = Color.rgb(160, 154, 143)
     private val green = Color.rgb(42, 166, 111)
     private val red = Color.rgb(202, 65, 65)
     private val amber = Color.rgb(204, 139, 43)
-    private val border = Color.rgb(60, 56, 50)
+    private val border = Color.rgb(105, 76, 31)
     private val bgInput = Color.rgb(35, 33, 30)
 
     private lateinit var content: LinearLayout
@@ -49,7 +49,7 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(bg)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(5, 7, 11), Color.rgb(20, 17, 14), Color.rgb(7, 9, 13)))
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
@@ -67,7 +67,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
             addView(label("JHONDRIVER", 21f, white, true))
-            addView(label("INTELIGÊNCIA PARA CADA CORRIDA", 9f, muted, true))
+            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, muted, true))
         }
         brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         val avatar = ImageView(this).apply {
@@ -164,8 +164,8 @@ class MainActivity : Activity() {
         val online = isOperationalOnline()
         row.addView(pill(if (online) "● ONLINE" else "● OFF", if (online) green else red))
         welcome.addView(row)
-        welcome.addView(label("Seu painel de corridas", 22f, white, true, 12, 3))
-        welcome.addView(label("Acompanhe seu desempenho em tempo real.", 12f, muted, false, 0, 12))
+        welcome.addView(label("Seu painel inteligente", 22f, white, true, 12, 3))
+        welcome.addView(label("Todas as suas ofertas em um só lugar.", 12f, muted, false, 0, 12))
         val metrics = horizontal()
         metrics.addView(metric("GANHOS", "R$ 0,00"), weight())
         metrics.addView(metric("POR HORA", "R$ 0,00"), weight())
