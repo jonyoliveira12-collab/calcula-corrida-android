@@ -17,23 +17,17 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
-import android.graphics.Bitmap
-import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class OfferAccessibilityService : AccessibilityService() {
     // Uma etiqueta independente por aplicativo (Uber, 99 e inDrive).
     private val overlays = linkedMapOf<String, OfferTagView>()
     private val overlayParams = linkedMapOf<String, WindowManager.LayoutParams>()
-    private val lastTexts = mutableMapOf<String, String>()
+    private data class PendingOffer(val signature: String, val offer: OfferTextParser.ParsedOffer, var hits: Int, var lastSeen: Long)
+    private val pendingOffers = mutableMapOf<String, PendingOffer>()
+    private val acceptedSignatures = mutableMapOf<String, String>()
     private var bubble: TextView? = null
-    private var lastOcrAt = 0L
-    private val overlayHandler = Handler(Looper.getMainLooper())
-    private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -128,21 +122,36 @@ class OfferAccessibilityService : AccessibilityService() {
             return
         }
 
-        val appName = driverAppName(pkg) ?: return
-        // Em tela dividida, usa a janela do app de motorista, não a do Maps.
+        if (driverAppName(pkg) == null) return
+        // A tela inteira via OCR pode misturar dois apps no tablet. Para evitar
+        // ofertas híbridas, aceitamos somente os dados da árvore do próprio app.
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow ?: return
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
-        if (screenText.isNotBlank() && screenText != lastTexts[pkg]) {
-            lastTexts[pkg] = screenText
-            val offer = OfferTextParser.parse(screenText)
-            if (offer != null) {
-                calculateAndShow(offer, findFareBounds(root), pkg)
-                return
-            }
+        val offer = OfferTextParser.parse(screenText) ?: return
+        val signature = listOf(
+            "%.2f".format(java.util.Locale.US, offer.fare),
+            "%.2f".format(java.util.Locale.US, offer.pickupKm),
+            "%.2f".format(java.util.Locale.US, offer.tripKm),
+            "%.1f".format(java.util.Locale.US, offer.minutes),
+            offer.passengerRating.orEmpty()
+        ).joinToString("|")
+        val now = android.os.SystemClock.elapsedRealtime()
+        val pending = pendingOffers[pkg]
+        val stable = if (pending != null && pending.signature == signature && now - pending.lastSeen <= 2500L) {
+            pending.hits += 1
+            pending.lastSeen = now
+            pending
+        } else {
+            PendingOffer(signature, offer, 1, now).also { pendingOffers[pkg] = it }
         }
-        readOfferByScreenshot(pkg)
+        // Exige duas leituras iguais antes de atualizar a cor/valores. Uma leitura
+        // parcial ou transitória nunca substitui uma etiqueta já válida.
+        if (stable.hits >= 2 && acceptedSignatures[pkg] != signature) {
+            acceptedSignatures[pkg] = signature
+            calculateAndShow(stable.offer, findFareBounds(root), pkg)
+        }
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
@@ -160,35 +169,6 @@ class OfferAccessibilityService : AccessibilityService() {
         // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
         JourneyStore.record(this, offer, result, sourcePackage)
         showOffer(result, offer.passengerRating, anchor, sourcePackage)
-    }
-
-    private fun readOfferByScreenshot(sourcePackage: String) {
-        if (Build.VERSION.SDK_INT < 30) return
-        val now = SystemClock.elapsedRealtime()
-        val last = getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getLong("ocr_last_$sourcePackage", 0L)
-        if (now - last < 1800L) return
-        getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
-            .putLong("ocr_last_$sourcePackage", now).apply()
-
-        takeScreenshot(android.view.Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
-            override fun onSuccess(result: ScreenshotResult) {
-                val bmp = try {
-                    Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
-                        ?.copy(Bitmap.Config.ARGB_8888, false)
-                } catch (_: Exception) { null }
-                result.hardwareBuffer.close()
-                if (bmp == null) return
-                recognizer.process(InputImage.fromBitmap(bmp, 0))
-                    .addOnSuccessListener { vision ->
-                        val parsed = OfferTextParser.parse(vision.text)
-                        if (parsed != null) calculateAndShow(parsed, null, sourcePackage)
-                    }
-                    .addOnFailureListener { /* Falha temporária: preserva a última etiqueta válida. */ }
-                    .addOnCompleteListener { bmp.recycle() }
-            }
-            override fun onFailure(errorCode: Int) { /* Não remove as etiquetas existentes. */ }
-        })
     }
 
     private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
@@ -347,9 +327,10 @@ class OfferAccessibilityService : AccessibilityService() {
         overlays.values.forEach { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
         overlays.clear()
         overlayParams.clear()
+        pendingOffers.clear()
+        acceptedSignatures.clear()
         bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         bubble = null
-        try { recognizer.close() } catch (_: Exception) { }
         super.onDestroy()
     }
 }
