@@ -49,7 +49,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
-            setPadding(dp(12), dp(8), dp(12), dp(5))
+            setPadding(dp(12), dp(8), dp(12), dp(18))
         }
 
         val header = LinearLayout(this).apply {
@@ -77,7 +77,7 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(20, 19, 18), 18, Color.rgb(91, 69, 37))
             setPadding(dp(3), dp(5), dp(3), dp(5))
         }
-        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(62)))
+        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(68)))
 
         setContentView(root)
         showTab("Início")
@@ -251,10 +251,11 @@ class MainActivity : Activity() {
 
     private fun buildTrafficSettings() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        content.addView(label("Configurar semáforo", 24f, white, true, 5, 2))
-        content.addView(label("Ajuste os limites e os nomes de cada faixa.", 13f, muted, false, 0, 14))
-        val labels = card()
-        labels.addView(label("NOMES DAS FAIXAS", 11f, gold, true))
+        content.addView(label("Semáforo de Valores", 24f, white, true, 5, 2))
+        content.addView(label("Configure os limites. Cada oferta será classificada automaticamente.", 13f, muted, false, 0, 12))
+
+        val names = card()
+        names.addView(label("NOMES DAS FAIXAS", 11f, gold, true))
         fun editLabel(title: String, key: String, defaultValue: String) {
             val row = horizontal()
             row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
@@ -267,19 +268,84 @@ class MainActivity : Activity() {
                         showTab("Semáforo")
                     }.show()
             })
-            row.setPadding(0, dp(8), 0, dp(8))
-            labels.addView(row)
+            row.setPadding(0, dp(7), 0, dp(7))
+            names.addView(row)
         }
         editLabel("Faixa vermelha", "label_bad", "Vixe não dá")
         editLabel("Faixa amarela", "label_review", "Hum, talvez")
         editLabel("Faixa verde", "label_good", "Bora carai")
-        content.addView(labels, margin(0, 10))
-        val limits = card()
-        limits.addView(label("LIMITES DE CLASSIFICAÇÃO", 11f, gold, true))
-        fun editNumber(title: String, key: String, defaultValue: Float, prefix: String = "R$ ") {
+        content.addView(names, margin(0, 8))
+
+        content.addView(label("CLASSIFICAÇÃO AUTOMÁTICA", 12f, gold, true, 4, 2))
+        content.addView(label("A faixa vermelha começa abaixo do primeiro limite; a verde começa ao atingir o segundo. Entre eles, a oferta fica amarela.", 11f, muted, false, 0, 6))
+
+        fun rangeControl(title: String, lowKey: String, highKey: String, lowDefault: Float, highDefault: Float, scale: Int, suffix: String) {
+            val box = card()
+            val head = horizontal()
+            head.addView(label(title, 15f, white, true), LinearLayout.LayoutParams(0, -2, 1f))
+            val values = label("", 12f, gold, true)
+            head.addView(values)
+            box.addView(head)
+
+            fun format(v: Float): String = suffix + String.format(java.util.Locale("pt", "BR"), "%.2f", v)
+            val low = (prefs.getFloat(lowKey, lowDefault) * scale).toInt().coerceIn(0, 10000)
+            val high = (prefs.getFloat(highKey, highDefault) * scale).toInt().coerceIn(0, 10000)
+            val lowText = label("● Ruim até " + format(low.toFloat() / scale), 11f, red, true, 6, 0)
+            val lowSeek = SeekBar(this).apply {
+                max = 1000
+                progress = low.coerceIn(0, max)
+                progressTintList = ColorStateList.valueOf(red)
+                thumbTintList = ColorStateList.valueOf(red)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        val value = progress.toFloat() / scale
+                        lowText.text = "● Ruim até " + format(value)
+                        values.text = format(value) + "  |  " + format(highSeekValue)
+                    }
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                        val value = (seekBar?.progress ?: low) .toFloat() / scale
+                        prefs.edit().putFloat(lowKey, value).apply()
+                    }
+                })
+            }
+            var highSeekValue = high.toFloat() / scale
+            val highText = label("● Bom a partir de " + format(highSeekValue), 11f, green, true, 3, 0)
+            val highSeek = SeekBar(this).apply {
+                max = 1000
+                progress = high.coerceIn(0, max)
+                progressTintList = ColorStateList.valueOf(green)
+                thumbTintList = ColorStateList.valueOf(green)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        highSeekValue = progress.toFloat() / scale
+                        highText.text = "● Bom a partir de " + format(highSeekValue)
+                        values.text = format(lowSeek.progress.toFloat() / scale) + "  |  " + format(highSeekValue)
+                    }
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                        prefs.edit().putFloat(highKey, highSeekValue).apply()
+                    }
+                })
+            }
+            values.text = format(low.toFloat() / scale) + "  |  " + format(highSeekValue)
+            box.addView(lowText)
+            box.addView(lowSeek)
+            box.addView(highText)
+            box.addView(highSeek)
+            content.addView(box, margin(0, 7))
+        }
+
+        rangeControl("Ganho por Km", "bad_per_km", "min_per_km", 1.50f, 1.80f, 100, "R$ ")
+        rangeControl("Ganho por Hora", "min_per_hour", "good_per_hour", 50f, 60f, 1, "R$ ")
+        rangeControl("Nota do Passageiro", "min_rating", "good_rating", 4.80f, 4.90f, 100, "★ ")
+
+        val minimums = card()
+        minimums.addView(label("GANHOS MÍNIMOS", 11f, gold, true))
+        fun editMinimum(title: String, key: String, defaultValue: Float) {
             val row = horizontal()
             row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(action(prefix + money(prefs.getFloat(key, defaultValue)), false) {
+            row.addView(action(money(prefs.getFloat(key, defaultValue)), false) {
                 val input = EditText(this).apply {
                     inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
                     setText(prefs.getFloat(key, defaultValue).toString())
@@ -287,23 +353,16 @@ class MainActivity : Activity() {
                 }
                 AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar", null)
                     .setPositiveButton("Salvar") { _, _ ->
-                        val value = input.text.toString().replace(",", ".").toFloatOrNull()
-                        if (value != null && value >= 0f) prefs.edit().putFloat(key, value).apply()
+                        input.text.toString().replace(",", ".").toFloatOrNull()?.let { if (it >= 0f) prefs.edit().putFloat(key, it).apply() }
                         showTab("Semáforo")
                     }.show()
             })
             row.setPadding(0, dp(8), 0, dp(8))
-            limits.addView(row)
+            minimums.addView(row)
         }
-        editNumber("R$/km — faixa vermelha", "bad_per_km", 1.50f)
-        editNumber("R$/km — mínimo verde", "min_per_km", 1.80f)
-        editNumber("R$/hora — mínimo vermelho", "min_per_hour", 50f)
-        editNumber("R$/hora — mínimo verde", "good_per_hour", 60f)
-        editNumber("Nota mínima do passageiro", "min_rating", 4.80f, "")
-        editNumber("Nota para faixa verde", "good_rating", 4.90f, "")
-        editNumber("Valor mínimo da corrida", "min_fare", 10f)
-        editNumber("Lucro líquido mínimo", "min_profit", 0f)
-        content.addView(limits, margin(0, 10))
+        editMinimum("Valor mínimo da viagem", "min_fare", 10f)
+        editMinimum("Lucro líquido mínimo", "min_profit", 0f)
+        content.addView(minimums, margin(0, 7))
         content.addView(action("VOLTAR AO INÍCIO", false) { showTab("Início") })
     }
 
