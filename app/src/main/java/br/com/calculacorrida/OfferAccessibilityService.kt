@@ -144,11 +144,29 @@ class OfferAccessibilityService : AccessibilityService() {
         if (driverAppName(pkg) == null) return
         // A tela inteira via OCR pode misturar dois apps no tablet. Para evitar
         // ofertas híbridas, aceitamos somente os dados da árvore do próprio app.
-        val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow ?: return
+        val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow?.takeIf {
+            it.packageName?.toString()?.equals(pkg, ignoreCase = true) == true
+        } ?: return
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
-        val offer = OfferTextParser.parse(screenText) ?: return
+
+        // Só existe oferta enquanto o próprio app do motorista exibe a ação de aceitar.
+        // Na tela de navegação/viagem, distância e ETA mudam conforme o carro se aproxima;
+        // esses dados NUNCA devem atualizar a análise da oferta já aceita.
+        if (!isIncomingOfferScreen(screenText)) {
+            hideOverlay(pkg)
+            acceptedSignatures.remove(pkg)
+            pendingOffers.remove(pkg)
+            return
+        }
+
+        val offer = OfferTextParser.parse(screenText)
+        if (offer == null) {
+            hideOverlay(pkg)
+            acceptedSignatures.remove(pkg)
+            return
+        }
         // Oferta completa: mostra imediatamente; assinatura evita redesenho repetido.
         val signature = listOf(
             "%.2f".format(java.util.Locale.US, offer.fare),
@@ -161,6 +179,21 @@ class OfferAccessibilityService : AccessibilityService() {
             acceptedSignatures[pkg] = signature
             calculateAndShow(offer, findFareBounds(root), pkg)
         }
+    }
+
+    private fun isIncomingOfferScreen(rawText: String): Boolean {
+        val normalized = java.text.Normalizer.normalize(rawText, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+            .lowercase(java.util.Locale.ROOT)
+
+        // O botão de aceite é o sinal de estado mais confiável.
+        val hasAcceptAction = Regex("""\\b(aceitar|aceite|accept|aceptar)\\b""")
+            .containsMatchIn(normalized)
+        val hasFare = Regex("""r\\$\\s*[0-9]""").containsMatchIn(normalized)
+        val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\\s*(?:min|km)\\b""")
+            .findAll(normalized).count() >= 2
+
+        return hasAcceptAction && hasFare && hasOfferMetrics
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
