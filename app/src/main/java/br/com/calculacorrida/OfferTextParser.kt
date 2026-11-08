@@ -15,11 +15,12 @@ object OfferTextParser {
     private val moneyRegex = Regex("""R\$\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
     private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE)
     private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(?:min(?:uto)?s?)\b""", RegexOption.IGNORE_CASE)
-
-    // Detecta pares como "1 min (60 m)" e "6 min (3 km)".
-    // Se houver resumo da rota fora dos parênteses, não soma os trechos novamente.
     private val legRegex = Regex(
-        """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*(\()?\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""",
+        """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*(\()\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    private val summaryRegex = Regex(
+        """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]\s*([0-9]+(?:[,.][0-9]+)?)\s*km\b""",
         RegexOption.IGNORE_CASE
     )
 
@@ -28,40 +29,43 @@ object OfferTextParser {
         val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
         val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
 
-        val legs = legRegex.findAll(text).mapNotNull { match ->
-            val minutes = toNumber(match.groupValues[1]) ?: return@mapNotNull null
-            val distance = toNumber(match.groupValues[3]) ?: return@mapNotNull null
-            val unit = match.groupValues[4].lowercase()
-            val km = if (unit == "m") distance / 1000.0 else distance
-            if (minutes <= 0 || km < 0) null
-            else Triple(minutes, km, match.groupValues[2].isNotEmpty())
+        fun km(value: String, unit: String): Double? {
+            val n = toNumber(value) ?: return null
+            return if (unit.equals("m", true)) n / 1000.0 else n
+        }
+
+        val summary = summaryRegex.find(text)?.let {
+            val mins = toNumber(it.groupValues[1])
+            val dist = toNumber(it.groupValues[2])
+            if (mins != null && dist != null) mins to dist else null
+        }
+        val parenthesizedLegs = legRegex.findAll(text).mapNotNull {
+            val mins = toNumber(it.groupValues[1]) ?: return@mapNotNull null
+            val dist = km(it.groupValues[3], it.groupValues[4]) ?: return@mapNotNull null
+            if (mins > 0 && dist > 0) mins to dist else null
         }.toList()
 
         val pickupKm: Double
         val tripKm: Double
         val totalMinutes: Double
 
-        if (legs.isNotEmpty()) {
-            val summary = legs.firstOrNull { !it.third }
-            if (summary != null) {
-                pickupKm = 0.0
-                tripKm = summary.second
-                totalMinutes = summary.first
-            } else if (legs.size == 1) {
-                pickupKm = 0.0
-                tripKm = legs.first().second
-                totalMinutes = legs.first().first
-            } else {
-                // Cartões como o da 99: primeiro trecho é embarque; os demais são viagem.
-                pickupKm = legs.first().second
-                tripKm = legs.drop(1).sumOf { it.second }
-                // Sem resumo geral, considerar o tempo total: chegada ao passageiro + viagem.
-                totalMinutes = legs.sumOf { it.first }
-            }
+        if (summary != null) {
+            // O resumo do cartão representa a viagem; o trecho entre parênteses
+            // representa a chegada ao passageiro. Não confundir o primeiro trecho com o resumo.
+            pickupKm = parenthesizedLegs.firstOrNull()?.second ?: 0.0
+            tripKm = summary.second
+            totalMinutes = summary.first + (parenthesizedLegs.firstOrNull()?.first ?: 0.0)
+        } else if (parenthesizedLegs.size >= 2) {
+            pickupKm = parenthesizedLegs.first().second
+            tripKm = parenthesizedLegs.drop(1).sumOf { it.second }
+            totalMinutes = parenthesizedLegs.sumOf { it.first }
+        } else if (parenthesizedLegs.size == 1) {
+            pickupKm = 0.0
+            tripKm = parenthesizedLegs.first().second
+            totalMinutes = parenthesizedLegs.first().first
         } else {
             val distances = distanceRegex.findAll(text).mapNotNull {
-                val value = toNumber(it.groupValues[1]) ?: return@mapNotNull null
-                if (it.groupValues[2].equals("m", true)) value / 1000.0 else value
+                km(it.groupValues[1], it.groupValues[2])
             }.toList()
             val durations = minuteRegex.findAll(text).mapNotNull {
                 toNumber(it.groupValues[1])
@@ -73,14 +77,7 @@ object OfferTextParser {
         }
 
         if (pickupKm + tripKm <= 0.0 || totalMinutes <= 0.0) return null
-
-        return ParsedOffer(
-            fare = fare,
-            pickupKm = pickupKm,
-            tripKm = tripKm,
-            minutes = totalMinutes,
-            passengerRating = extractPassengerRating(text)
-        )
+        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text))
     }
 
     private fun extractPassengerRating(text: String): String? {
@@ -89,14 +86,11 @@ object OfferTextParser {
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (labeled != null) return normalizeRating(labeled)
-
-        // Exemplo da 99: "4,97 · 498 corridas", sem o rótulo Nota.
         val besideTrips = Regex(
             """([0-5][,.][0-9]{1,2})\s*(?:[·•|]\s*)?[0-9]+\s*corridas?""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (besideTrips != null) return normalizeRating(besideTrips)
-
         return null
     }
 
