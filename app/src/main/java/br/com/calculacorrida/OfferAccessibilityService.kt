@@ -164,6 +164,9 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun readOfferByScreenshot() {
+        // Não deixe o OCR da tela inteira substituir uma oferta já lida corretamente
+        // pela árvore de acessibilidade: o OCR pode capturar valores de outros cartões.
+        if (overlay?.visibility == View.VISIBLE) return
         if (Build.VERSION.SDK_INT < 30) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastOcrAt < 1500L) return
