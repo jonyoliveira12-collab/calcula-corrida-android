@@ -9,6 +9,8 @@
     <application
         android:allowBackup="false"
         android:label="JHONDRIVER"
+        android:icon="@drawable/jhondriver_logo"
+        android:roundIcon="@drawable/jhondriver_logo"
         android:theme="@style/AppTheme">
 
         <!-- Tela de Login (Inicial) -->
