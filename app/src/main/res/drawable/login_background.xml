@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item><shape android:shape="rectangle"><gradient android:angle="135" android:startColor="#E7F0FF" android:centerColor="#F4EDFF" android:endColor="#E3FAF4" android:type="linear"/></shape></item>
-    <item android:gravity="top|right" android:width="260dp" android:height="260dp" android:top="-115dp" android:right="-90dp">
-        <shape android:shape="oval"><solid android:color="#55A7B8FF"/></shape>
-    </item>
-    <item android:gravity="bottom|left" android:width="230dp" android:height="230dp" android:bottom="-100dp" android:left="-90dp">
-        <shape android:shape="oval"><solid android:color="#55A5E9D8"/></shape>
-    </item>
-    <item android:gravity="top|left" android:width="150dp" android:height="150dp" android:top="80dp" android:left="-95dp">
-        <shape android:shape="oval"><solid android:color="#33F4C66A"/></shape>
-    </item>
+<item><shape android:shape="rectangle"><gradient android:angle="135" android:startColor="#18345F" android:centerColor="#24517D" android:endColor="#147D82"/></shape></item>
+<item android:drawable="@drawable/login_illustration"/>
+<item android:gravity="top|right" android:width="210dp" android:height="210dp" android:top="-105dp" android:right="-75dp"><shape android:shape="oval"><solid android:color="#33FFFFFF"/></shape></item>
 </layer-list>
