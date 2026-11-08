@@ -22,6 +22,7 @@ class OfferTagView(context: Context) : View(context) {
     private var passengerRating = "--"
     private var accent = Color.rgb(120, 120, 120)
     private var diagnostic = false
+    private var aiInsight = ""
 
     init {
         contentDescription = "Faixa JHONDRIVER com classificação da corrida, tempo, distância, valor por quilômetro, valor por hora e nota do passageiro."
@@ -51,6 +52,11 @@ class OfferTagView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun setAiInsight(message: String) {
+        aiInsight = message.take(90)
+        invalidate()
+    }
+
     fun setDiagnostic(message: String) {
         status = message
         diagnostic = true
@@ -59,7 +65,7 @@ class OfferTagView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, dp(112f).toInt())
+        setMeasuredDimension(w, dp(132f).toInt())
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -104,6 +110,9 @@ class OfferTagView(context: Context) : View(context) {
             drawText(canvas, values[i], x + dp(4f), dp(96f), 17f, Color.rgb(20, 23, 27), true)
             p.color = accent
             canvas.drawRoundRect(x + dp(4f), dp(78f), x + dp(7f), dp(101f), dp(1.5f), dp(1.5f), p)
+        }
+        if (aiInsight.isNotBlank()) {
+            drawText(canvas, "✦ IA: " + aiInsight, dp(12f), dp(124f), 9f, Color.rgb(65, 78, 125), true)
         }
     }
 
