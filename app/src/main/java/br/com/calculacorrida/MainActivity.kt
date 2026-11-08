@@ -19,8 +19,8 @@ import android.content.res.ColorStateList
 class MainActivity : Activity() {
 
     private val bg = Color.rgb(7, 9, 13)
-    private val panel = Color.rgb(19, 21, 25)
-    private val gold = Color.rgb(235, 184, 76)
+    private val panel = Color.rgb(22, 23, 25)
+    private val gold = Color.rgb(239, 193, 96)
     private val white = Color.rgb(247, 244, 237)
     private val muted = Color.rgb(160, 154, 143)
     private val green = Color.rgb(42, 166, 111)
@@ -55,12 +55,27 @@ class MainActivity : Activity() {
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(5), dp(7), dp(5), dp(12))
+            setPadding(dp(12), dp(11), dp(12), dp(11))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(39, 29, 17), Color.rgb(17, 19, 23), Color.rgb(38, 27, 15))
+            ).apply {
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1), Color.rgb(151, 111, 48))
+            }
+            elevation = dp(5).toFloat()
         }
         val brandRow = horizontal()
         brandRow.addView(label("JD", 19f, Color.BLACK, true).apply {
             gravity = Gravity.CENTER
-            background = rounded(gold, 14, Color.rgb(245, 205, 112))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(255, 224, 157), Color.rgb(183, 129, 43))
+            ).apply {
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.rgb(255, 237, 190))
+            }
+            elevation = dp(4).toFloat()
             setPadding(dp(11), dp(8), dp(11), dp(8))
         })
         val brandText = LinearLayout(this).apply {
@@ -101,7 +116,14 @@ class MainActivity : Activity() {
         bottom = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = rounded(Color.rgb(18, 19, 20), 18, border)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.rgb(31, 29, 25), Color.rgb(12, 14, 18))
+            ).apply {
+                cornerRadius = dp(19).toFloat()
+                setStroke(dp(1), Color.rgb(112, 82, 37))
+            }
+            elevation = dp(8).toFloat()
             setPadding(dp(3), dp(5), dp(3), dp(5))
         }
         root.addView(bottom, LinearLayout.LayoutParams(-1, dp(72)))
@@ -673,7 +695,14 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = rounded(panel, 20, border)
+        background = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(Color.rgb(34, 32, 28), Color.rgb(20, 22, 26), Color.rgb(15, 17, 21))
+        ).apply {
+            cornerRadius = dp(20).toFloat()
+            setStroke(dp(1), Color.rgb(91, 69, 37))
+        }
+        elevation = dp(3).toFloat()
         layoutParams = margin(0, 10)
     }
 
