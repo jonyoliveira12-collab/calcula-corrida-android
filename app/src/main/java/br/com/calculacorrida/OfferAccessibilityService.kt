@@ -161,6 +161,8 @@ class OfferAccessibilityService : AccessibilityService() {
             hideOverlay()
             return
         }
+        // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
+        JourneyStore.record(this, offer, result, lastPackage)
         showOffer(result, offer.passengerRating, anchor)
     }
 
