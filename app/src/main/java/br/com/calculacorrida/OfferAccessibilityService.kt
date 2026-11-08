@@ -250,9 +250,9 @@ class OfferAccessibilityService : AccessibilityService() {
                                     java.text.Normalizer.Form.NFD)
                                     .replace(Regex("\\p{Mn}+"), "")
                                     .lowercase(java.util.Locale.ROOT)
-                                val hasAccept = Regex("""\\b(aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b""")
+                                val hasAccept = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
                                     .containsMatchIn(normalized)
-                                val offer = if (hasAccept && Regex("""r\\$\\s*[0-9]""").containsMatchIn(normalized))
+                                val offer = if (hasAccept && Regex("""r\$\s*[0-9]""").containsMatchIn(normalized))
                                     OfferTextParser.parse(recognized) else null
                                 if (offer == null) {
                                     hideOverlay(pkg)
