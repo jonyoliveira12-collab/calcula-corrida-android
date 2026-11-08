@@ -9,8 +9,8 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:paddingStart="22dp"
-        android:paddingEnd="22dp"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
         android:paddingTop="18dp"
         android:paddingBottom="18dp">
 
@@ -21,8 +21,8 @@
             android:orientation="vertical"
             android:layout_marginBottom="18dp">
             <ImageView
-                android:layout_width="68dp"
-                android:layout_height="68dp"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
                 android:src="@drawable/jhondriver_logo"
                 android:contentDescription="Logo JHONDRIVER"
                 android:scaleType="fitCenter"
@@ -31,15 +31,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="JHONDRIVER"
-                android:textColor="#26345F"
-                android:textSize="25sp"
-                android:letterSpacing="0.10"
+                android:textColor="#FFFFFF"
+                android:textSize="27sp"
+                android:letterSpacing="0.13"
                 android:textStyle="bold"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="INTELIGÊNCIA PARA CADA PERCURSO"
-                android:textColor="#586A9B"
+                android:textColor="#D9E8FF"
                 android:textSize="9sp"
                 android:letterSpacing="0.12"
                 android:layout_marginTop="3dp"/>
@@ -50,21 +50,21 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:orientation="vertical"
-            android:padding="20dp"
+            android:padding="22dp"
             android:background="@drawable/login_card"
             android:elevation="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Bem-vindo de volta!"
+                android:text="Sua próxima corrida começa aqui"
                 android:textColor="#26345F"
-                android:textSize="20sp"
+                android:textSize="19sp"
                 android:textStyle="bold"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Entre para acompanhar cada oportunidade."
+                android:text="Entre para ver suas oportunidades com inteligência."
                 android:textColor="#7180A3"
                 android:textSize="12sp"
                 android:layout_marginTop="4dp"
@@ -142,7 +142,8 @@
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#596FE8"
+                android:background="@drawable/login_primary_button"
+                android:backgroundTint="@null"
                 android:layout_marginTop="12dp"/>
             <Button
                 android:id="@+id/registerButton"
@@ -151,8 +152,9 @@
                 android:text="CRIAR CONTA"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="#4E62C9"
-                android:backgroundTint="#E9EDFF"
+                android:textColor="#4058C8"
+                android:background="@drawable/login_secondary_button"
+                android:backgroundTint="@null"
                 android:layout_marginTop="7dp"/>
             <ProgressBar
                 android:id="@+id/progressBar"
