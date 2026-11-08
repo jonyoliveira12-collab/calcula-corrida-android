@@ -51,7 +51,7 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Reaproveita a sessão local ao voltar ou abrir novamente o aplicativo.
-        if (sessionManager.isLoggedIn()) {
+        if (sessionManager.isLoggedIn() && NetworkGate.isOnline(this)) {
             openMain()
             return
         }
@@ -68,12 +68,19 @@ class LoginActivity : AppCompatActivity() {
         val loginPrefs = getSharedPreferences("login_preferences", MODE_PRIVATE)
         emailInput.setText(loginPrefs.getString("saved_email", "") ?: "")
         rememberEmailCheck.isChecked = loginPrefs.getBoolean("remember_email", true)
+        if (!NetworkGate.isOnline(this)) {
+            Toast.makeText(this, "JHONDRIVER funciona somente com internet. Conecte-se e tente novamente.", Toast.LENGTH_LONG).show()
+        }
 
         loginButton.setOnClickListener { authenticate(isRegistration = false) }
         registerButton.setOnClickListener { authenticate(isRegistration = true) }
     }
 
     private fun authenticate(isRegistration: Boolean) {
+        if (!NetworkGate.isOnline(this)) {
+            Toast.makeText(this, "Sem internet validada. Conecte-se para entrar ou criar sua conta.", Toast.LENGTH_LONG).show()
+            return
+        }
         val email = emailInput.text?.toString()?.trim().orEmpty()
         val password = passwordInput.text?.toString().orEmpty()
         getSharedPreferences("login_preferences", MODE_PRIVATE).edit()
@@ -133,6 +140,10 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun sendPasswordRecovery() {
+        if (!NetworkGate.isOnline(this)) {
+            Toast.makeText(this, "A recuperação de senha precisa de internet.", Toast.LENGTH_LONG).show()
+            return
+        }
         val email = emailInput.text?.toString()?.trim().orEmpty()
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             emailInput.error = "Digite o e-mail cadastrado para receber o link"
