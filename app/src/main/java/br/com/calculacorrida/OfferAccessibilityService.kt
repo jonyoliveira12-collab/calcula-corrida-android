@@ -26,7 +26,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class OfferAccessibilityService : AccessibilityService() {
-    private var overlay: TextView? = null
+    private var overlay: OfferTagView? = null
     private var overlayParams: WindowManager.LayoutParams? = null
     private var lastText = ""
     private var lastPackage = ""
@@ -203,12 +203,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun showDiagnostic(message: String) {
         val view = ensureOverlay(null) ?: return
-        view.background = GradientDrawable().apply {
-            setColor(Color.rgb(24, 24, 26))
-            cornerRadius = dp(12).toFloat()
-            setStroke(dp(2), Color.rgb(218, 166, 67))
-        }
-        view.text = message
+        view.setDiagnostic(message)
         view.visibility = View.VISIBLE
     }
 
@@ -237,28 +232,18 @@ class OfferAccessibilityService : AccessibilityService() {
         return null
     }
 
-    private fun ensureOverlay(anchor: Rect?): TextView? {
+    private fun ensureOverlay(anchor: Rect?): OfferTagView? {
         if (!Settings.canDrawOverlays(this)) return null
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val scale = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("overlay_scale", 85).coerceIn(65, 110) / 100f
         val overlayWidth = (310 * scale).toInt().coerceIn(220, 340)
         if (overlay == null) {
-            val view = TextView(this).apply {
-                setTextColor(Color.WHITE)
-                textSize = 13f * scale
-                setTypeface(null, Typeface.BOLD)
-                setPadding((13 * scale).toInt(), (10 * scale).toInt(), (13 * scale).toInt(), (10 * scale).toInt())
-                maxLines = 5
-                background = GradientDrawable().apply {
-                    setColor(Color.rgb(18, 18, 20))
-                    cornerRadius = dp(12).toFloat()
-                    setStroke(dp(2), Color.rgb(218, 166, 67))
-                }
+            val view = OfferTagView(this).apply {
                 elevation = dp(8).toFloat()
             }
             val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
             val params = WindowManager.LayoutParams(
-                dp(overlayWidth), ViewGroup.LayoutParams.WRAP_CONTENT, type,
+                dp(overlayWidth), dp(112), type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             )
@@ -313,8 +298,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (anchor != null && params != null) {
             val screenWidth = resources.displayMetrics.widthPixels
             params.width = dp(overlayWidth)
-            overlay?.textSize = 13f * scale
-            overlay?.setPadding((13 * scale).toInt(), (10 * scale).toInt(), (13 * scale).toInt(), (10 * scale).toInt())
+            params.height = dp(112)
             val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
             if (!prefs.contains("offer_tag_x")) {
                 params.x = anchor.left.coerceIn(0, (screenWidth - dp(overlayWidth)).coerceAtLeast(0))
@@ -332,17 +316,8 @@ class OfferAccessibilityService : AccessibilityService() {
             Rating.REVIEW -> Pair(prefs.getString("label_review", "Hum, talvez") ?: "Hum, talvez", Color.rgb(205, 132, 0))
             Rating.BAD -> Pair(prefs.getString("label_bad", "Vixe não dá") ?: "Vixe não dá", Color.rgb(190, 40, 40))
         }
-        val rating = passengerRating?.let { "⭐ $it" } ?: "Não identificada"
         val view = ensureOverlay(anchor) ?: return
-        val accent = GradientDrawable().apply {
-            setColor(Color.rgb(18, 18, 20))
-            cornerRadius = dp(12).toFloat()
-            setStroke(dp(3), color)
-        }
-        view.background = accent
-        view.text = "× FECHAR   •   $label\nR$ %.2f  •  R$ %.2f/km\n%.1f min  •  R$ %.2f/h  •  %s\n%s".format(
-            r.fare, r.perKm, r.minutes, r.perHour, rating, r.reason
-        )
+        view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, passengerRating, color)
         view.visibility = View.VISIBLE
         // A etiqueta permanece visível até o motorista tocar em FECHAR.
         dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
