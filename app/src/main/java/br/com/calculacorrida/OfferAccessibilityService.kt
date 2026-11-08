@@ -233,7 +233,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun isAcceptActionNode(node: AccessibilityNodeInfo?): Boolean {
         if (node == null) return false
         val label = normalizeActionText(node.text).ifBlank { normalizeActionText(node.contentDescription) }
-        return Regex("""\\b(aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b""").containsMatchIn(label)
+        return Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""").containsMatchIn(label)
     }
 
     private fun hasVisibleAcceptAction(node: AccessibilityNodeInfo): Boolean {
