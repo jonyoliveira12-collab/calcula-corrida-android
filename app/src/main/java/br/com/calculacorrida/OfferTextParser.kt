@@ -102,7 +102,7 @@ object OfferTextParser {
         val start = Regex("""(?i)\\b(?:rua|r\\.|avenida|av\\.|alameda|travessa|praça|praca|rodovia|estrada|largo)\\b""").find(segment) ?: return null
         val candidate = segment.substring(start.range.first)
             .replace(Regex("""(?i)\\b(?:aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b.*$"""), "")
-            .replace(Regex("\\\\s+"), " ")
+            .replace(Regex("\\s+"), " ")
             .trim(' ', ',', '·', '•', '-', ':')
         return candidate.takeIf { it.length in 8..140 }
     }
