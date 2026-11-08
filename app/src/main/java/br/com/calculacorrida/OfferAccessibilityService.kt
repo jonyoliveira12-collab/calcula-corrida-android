@@ -100,6 +100,7 @@ class OfferAccessibilityService : AccessibilityService() {
             p.contains("uber") -> "UBER"
             p.contains("didiglobal") || p.contains("99") -> "99"
             p.contains("indrive") || p.contains("indriver") || p.contains("taxi") -> "INDRIVE"
+            p.contains("ifood") -> "IFOOD"
             else -> null
         }
     }
@@ -223,12 +224,18 @@ class OfferAccessibilityService : AccessibilityService() {
             val slot = when (driverAppName(sourcePackage)) {
                 "UBER" -> 0
                 "99" -> 1
-                else -> 2
+                "INDRIVE" -> 2
+                "IFOOD" -> 3
+                else -> 4
             }
             val suffix = sourcePackage.hashCode().toString()
             val landscape = screenWidthDp > screenHeightDp
-            val defaultX = if (landscape && screenWidthDp >= 900) dp(12 + slot * (overlayWidth + 8)) else dp(8)
-            val defaultY = if (landscape && screenWidthDp >= 900) dp(70) else dp(70 + slot * 116)
+            val landscapeColumns = ((screenWidthDp - 24) / (overlayWidth + 8)).coerceAtLeast(1)
+            val useLandscapeRow = landscape && screenWidthDp >= 900
+            val column = if (useLandscapeRow) slot % landscapeColumns else 0
+            val row = if (useLandscapeRow) slot / landscapeColumns else slot
+            val defaultX = if (useLandscapeRow) dp(12 + column * (overlayWidth + 8)) else dp(8)
+            val defaultY = if (useLandscapeRow) dp(70 + row * 116) else dp(70 + slot * 116)
             params.x = prefs.getInt("offer_tag_x_$suffix", defaultX)
                 .coerceIn(0, (screenWidthPx - dp(overlayWidth)).coerceAtLeast(0))
             params.y = prefs.getInt("offer_tag_y_$suffix", defaultY)
