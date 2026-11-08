@@ -1,36 +1,8 @@
-name: Build Android APK
+name: Build Android APK (manual only)
 on:
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Install Android SDK packages
-        run: |
-          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-      - name: Show project files
-        run: find . -maxdepth 8 -type f | sort
-      - name: Build APK and print diagnostics
-        run: |
-          set +e
-          gradle --no-daemon --stacktrace --info assembleDebug > build.log 2>&1
-          result=$?
-          tail -n 240 build.log
-          exit $result
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: calcula-corrida-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+      - run: echo "Use the Build JHONDRIVER APK workflow for signed builds."
