@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import android.widget.*
 import android.app.AlertDialog
 import android.content.res.ColorStateList
@@ -95,6 +96,14 @@ class MainActivity : Activity() {
 
         setContentView(root)
         showTab("Início")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Atualiza o indicador assim que o usuário retorna das configurações do Android.
+        if (::content.isInitialized && selectedTab == "Perfil") {
+            showTab("Perfil")
+        }
     }
 
     // Voltar envia o app para segundo plano sem encerrar a sessão.
@@ -729,9 +738,19 @@ class MainActivity : Activity() {
     }
 
     private fun isAccessibilityEnabled(): Boolean {
-        val expected = componentName.flattenToString()
-        val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
-        return enabled.contains(expected)
+        return try {
+            val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+            manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                .any { info ->
+                    val service = info.resolveInfo?.serviceInfo
+                    service?.packageName == packageName &&
+                        service.name == OfferAccessibilityService::class.java.name
+                }
+        } catch (_: Exception) {
+            val expected = android.content.ComponentName(this, OfferAccessibilityService::class.java).flattenToString()
+            val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+        }
     }
 
     private fun rounded(color: Int, radius: Int, stroke: Int): GradientDrawable = GradientDrawable().apply {
