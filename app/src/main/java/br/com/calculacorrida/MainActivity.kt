@@ -113,8 +113,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         // Atualiza o indicador assim que o usuário retorna das configurações do Android.
-        if (::content.isInitialized && selectedTab == "Perfil") {
-            showTab("Perfil")
+        if (::content.isInitialized && (selectedTab == "Perfil" || selectedTab == "Início")) {
+            showTab(selectedTab)
         }
     }
 
