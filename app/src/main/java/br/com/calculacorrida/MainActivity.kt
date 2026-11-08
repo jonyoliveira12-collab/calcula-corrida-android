@@ -49,7 +49,7 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(235, 243, 255), Color.rgb(248, 240, 255), Color.rgb(232, 250, 248)))
+            background = getDrawable(R.drawable.home_background)
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
@@ -58,10 +58,10 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(11), dp(12), dp(11))
             background = GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(218, 230, 255), Color.rgb(239, 230, 255), Color.rgb(220, 250, 243))
+                intArrayOf(Color.rgb(47, 73, 139), Color.rgb(91, 83, 177), Color.rgb(34, 139, 143))
             ).apply {
                 cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), Color.rgb(191, 204, 239))
+                setStroke(dp(1), Color.rgb(126, 151, 224))
             }
             elevation = dp(5).toFloat()
         }
@@ -75,8 +75,8 @@ class MainActivity : Activity() {
         val brandText = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
-            addView(label("JHONDRIVER", 21f, white, true))
-            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, muted, true))
+            addView(label("JHONDRIVER", 21f, Color.WHITE, true))
+            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, Color.rgb(221, 233, 255), true))
         }
         brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         val avatar = ImageView(this).apply {
@@ -691,7 +691,7 @@ class MainActivity : Activity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(249, 251, 255), Color.rgb(237, 245, 255))
+            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(247, 250, 255), Color.rgb(235, 244, 255))
         ).apply {
             cornerRadius = dp(20).toFloat()
             setStroke(dp(1), Color.rgb(215, 224, 244))
@@ -716,7 +716,7 @@ class MainActivity : Activity() {
         this.text = text
         textSize = size
         setTextColor(color)
-        typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        typeface = if (bold) Typeface.create("sans-serif", Typeface.BOLD) else Typeface.create("sans-serif", Typeface.NORMAL)
         if (top > 0) setPadding(0, dp(top), 0, 0)
         if (bottom > 0) setPadding(0, if (top > 0) dp(top) else 0, 0, dp(bottom))
     }
