@@ -130,6 +130,7 @@ class OfferAccessibilityService : AccessibilityService() {
         collectText(root, text)
         val screenText = text.toString()
         val offer = OfferTextParser.parse(screenText) ?: return
+        // Oferta completa: mostra imediatamente; assinatura evita redesenho repetido.
         val signature = listOf(
             "%.2f".format(java.util.Locale.US, offer.fare),
             "%.2f".format(java.util.Locale.US, offer.pickupKm),
@@ -137,20 +138,9 @@ class OfferAccessibilityService : AccessibilityService() {
             "%.1f".format(java.util.Locale.US, offer.minutes),
             offer.passengerRating.orEmpty()
         ).joinToString("|")
-        val now = android.os.SystemClock.elapsedRealtime()
-        val pending = pendingOffers[pkg]
-        val stable = if (pending != null && pending.signature == signature && now - pending.lastSeen <= 2500L) {
-            pending.hits += 1
-            pending.lastSeen = now
-            pending
-        } else {
-            PendingOffer(signature, offer, 1, now).also { pendingOffers[pkg] = it }
-        }
-        // Exige duas leituras iguais antes de atualizar a cor/valores. Uma leitura
-        // parcial ou transitória nunca substitui uma etiqueta já válida.
-        if (stable.hits >= 2 && acceptedSignatures[pkg] != signature) {
+        if (acceptedSignatures[pkg] != signature) {
             acceptedSignatures[pkg] = signature
-            calculateAndShow(stable.offer, findFareBounds(root), pkg)
+            calculateAndShow(offer, findFareBounds(root), pkg)
         }
     }
 
@@ -211,8 +201,13 @@ class OfferAccessibilityService : AccessibilityService() {
         if (!Settings.canDrawOverlays(this)) return null
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val metrics = resources.displayMetrics
+        val screenWidthPx = metrics.widthPixels
+        val screenHeightPx = metrics.heightPixels
+        val screenWidthDp = (screenWidthPx / metrics.density).toInt()
+        val screenHeightDp = (screenHeightPx / metrics.density).toInt()
         val scale = prefs.getInt("overlay_scale", 85).coerceIn(65, 110) / 100f
-        val overlayWidth = (310 * scale).toInt().coerceIn(220, 340)
+        val overlayWidth = (310 * scale).toInt().coerceIn(220, (screenWidthDp - 16).coerceAtLeast(180))
         var view = overlays[sourcePackage]
         var params = overlayParams[sourcePackage]
 
@@ -231,9 +226,13 @@ class OfferAccessibilityService : AccessibilityService() {
                 else -> 2
             }
             val suffix = sourcePackage.hashCode().toString()
-            params.x = prefs.getInt("offer_tag_x_$suffix", dp(12)).coerceAtLeast(0)
-            params.y = prefs.getInt("offer_tag_y_$suffix", dp(145 + slot * 120))
-                .coerceIn(dp(45), (resources.displayMetrics.heightPixels - dp(120)).coerceAtLeast(dp(45)))
+            val landscape = screenWidthDp > screenHeightDp
+            val defaultX = if (landscape && screenWidthDp >= 900) dp(12 + slot * (overlayWidth + 8)) else dp(8)
+            val defaultY = if (landscape && screenWidthDp >= 900) dp(70) else dp(70 + slot * 116)
+            params.x = prefs.getInt("offer_tag_x_$suffix", defaultX)
+                .coerceIn(0, (screenWidthPx - dp(overlayWidth)).coerceAtLeast(0))
+            params.y = prefs.getInt("offer_tag_y_$suffix", defaultY)
+                .coerceIn(dp(24), (screenHeightPx - dp(116)).coerceAtLeast(dp(24)))
 
             var downX = 0f
             var downY = 0f
@@ -293,6 +292,8 @@ class OfferAccessibilityService : AccessibilityService() {
                 params.y = (anchor.top - dp(118)).coerceIn(dp(45), (resources.displayMetrics.heightPixels - dp(120)).coerceAtLeast(dp(45)))
             }
             params.width = dp(overlayWidth)
+            params.x = params.x.coerceIn(0, (screenWidthPx - dp(overlayWidth)).coerceAtLeast(0))
+            params.y = params.y.coerceIn(dp(24), (screenHeightPx - dp(116)).coerceAtLeast(dp(24)))
             try { wm.updateViewLayout(view, params) } catch (_: Exception) {}
         }
         return view
