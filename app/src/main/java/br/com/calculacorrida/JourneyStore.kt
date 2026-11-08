@@ -54,6 +54,8 @@ object JourneyStore {
             put("perKm", result.perKm)
             put("perHour", result.perHour)
             put("passengerRating", offer.passengerRating ?: "")
+            put("pickupAddress", offer.pickupAddress ?: "")
+            put("destinationAddress", offer.destinationAddress ?: "")
             put("classification", result.rating.name)
             put("reason", result.reason)
         }
