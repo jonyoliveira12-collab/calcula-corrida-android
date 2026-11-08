@@ -18,16 +18,16 @@ import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
 
-    private val bg = Color.rgb(7, 9, 13)
-    private val panel = Color.rgb(22, 23, 25)
-    private val gold = Color.rgb(239, 193, 96)
-    private val white = Color.rgb(247, 244, 237)
-    private val muted = Color.rgb(160, 154, 143)
-    private val green = Color.rgb(42, 166, 111)
-    private val red = Color.rgb(202, 65, 65)
-    private val amber = Color.rgb(204, 139, 43)
-    private val border = Color.rgb(105, 76, 31)
-    private val bgInput = Color.rgb(35, 33, 30)
+    private val bg = Color.rgb(242, 246, 255)
+    private val panel = Color.rgb(255, 255, 255)
+    private val gold = Color.rgb(83, 101, 232)
+    private val white = Color.rgb(35, 43, 68)
+    private val muted = Color.rgb(105, 117, 145)
+    private val green = Color.rgb(20, 166, 123)
+    private val red = Color.rgb(226, 75, 100)
+    private val amber = Color.rgb(242, 157, 45)
+    private val border = Color.rgb(213, 222, 244)
+    private val bgInput = Color.rgb(240, 244, 252)
 
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
@@ -49,7 +49,7 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(5, 7, 11), Color.rgb(20, 17, 14), Color.rgb(7, 9, 13)))
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(235, 243, 255), Color.rgb(248, 240, 255), Color.rgb(232, 250, 248)))
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
@@ -58,10 +58,10 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(11), dp(12), dp(11))
             background = GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(39, 29, 17), Color.rgb(17, 19, 23), Color.rgb(38, 27, 15))
+                intArrayOf(Color.rgb(224, 235, 255), Color.rgb(239, 230, 255), Color.rgb(222, 249, 246))
             ).apply {
                 cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), Color.rgb(151, 111, 48))
+                setStroke(dp(1), Color.rgb(191, 204, 239))
             }
             elevation = dp(5).toFloat()
         }
@@ -70,7 +70,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(255, 224, 157), Color.rgb(183, 129, 43))
+                intArrayOf(Color.rgb(132, 151, 255), Color.rgb(83, 101, 232))
             ).apply {
                 cornerRadius = dp(14).toFloat()
                 setStroke(dp(1), Color.rgb(255, 237, 190))
@@ -89,7 +89,7 @@ class MainActivity : Activity() {
             val size = dp(44)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { leftMargin = dp(8) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(55, 45, 28), 24, gold)
+            background = rounded(Color.rgb(230, 237, 255), 24, gold)
             clipToOutline = true
             val savedPhoto = getSharedPreferences("settings", MODE_PRIVATE).getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -118,10 +118,10 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(31, 29, 25), Color.rgb(12, 14, 18))
+                intArrayOf(Color.rgb(255, 255, 255), Color.rgb(237, 243, 255))
             ).apply {
                 cornerRadius = dp(19).toFloat()
-                setStroke(dp(1), Color.rgb(112, 82, 37))
+                setStroke(dp(1), Color.rgb(202, 213, 240))
             }
             elevation = dp(8).toFloat()
             setPadding(dp(3), dp(5), dp(3), dp(5))
@@ -564,7 +564,7 @@ class MainActivity : Activity() {
             val size = dp(66)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { rightMargin = dp(14) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(55, 45, 28), 36, gold)
+            background = rounded(Color.rgb(230, 237, 255), 36, gold)
             clipToOutline = true
             val savedPhoto = prefs.getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -697,10 +697,10 @@ class MainActivity : Activity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(34, 32, 28), Color.rgb(20, 22, 26), Color.rgb(15, 17, 21))
+            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(247, 249, 255), Color.rgb(239, 246, 255))
         ).apply {
             cornerRadius = dp(20).toFloat()
-            setStroke(dp(1), Color.rgb(91, 69, 37))
+            setStroke(dp(1), Color.rgb(215, 224, 244))
         }
         elevation = dp(3).toFloat()
         layoutParams = margin(0, 10)
@@ -729,7 +729,7 @@ class MainActivity : Activity() {
 
     private fun pill(text: String, color: Int): TextView = TextView(this).apply {
         this.text = text
-        setTextColor(Color.BLACK)
+        setTextColor(Color.WHITE)
         textSize = 10f
         typeface = Typeface.DEFAULT_BOLD
         setPadding(dp(10), dp(4), dp(10), dp(4))
