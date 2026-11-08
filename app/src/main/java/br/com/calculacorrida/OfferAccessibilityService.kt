@@ -17,6 +17,13 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
+import android.graphics.Bitmap
+import android.hardware.HardwareBuffer
+import android.view.Display
+import java.util.concurrent.Executors
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import android.os.Handler
 import android.os.Looper
 import android.net.ConnectivityManager
@@ -33,6 +40,10 @@ class OfferAccessibilityService : AccessibilityService() {
     // Evita atualizar uma oferta depois que o motorista toca em Aceitar.
     private val acceptedOfferSignatures = mutableMapOf<String, String>()
     private var bubble: TextView? = null
+    private val screenshotExecutor = Executors.newSingleThreadExecutor()
+    private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    @Volatile private var screenshotInProgress = false
+    @Volatile private var lastScreenshotAt = 0L
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
             Handler(Looper.getMainLooper()).post { hideAllOverlays() }
@@ -156,7 +167,7 @@ class OfferAccessibilityService : AccessibilityService() {
         // ofertas híbridas, aceitamos somente os dados da árvore do próprio app.
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow?.takeIf {
             it.packageName?.toString()?.equals(pkg, ignoreCase = true) == true
-        } ?: return
+        } ?: run { requestOfferScreenshot(pkg); return }
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
@@ -169,6 +180,7 @@ class OfferAccessibilityService : AccessibilityService() {
             acceptedSignatures.remove(pkg)
             pendingOffers.remove(pkg)
             acceptedOfferSignatures.remove(pkg)
+            requestOfferScreenshot(pkg)
             return
         }
 
@@ -176,6 +188,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (offer == null) {
             hideOverlay(pkg)
             acceptedSignatures.remove(pkg)
+            requestOfferScreenshot(pkg)
             return
         }
         val clickedAccept = event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && isAcceptActionNode(event.source)
@@ -202,6 +215,80 @@ class OfferAccessibilityService : AccessibilityService() {
         if (acceptedSignatures[pkg] != signature) {
             acceptedSignatures[pkg] = signature
             calculateAndShow(offer, findFareBounds(root), pkg)
+        }
+    }
+
+    // Alguns cartões da Uber/99 são desenhados como imagem e não aparecem na árvore
+    // de acessibilidade. Nesses casos, fazemos OCR da tela ANTES do aceite.
+    private fun requestOfferScreenshot(pkg: String) {
+        if (Build.VERSION.SDK_INT < 30 || screenshotInProgress) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastScreenshotAt < 700L) return
+        lastScreenshotAt = now
+        screenshotInProgress = true
+        try {
+            takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor,
+                object : AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+                        var bitmap: Bitmap? = null
+                        try {
+                            val hardwareBuffer = result.hardwareBuffer
+                            bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, result.colorSpace)
+                                ?.copy(Bitmap.Config.ARGB_8888, false)
+                            hardwareBuffer.close()
+                        } catch (_: Exception) {
+                        }
+                        result.hardwareBuffer.close()
+                        val captured = bitmap
+                        if (captured == null) {
+                            screenshotInProgress = false
+                            return
+                        }
+                        textRecognizer.process(InputImage.fromBitmap(captured, 0))
+                            .addOnSuccessListener { visionText ->
+                                val recognized = visionText.text
+                                val normalized = java.text.Normalizer.normalize(recognized,
+                                    java.text.Normalizer.Form.NFD)
+                                    .replace(Regex("\\\\p{Mn}+"), "")
+                                    .lowercase(java.util.Locale.ROOT)
+                                val hasAccept = Regex("""\\b(aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b""")
+                                    .containsMatchIn(normalized)
+                                val offer = if (hasAccept && Regex("""r\\$\\s*[0-9]""").containsMatchIn(normalized))
+                                    OfferTextParser.parse(recognized) else null
+                                if (offer == null) {
+                                    hideOverlay(pkg)
+                                    acceptedSignatures.remove(pkg)
+                                    acceptedOfferSignatures.remove(pkg)
+                                } else {
+                                    val signature = listOf(
+                                        "%.2f".format(java.util.Locale.US, offer.fare),
+                                        "%.2f".format(java.util.Locale.US, offer.pickupKm),
+                                        "%.2f".format(java.util.Locale.US, offer.tripKm),
+                                        "%.1f".format(java.util.Locale.US, offer.minutes),
+                                        offer.passengerRating.orEmpty(),
+                                        offer.pickupAddress.orEmpty(),
+                                        offer.destinationAddress.orEmpty()
+                                    ).joinToString("|")
+                                    if (acceptedOfferSignatures[pkg] != signature && acceptedSignatures[pkg] != signature) {
+                                        acceptedOfferSignatures.remove(pkg)
+                                        acceptedSignatures[pkg] = signature
+                                        calculateAndShow(offer, null, pkg)
+                                    }
+                                }
+                            }
+                            .addOnFailureListener { }
+                            .addOnCompleteListener {
+                                captured.recycle()
+                                screenshotInProgress = false
+                            }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        screenshotInProgress = false
+                    }
+                })
+        } catch (_: Exception) {
+            screenshotInProgress = false
         }
     }
 
@@ -456,6 +543,8 @@ class OfferAccessibilityService : AccessibilityService() {
         acceptedOfferSignatures.clear()
         bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         bubble = null
+        try { textRecognizer.close() } catch (_: Exception) {}
+        screenshotExecutor.shutdown()
         super.onDestroy()
     }
 }
