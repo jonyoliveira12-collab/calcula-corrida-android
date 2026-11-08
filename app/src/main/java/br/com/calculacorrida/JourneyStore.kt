@@ -26,7 +26,8 @@ object JourneyStore {
         val now = System.currentTimeMillis()
         val signature = listOf(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
-            offer.passengerRating.orEmpty(), driverPackage
+            offer.passengerRating.orEmpty(), offer.pickupAddress.orEmpty(),
+            offer.destinationAddress.orEmpty(), driverPackage
         ).joinToString("|")
         if (records.length() > 0) {
             val last = records.optJSONObject(records.length() - 1)
