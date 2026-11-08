@@ -9,7 +9,9 @@ object OfferTextParser {
         val pickupKm: Double,
         val tripKm: Double,
         val minutes: Double,
-        val passengerRating: String?
+        val passengerRating: String?,
+        val pickupAddress: String? = null,
+        val destinationAddress: String? = null
     )
 
     private val moneyRegex = Regex("""R\$\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
@@ -86,7 +88,23 @@ object OfferTextParser {
         }
 
         if (pickupKm + tripKm <= 0.0 || totalMinutes <= 0.0) return null
-        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text))
+        val legMatches = legRegex.findAll(text).toList()
+        val pickupAddress = if (legMatches.size >= 2) {
+            extractAddress(text.substring(legMatches[0].range.last + 1, legMatches[1].range.first))
+        } else null
+        val destinationAddress = if (legMatches.size >= 2) {
+            extractAddress(text.substring(legMatches[1].range.last + 1))
+        } else null
+        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text), pickupAddress, destinationAddress)
+    }
+
+    private fun extractAddress(segment: String): String? {
+        val start = Regex("""(?i)\\b(?:rua|r\\.|avenida|av\\.|alameda|travessa|praça|praca|rodovia|estrada|largo)\\b""").find(segment) ?: return null
+        val candidate = segment.substring(start.range.first)
+            .replace(Regex("""(?i)\\b(?:aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b.*$"""), "")
+            .replace(Regex("\\\\s+"), " ")
+            .trim(' ', ',', '·', '•', '-', ':')
+        return candidate.takeIf { it.length in 8..140 }
     }
 
     private fun extractPassengerRating(text: String): String? {
