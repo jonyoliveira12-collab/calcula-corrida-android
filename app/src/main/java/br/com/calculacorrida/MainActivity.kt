@@ -36,6 +36,14 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // O aplicativo exige internet validada para abrir e operar.
+        if (!NetworkGate.isOnline(this)) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            Toast.makeText(this, "JHONDRIVER precisa de internet para funcionar.", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
         // Verifica login - se não estiver logado, vai para tela de login
         if (!SessionManager(this).isLoggedIn()) {
             startActivity(Intent(this, LoginActivity::class.java))
@@ -128,6 +136,12 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (!NetworkGate.isOnline(this)) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            Toast.makeText(this, "Conexão perdida. Reconecte-se à internet para continuar.", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
         // Atualiza o indicador assim que o usuário retorna das configurações do Android.
         if (::content.isInitialized && (selectedTab == "Perfil" || selectedTab == "Início")) {
             showTab(selectedTab)
@@ -310,7 +324,8 @@ class MainActivity : Activity() {
 
     private fun isOperationalOnline(): Boolean {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        return prefs.getBoolean("copilot_enabled", false) &&
+        return NetworkGate.isOnline(this) &&
+            prefs.getBoolean("copilot_enabled", false) &&
             prefs.getBoolean("traffic_enabled", false) &&
             Settings.canDrawOverlays(this) && isAccessibilityEnabled()
     }
