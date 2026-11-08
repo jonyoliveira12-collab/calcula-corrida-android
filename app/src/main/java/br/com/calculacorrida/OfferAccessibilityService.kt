@@ -312,9 +312,9 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun showOffer(r: TripResult, passengerRating: String?, anchor: Rect?) {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val (label, color) = when (r.rating) {
-            Rating.GOOD -> Pair(prefs.getString("label_good", "Bora carai") ?: "Bora carai", Color.rgb(25, 145, 76))
-            Rating.REVIEW -> Pair(prefs.getString("label_review", "Hum, talvez") ?: "Hum, talvez", Color.rgb(205, 132, 0))
-            Rating.BAD -> Pair(prefs.getString("label_bad", "Vixe não dá") ?: "Vixe não dá", Color.rgb(190, 40, 40))
+            Rating.GOOD -> Pair("ACEITAR", Color.rgb(25, 145, 76))
+            Rating.REVIEW -> Pair("ATENÇÃO", Color.rgb(205, 132, 0))
+            Rating.BAD -> Pair("REJEITAR", Color.rgb(190, 40, 40))
         }
         val view = ensureOverlay(anchor) ?: return
         view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, passengerRating, color)
