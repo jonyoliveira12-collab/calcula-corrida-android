@@ -113,7 +113,7 @@ class LoginActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 } else {
-                    sessionManager.saveUser(email)
+                    sessionManager.saveUser(email, result.accessToken)
                     Toast.makeText(
                         this@LoginActivity,
                         if (isRegistration) "Conta criada com sucesso!" else "Login realizado!",
@@ -215,8 +215,9 @@ class LoginActivity : AppCompatActivity() {
                 throw IOException(error)
             }
 
-            val hasSession = json.optString("access_token").isNotBlank()
-            return AuthResult(hasSession)
+            val accessToken = json.optString("access_token").takeIf { it.isNotBlank() }
+            val hasSession = accessToken != null
+            return AuthResult(hasSession, accessToken)
         }
     }
 
@@ -234,5 +235,5 @@ class LoginActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private data class AuthResult(val hasSession: Boolean)
+    private data class AuthResult(val hasSession: Boolean, val accessToken: String?)
 }
