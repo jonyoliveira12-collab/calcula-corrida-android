@@ -16,7 +16,22 @@ serve(async (req) => {
   if (!apiKey) return Response.json({ error: "IA ainda não configurada no servidor." }, { status: 503, headers: cors });
 
   const auth = req.headers.get("Authorization");
-  if (!auth?.startsWith("Bearer ")) return Response.json({ error: "Autenticação necessária." }, { status: 401, headers: cors });
+  if (!auth?.startsWith("Bearer ")) {
+    return Response.json({ error: "Autenticação necessária." }, { status: 401, headers: cors });
+  }
+
+  // Confere a sessão no Supabase antes de consumir créditos da OpenAI.
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return Response.json({ error: "Autenticação do servidor não configurada." }, { status: 503, headers: cors });
+  }
+  const userCheck = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { "Authorization": auth, "apikey": supabaseAnonKey },
+  });
+  if (!userCheck.ok) {
+    return Response.json({ error: "Sessão inválida ou expirada." }, { status: 401, headers: cors });
+  }
 
   try {
     const input = await req.json();
