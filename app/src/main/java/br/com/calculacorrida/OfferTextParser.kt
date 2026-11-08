@@ -49,12 +49,21 @@ object OfferTextParser {
         val tripKm: Double
         val totalMinutes: Double
 
-        if (summary != null) {
-            // O resumo do cartão representa a viagem; o trecho entre parênteses
-            // representa a chegada ao passageiro. Não confundir o primeiro trecho com o resumo.
-            pickupKm = parenthesizedLegs.firstOrNull()?.second ?: 0.0
+        if (summary != null && parenthesizedLegs.size >= 2) {
+            // No cartão do Uber mostrado: o resumo (8 min • 3,5 km) já é o TOTAL.
+            // As linhas detalhadas separam chegada (3 min/1,4 km) e viagem (5 min/2,1 km).
+            // Somar o resumo novamente duplicaria a distância e o tempo de chegada.
+            pickupKm = parenthesizedLegs.first().second
+            tripKm = parenthesizedLegs.drop(1).sumOf { it.second }
+            totalMinutes = parenthesizedLegs.sumOf { it.first }
+        } else if (summary != null && parenthesizedLegs.size == 1) {
+            pickupKm = parenthesizedLegs.first().second
+            tripKm = (summary.second - pickupKm).coerceAtLeast(0.0)
+            totalMinutes = summary.first
+        } else if (summary != null) {
+            pickupKm = 0.0
             tripKm = summary.second
-            totalMinutes = summary.first + (parenthesizedLegs.firstOrNull()?.first ?: 0.0)
+            totalMinutes = summary.first
         } else if (parenthesizedLegs.size >= 2) {
             pickupKm = parenthesizedLegs.first().second
             tripKm = parenthesizedLegs.drop(1).sumOf { it.second }
