@@ -290,6 +290,7 @@ class MainActivity : Activity() {
             fun format(v: Float): String = suffix + String.format(java.util.Locale("pt", "BR"), "%.2f", v)
             val low = (prefs.getFloat(lowKey, lowDefault) * scale).toInt().coerceIn(0, 10000)
             val high = (prefs.getFloat(highKey, highDefault) * scale).toInt().coerceIn(0, 10000)
+            var highSeekValue = high.toFloat() / scale
             val lowText = label("● Ruim até " + format(low.toFloat() / scale), 11f, red, true, 6, 0)
             val lowSeek = SeekBar(this).apply {
                 max = 1000
@@ -309,7 +310,6 @@ class MainActivity : Activity() {
                     }
                 })
             }
-            var highSeekValue = high.toFloat() / scale
             val highText = label("● Bom a partir de " + format(highSeekValue), 11f, green, true, 3, 0)
             val highSeek = SeekBar(this).apply {
                 max = 1000
