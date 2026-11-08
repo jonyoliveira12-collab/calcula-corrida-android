@@ -56,8 +56,22 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(5), dp(7), dp(5), dp(12))
         }
-        header.addView(label("JHONDRIVER", 23f, white, true))
-        header.addView(label("INTELIGÊNCIA PARA CADA CORRIDA", 10f, muted, true))
+        val brandRow = horizontal()
+        brandRow.addView(label("JD", 17f, Color.BLACK, true).apply {
+            gravity = Gravity.CENTER
+            background = rounded(gold, 10, gold)
+            setPadding(dp(9), dp(5), dp(9), dp(5))
+        })
+        val brandText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+            addView(label("JHONDRIVER", 21f, white, true))
+            addView(label("INTELIGÊNCIA PARA CADA CORRIDA", 9f, muted, true))
+        }
+        brandRow.addView(brandText)
+        brandRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        brandRow.addView(pill("PREMIUM", gold))
+        header.addView(brandRow)
         root.addView(header)
 
         val scroll = ScrollView(this).apply {
@@ -74,13 +88,18 @@ class MainActivity : Activity() {
         bottom = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = rounded(Color.rgb(20, 19, 18), 18, Color.rgb(91, 69, 37))
+            background = rounded(Color.rgb(18, 19, 20), 18, border)
             setPadding(dp(3), dp(5), dp(3), dp(5))
         }
         root.addView(bottom, LinearLayout.LayoutParams(-1, dp(68)))
 
         setContentView(root)
         showTab("Início")
+    }
+
+    // Voltar envia o app para segundo plano sem encerrar a sessão.
+    override fun onBackPressed() {
+        moveTaskToBack(true)
     }
 
     private fun showTab(tab: String) {
@@ -475,9 +494,30 @@ class MainActivity : Activity() {
         val limits = card()
         limits.addView(label("SUAS METAS", 11f, gold, true))
 
-        limits.addView(settingRow("R$/km mínimo", money(prefs.getFloat("min_per_km", 1.8f))))
-        limits.addView(settingRow("R$/hora mínimo", money(prefs.getFloat("min_per_hour", 50f))))
-        limits.addView(settingRow("Custo R$/km (combustível)", money(prefs.getFloat("cost_per_km", 0.65f))))
+        fun editableGoal(title: String, key: String, defaultValue: Float) {
+            val row = horizontal()
+            row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(action(money(prefs.getFloat(key, defaultValue)) + "  ✎", false) {
+                val field = EditText(this).apply {
+                    inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                    setText(prefs.getFloat(key, defaultValue).toString())
+                    setSingleLine(true)
+                }
+                AlertDialog.Builder(this).setTitle(title).setView(field)
+                    .setNegativeButton("Cancelar", null)
+                    .setPositiveButton("Salvar") { _, _ ->
+                        field.text.toString().replace(",", ".").toFloatOrNull()?.let { value ->
+                            if (value >= 0f) prefs.edit().putFloat(key, value).apply()
+                        }
+                        showTab("Perfil")
+                    }.show()
+            })
+            row.setPadding(0, dp(9), 0, dp(9))
+            limits.addView(row)
+        }
+        editableGoal("R$/km mínimo", "min_per_km", 1.8f)
+        editableGoal("R$/hora mínimo", "min_per_hour", 50f)
+        editableGoal("Custo R$/km (combustível)", "cost_per_km", 0.65f)
 
         limits.addView(label("OPÇÕES DA TAG", 11f, gold, true, 14, 0))
 
@@ -510,6 +550,23 @@ class MainActivity : Activity() {
         limits.addView(toggleRow("Voz (falar resultado)", voiceSwitch))
 
         content.addView(limits, margin(0, 10))
+
+        val configCard = card()
+        configCard.addView(label("CENTRAL DE CONFIGURAÇÕES", 11f, gold, true))
+        configCard.addView(label("Personalize as faixas e os critérios usados para analisar cada oferta.", 12f, muted, false, 5, 5))
+        configCard.addView(action("CONFIGURAR SEMÁFORO  ›", false) { showTab("Semáforo") })
+        content.addView(configCard, margin(0, 10))
+
+        val backgroundCard = card()
+        backgroundCard.addView(label("FUNCIONAMENTO EM SEGUNDO PLANO", 11f, gold, true))
+        backgroundCard.addView(label("Mantenha a acessibilidade e a permissão de sobreposição ativadas para o leitor e a etiqueta funcionarem sobre Uber e 99.", 12f, muted, false, 5, 8))
+        backgroundCard.addView(permissionRow("Acessibilidade", isAccessibilityEnabled()) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        })
+        backgroundCard.addView(permissionRow("Sobreposição de tela", Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        })
+        content.addView(backgroundCard, margin(0, 10))
 
         // Posição da tag
         val posCard = card()
@@ -545,7 +602,7 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = rounded(panel, 20, gold)
+        background = rounded(panel, 20, border)
         layoutParams = margin(0, 10)
     }
 
