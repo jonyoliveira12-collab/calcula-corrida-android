@@ -58,7 +58,7 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(11), dp(12), dp(11))
             background = GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(224, 235, 255), Color.rgb(239, 230, 255), Color.rgb(222, 249, 246))
+                intArrayOf(Color.rgb(218, 230, 255), Color.rgb(239, 230, 255), Color.rgb(220, 250, 243))
             ).apply {
                 cornerRadius = dp(20).toFloat()
                 setStroke(dp(1), Color.rgb(191, 204, 239))
@@ -66,17 +66,11 @@ class MainActivity : Activity() {
             elevation = dp(5).toFloat()
         }
         val brandRow = horizontal()
-        brandRow.addView(label("JD", 19f, Color.BLACK, true).apply {
-            gravity = Gravity.CENTER
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.rgb(132, 151, 255), Color.rgb(83, 101, 232))
-            ).apply {
-                cornerRadius = dp(14).toFloat()
-                setStroke(dp(1), Color.rgb(255, 237, 190))
-            }
-            elevation = dp(4).toFloat()
-            setPadding(dp(11), dp(8), dp(11), dp(8))
+        brandRow.addView(ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            setImageResource(R.drawable.jhondriver_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Logo JHONDRIVER"
         })
         val brandText = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -89,7 +83,7 @@ class MainActivity : Activity() {
             val size = dp(44)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { leftMargin = dp(8) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(230, 237, 255), 24, gold)
+            background = rounded(Color.rgb(224, 233, 255), 24, gold)
             clipToOutline = true
             val savedPhoto = getSharedPreferences("settings", MODE_PRIVATE).getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -697,12 +691,12 @@ class MainActivity : Activity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(247, 249, 255), Color.rgb(239, 246, 255))
+            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(249, 251, 255), Color.rgb(237, 245, 255))
         ).apply {
             cornerRadius = dp(20).toFloat()
             setStroke(dp(1), Color.rgb(215, 224, 244))
         }
-        elevation = dp(3).toFloat()
+        elevation = dp(6).toFloat()
         layoutParams = margin(0, 10)
     }
 
