@@ -367,19 +367,78 @@ class MainActivity : Activity() {
     }
 
     private fun buildHistory() {
-        content.addView(label("Histórico", 24f, white, true, 5, 2))
-        content.addView(label("Suas corridas analisadas", 13f, muted, false, 0, 14))
+        val records = JourneyStore.getRecords(this)
+        content.addView(label("Jornada • Relatório", 24f, white, true, 5, 2))
+        content.addView(label("Cada oferta identificada pelo leitor fica salva automaticamente aqui.", 13f, muted, false, 0, 14))
 
-        val c = card()
-        c.addView(label("Ainda não há corridas registradas.", 15f, white, true))
-        c.addView(label("Quando uma oferta for lida e calculada, os registros aparecerão aqui.", 12f, muted, false, 0, 8))
-        content.addView(c)
+        val todayStart = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val today = records.filter { it.optLong("timestamp") >= todayStart }
+        val avgPerKm = if (today.isNotEmpty()) today.map { it.optDouble("perKm") }.average() else 0.0
 
-        content.addView(card().apply {
-            addView(label("RESUMO DA JORNADA", 11f, gold, true))
-            addView(label("Tempo trabalhado: —", 14f, white, false, 0, 8))
-            addView(label("Ofertas analisadas: 0", 14f, white, false))
-        }, margin(0, 10))
+        val summary = card()
+        summary.addView(label("RESUMO DE HOJE", 11f, gold, true))
+        val stats = horizontal()
+        stats.addView(metric("OFERTAS LIDAS", today.size.toString()), weight())
+        stats.addView(metric("MÉDIA POR KM", if (today.isNotEmpty()) money(avgPerKm.toFloat()) else "—"), weight())
+        stats.addView(metric("TOTAL NO HISTÓRICO", records.size.toString()), weight())
+        summary.addView(stats)
+        if (today.size >= 2) {
+            val first = today.minOf { it.optLong("timestamp") }
+            val last = today.maxOf { it.optLong("timestamp") }
+            val fmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale("pt", "BR"))
+            summary.addView(label("Período entre ofertas: ${fmt.format(java.util.Date(first))} – ${fmt.format(java.util.Date(last))}", 11f, muted, false, 10, 0))
+        } else {
+            summary.addView(label("As ofertas serão registradas automaticamente assim que forem identificadas.", 11f, muted, false, 8, 0))
+        }
+        content.addView(summary, margin(0, 8))
+
+        content.addView(label("OFERTAS REGISTRADAS", 12f, gold, true, 4, 2))
+        if (records.isEmpty()) {
+            content.addView(card().apply {
+                addView(label("Nenhuma oferta salva ainda.", 15f, white, true))
+                addView(label("Ative o Semáforo e abra Uber, 99 ou outro app monitorado. Quando uma oferta aparecer e for calculada, ela será adicionada aqui automaticamente.", 12f, muted, false, 6, 0))
+            }, margin(0, 7))
+            return
+        }
+
+        records.forEach { item ->
+            val fare = item.optDouble("fare")
+            val km = item.optDouble("totalKm")
+            val minutes = item.optDouble("minutes")
+            val perKm = item.optDouble("perKm")
+            val perHour = item.optDouble("perHour")
+            val rating = item.optString("passengerRating")
+            val app = item.optString("app", "Aplicativo")
+            val timestamp = item.optLong("timestamp")
+            val date = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("pt", "BR"))
+                .format(java.util.Date(timestamp))
+            val classification = item.optString("classification")
+            val (status, statusColor) = when (classification) {
+                "GOOD" -> Pair("ACEITAR", green)
+                "REVIEW" -> Pair("ATENÇÃO", amber)
+                else -> Pair("REJEITAR", red)
+            }
+            val entry = card()
+            val top = horizontal()
+            top.addView(label("$app • $date", 11f, muted, true), LinearLayout.LayoutParams(0, -2, 1f))
+            top.addView(pill(status, statusColor))
+            entry.addView(top)
+            entry.addView(label(money(fare.toFloat()), 25f, white, true, 7, 2))
+            entry.addView(label(
+                String.format(java.util.Locale("pt", "BR"), "%.1f km • %.0f min • R$ %.2f/km", km, minutes, perKm).replace(".", ","),
+                12f, muted, false, 0, 8
+            ))
+            val metrics = horizontal()
+            metrics.addView(financeStat("R$/HORA", money(perHour.toFloat())), weight())
+            metrics.addView(financeStat("NOTA", if (rating.isBlank()) "—" else "★ $rating"), weight())
+            entry.addView(metrics)
+            content.addView(entry, margin(0, 7))
+        }
     }
 
     private fun buildFinances() {
