@@ -224,7 +224,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun normalizeActionText(value: CharSequence?): String {
         return java.text.Normalizer.normalize(value?.toString().orEmpty(), java.text.Normalizer.Form.NFD)
-            .replace(Regex("\\\\p{Mn}+"), "")
+            .replace(Regex("\\p{Mn}+"), "")
             .lowercase(java.util.Locale.ROOT)
             .trim()
     }
