@@ -37,9 +37,10 @@ class OfferTagView(context: Context) : View(context) {
         valuePerKm: Double,
         valuePerHour: Double,
         rating: String?,
-        color: Int
+        color: Int,
+        source: String = "APP"
     ) {
-        status = label.uppercase()
+        status = "$source • ${label.uppercase()}"
         duration = String.format(java.util.Locale("pt", "BR"), "%.0f min", minutes)
         distance = String.format(java.util.Locale("pt", "BR"), "%.1f km", totalKm)
         perKm = String.format(java.util.Locale("pt", "BR"), "%.2f", valuePerKm)
@@ -81,7 +82,7 @@ class OfferTagView(context: Context) : View(context) {
         p.color = accent
         canvas.drawRoundRect(dp(10f), dp(8f), dp(116f), dp(32f), dp(7f), dp(7f), p)
         drawText(canvas, if (diagnostic) "!" else "●", dp(22f), dp(24f), 11f, Color.WHITE, true)
-        drawText(canvas, status, dp(36f), dp(24f), 11f, Color.WHITE, true)
+        drawText(canvas, status, dp(36f), dp(24f), 10f, Color.WHITE, true)
         drawText(canvas, "×", w - dp(22f), dp(24f), 19f, Color.DKGRAY, true, Paint.Align.CENTER)
 
         if (diagnostic) return

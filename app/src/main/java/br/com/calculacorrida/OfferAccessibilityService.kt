@@ -26,14 +26,13 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class OfferAccessibilityService : AccessibilityService() {
-    private var overlay: OfferTagView? = null
-    private var overlayParams: WindowManager.LayoutParams? = null
-    private var lastText = ""
-    private var lastPackage = ""
+    // Uma etiqueta independente por aplicativo (Uber, 99 e inDrive).
+    private val overlays = linkedMapOf<String, OfferTagView>()
+    private val overlayParams = linkedMapOf<String, WindowManager.LayoutParams>()
+    private val lastTexts = mutableMapOf<String, String>()
     private var bubble: TextView? = null
     private var lastOcrAt = 0L
     private val overlayHandler = Handler(Looper.getMainLooper())
-    private var dismissOverlayTask: Runnable? = null
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     override fun onServiceConnected() {
@@ -101,9 +100,14 @@ class OfferAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun isSupportedDriverApp(pkg: String): Boolean {
+    private fun driverAppName(pkg: String): String? {
         val p = pkg.lowercase()
-        return p.contains("uber") || p.contains("didiglobal") || p.contains("99") || p.contains("taxi")
+        return when {
+            p.contains("uber") -> "UBER"
+            p.contains("didiglobal") || p.contains("99") -> "99"
+            p.contains("indrive") || p.contains("taxi") -> "INDRIVE"
+            else -> null
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -112,6 +116,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val copilotEnabled = prefs.getBoolean("copilot_enabled", false)
         val trafficEnabled = prefs.getBoolean("traffic_enabled", false)
+
         if (!copilotEnabled) {
             bubble?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
             bubble = null
@@ -119,34 +124,28 @@ class OfferAccessibilityService : AccessibilityService() {
             onServiceConnected()
         }
         if (!trafficEnabled) {
-            hideOverlay()
+            hideAllOverlays()
             return
         }
-        if (!isSupportedDriverApp(pkg)) {
-            if (lastPackage.isNotEmpty()) hideOverlay()
-            lastPackage = ""
-            return
-        }
-        lastPackage = pkg
-        // In split-screen, rootInActiveWindow may belong to Maps. Search the driver's own window.
+
+        val appName = driverAppName(pkg) ?: return
+        // Em tela dividida, usa a janela do app de motorista, não a do Maps.
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow ?: return
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
-        if (screenText.isNotBlank() && screenText != lastText) {
-            lastText = screenText
+        if (screenText.isNotBlank() && screenText != lastTexts[pkg]) {
+            lastTexts[pkg] = screenText
             val offer = OfferTextParser.parse(screenText)
             if (offer != null) {
-                calculateAndShow(offer, findFareBounds(root))
+                calculateAndShow(offer, findFareBounds(root), pkg)
                 return
             }
         }
-        // Estar online no app não significa que uma oferta chegou.
-        // Faz OCR em intervalos curtos e só mostra o semáforo quando encontrar dados reais.
-        readOfferByScreenshot()
+        readOfferByScreenshot(pkg)
     }
 
-    private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?) {
+    private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val result = TripCalculator.calculate(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
@@ -159,34 +158,36 @@ class OfferAccessibilityService : AccessibilityService() {
             prefs.getFloat("good_rating", 4.90f).toDouble()
         ) ?: return // Dados incompletos não apagam uma etiqueta válida já exibida.
         // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
-        JourneyStore.record(this, offer, result, lastPackage)
-        showOffer(result, offer.passengerRating, anchor)
+        JourneyStore.record(this, offer, result, sourcePackage)
+        showOffer(result, offer.passengerRating, anchor, sourcePackage)
     }
 
-    private fun readOfferByScreenshot() {
-        // Não deixe o OCR da tela inteira substituir uma oferta já lida corretamente
-        // pela árvore de acessibilidade: o OCR pode capturar valores de outros cartões.
-        if (overlay?.visibility == View.VISIBLE) return
+    private fun readOfferByScreenshot(sourcePackage: String) {
         if (Build.VERSION.SDK_INT < 30) return
         val now = SystemClock.elapsedRealtime()
-        if (now - lastOcrAt < 1500L) return
-        lastOcrAt = now
+        val last = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getLong("ocr_last_$sourcePackage", 0L)
+        if (now - last < 1800L) return
+        getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+            .putLong("ocr_last_$sourcePackage", now).apply()
+
         takeScreenshot(android.view.Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
             override fun onSuccess(result: ScreenshotResult) {
-                val bmp = try { Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Exception) { null }
+                val bmp = try {
+                    Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                        ?.copy(Bitmap.Config.ARGB_8888, false)
+                } catch (_: Exception) { null }
                 result.hardwareBuffer.close()
                 if (bmp == null) return
                 recognizer.process(InputImage.fromBitmap(bmp, 0))
                     .addOnSuccessListener { vision ->
                         val parsed = OfferTextParser.parse(vision.text)
-                        // OCR de tela inteira pode não encontrar o cartão em todo evento.
-                        // Ausência de leitura não significa que a oferta deixou de existir.
-                        if (parsed != null) calculateAndShow(parsed, null)
+                        if (parsed != null) calculateAndShow(parsed, null, sourcePackage)
                     }
-                    .addOnFailureListener { /* Mantém a última etiqueta válida na tela. */ }
+                    .addOnFailureListener { /* Falha temporária: preserva a última etiqueta válida. */ }
                     .addOnCompleteListener { bmp.recycle() }
             }
-            override fun onFailure(errorCode: Int) { /* Falha temporária não apaga a etiqueta. */ }
+            override fun onFailure(errorCode: Int) { /* Não remove as etiquetas existentes. */ }
         })
     }
 
@@ -232,24 +233,34 @@ class OfferAccessibilityService : AccessibilityService() {
         return null
     }
 
-    private fun ensureOverlay(anchor: Rect?): OfferTagView? {
+    private fun ensureOverlay(sourcePackage: String, anchor: Rect?): OfferTagView? {
         if (!Settings.canDrawOverlays(this)) return null
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        val scale = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("overlay_scale", 85).coerceIn(65, 110) / 100f
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val scale = prefs.getInt("overlay_scale", 85).coerceIn(65, 110) / 100f
         val overlayWidth = (310 * scale).toInt().coerceIn(220, 340)
-        if (overlay == null) {
-            val view = OfferTagView(this).apply {
-                elevation = dp(8).toFloat()
-            }
+        var view = overlays[sourcePackage]
+        var params = overlayParams[sourcePackage]
+
+        if (view == null || params == null) {
+            view = OfferTagView(this).apply { elevation = dp(8).toFloat() }
             val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
-            val params = WindowManager.LayoutParams(
+            params = WindowManager.LayoutParams(
                 dp(overlayWidth), dp(112), type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             )
             params.gravity = Gravity.TOP or Gravity.LEFT
-            params.x = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("offer_tag_x", dp(12)).coerceAtLeast(0)
-            params.y = getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("offer_tag_y", dp(150)).coerceAtLeast(0)
+            val slot = when (driverAppName(sourcePackage)) {
+                "UBER" -> 0
+                "99" -> 1
+                else -> 2
+            }
+            val suffix = sourcePackage.hashCode().toString()
+            params.x = prefs.getInt("offer_tag_x_$suffix", dp(12)).coerceAtLeast(0)
+            params.y = prefs.getInt("offer_tag_y_$suffix", dp(145 + slot * 120))
+                .coerceIn(dp(45), (resources.displayMetrics.heightPixels - dp(120)).coerceAtLeast(dp(45)))
+
             var downX = 0f
             var downY = 0f
             var startX = params.x
@@ -261,10 +272,10 @@ class OfferAccessibilityService : AccessibilityService() {
                     MotionEvent.ACTION_DOWN -> {
                         downX = event.rawX
                         downY = event.rawY
-                        startX = params.x
+                        startX = params!!.x
                         startY = params.y
                         moved = false
-                        closeTap = event.y <= dp(42)
+                        closeTap = event.x >= v.width - dp(42) && event.y <= dp(42)
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
@@ -272,71 +283,76 @@ class OfferAccessibilityService : AccessibilityService() {
                         val dy = (event.rawY - downY).toInt()
                         if (kotlin.math.abs(dx) > dp(5) || kotlin.math.abs(dy) > dp(5)) moved = true
                         if (moved) {
-                            params.x = (startX + dx).coerceIn(0, (resources.displayMetrics.widthPixels - v.width).coerceAtLeast(0))
-                            params.y = (startY + dy).coerceIn(0, (resources.displayMetrics.heightPixels - v.height).coerceAtLeast(0))
+                            params!!.x = (startX + dx).coerceIn(0, (resources.displayMetrics.widthPixels - v.width).coerceAtLeast(0))
+                            params.y = (startY + dy).coerceIn(dp(35), (resources.displayMetrics.heightPixels - v.height).coerceAtLeast(dp(35)))
                             try { wm.updateViewLayout(v, params) } catch (_: Exception) {}
                         }
                         true
                     }
                     MotionEvent.ACTION_UP -> {
                         if (moved) {
-                            getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
-                                .putInt("offer_tag_x", params.x).putInt("offer_tag_y", params.y).apply()
+                            prefs.edit()
+                                .putInt("offer_tag_x_$suffix", params!!.x)
+                                .putInt("offer_tag_y_$suffix", params.y).apply()
                         } else if (closeTap) {
-                            hideOverlay()
+                            hideOverlay(sourcePackage)
                         }
                         true
                     }
                     else -> true
                 }
             }
-            wm.addView(view, params)
-            overlay = view
-            overlayParams = params
-        }
-        val params = overlayParams
-        if (anchor != null && params != null) {
-            val screenWidth = resources.displayMetrics.widthPixels
-            params.width = dp(overlayWidth)
-            params.height = dp(112)
-            val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-            if (!prefs.contains("offer_tag_x")) {
-                params.x = anchor.left.coerceIn(0, (screenWidth - dp(overlayWidth)).coerceAtLeast(0))
-                params.y = (anchor.top - dp(118)).coerceAtLeast(dp(55))
+            try {
+                wm.addView(view, params)
+                overlays[sourcePackage] = view
+                overlayParams[sourcePackage] = params
+            } catch (_: Exception) {
+                return null
             }
-            try { wm.updateViewLayout(overlay, params) } catch (_: Exception) {}
         }
-        return overlay
+
+        if (anchor != null && params != null) {
+            // Mantém cada app na sua posição salva; a âncora só orienta a primeira exibição.
+            val suffix = sourcePackage.hashCode().toString()
+            if (!prefs.contains("offer_tag_x_$suffix")) {
+                params.x = anchor.left.coerceIn(0, (resources.displayMetrics.widthPixels - dp(overlayWidth)).coerceAtLeast(0))
+                params.y = (anchor.top - dp(118)).coerceIn(dp(45), (resources.displayMetrics.heightPixels - dp(120)).coerceAtLeast(dp(45)))
+            }
+            params.width = dp(overlayWidth)
+            try { wm.updateViewLayout(view, params) } catch (_: Exception) {}
+        }
+        return view
     }
 
-    private fun showOffer(r: TripResult, passengerRating: String?, anchor: Rect?) {
-        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private fun showOffer(r: TripResult, passengerRating: String?, anchor: Rect?, sourcePackage: String) {
         val (label, color) = when (r.rating) {
             Rating.GOOD -> Pair("ACEITAR", Color.rgb(25, 145, 76))
             Rating.REVIEW -> Pair("ATENÇÃO", Color.rgb(205, 132, 0))
             Rating.BAD -> Pair("REJEITAR", Color.rgb(190, 40, 40))
         }
-        val view = ensureOverlay(anchor) ?: return
-        view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, passengerRating, color)
+        val view = ensureOverlay(sourcePackage, anchor) ?: return
+        val appName = driverAppName(sourcePackage) ?: "APP"
+        view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, passengerRating, color, appName)
         view.visibility = View.VISIBLE
-        // A etiqueta permanece visível até o motorista tocar em FECHAR.
-        dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
-        dismissOverlayTask = null
+        // Não há temporizador: a oferta fica fixa até o usuário fechar sua própria etiqueta.
     }
 
-    private fun hideOverlay() {
-        dismissOverlayTask?.let { overlayHandler.removeCallbacks(it) }
-        dismissOverlayTask = null
-        overlay?.visibility = View.GONE
+    private fun hideOverlay(sourcePackage: String) {
+        overlays[sourcePackage]?.visibility = View.GONE
     }
+
+    private fun hideAllOverlays() {
+        overlays.values.forEach { it.visibility = View.GONE }
+    }
+
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    override fun onInterrupt() { hideOverlay() }
+    override fun onInterrupt() { /* Mantém as etiquetas válidas durante interrupções breves. */ }
 
     override fun onDestroy() {
-        overlay?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
-        overlay = null
-        overlayParams = null
+        overlays.values.forEach { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
+        overlays.clear()
+        overlayParams.clear()
         bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         bubble = null
         try { recognizer.close() } catch (_: Exception) { }
