@@ -30,6 +30,8 @@ class OfferAccessibilityService : AccessibilityService() {
     private data class PendingOffer(val signature: String, val offer: OfferTextParser.ParsedOffer, var hits: Int, var lastSeen: Long)
     private val pendingOffers = mutableMapOf<String, PendingOffer>()
     private val acceptedSignatures = mutableMapOf<String, String>()
+    // Evita atualizar uma oferta depois que o motorista toca em Aceitar.
+    private val acceptedOfferSignatures = mutableMapOf<String, String>()
     private var bubble: TextView? = null
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
@@ -121,6 +123,14 @@ class OfferAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        val relevantTypes = setOf(
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_CLICKED,
+            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
+        )
+        if (event.eventType !in relevantTypes) return
         val pkg = event.packageName?.toString() ?: return
         if (!NetworkGate.isOnline(this)) {
             hideAllOverlays()
@@ -154,10 +164,11 @@ class OfferAccessibilityService : AccessibilityService() {
         // Só existe oferta enquanto o próprio app do motorista exibe a ação de aceitar.
         // Na tela de navegação/viagem, distância e ETA mudam conforme o carro se aproxima;
         // esses dados NUNCA devem atualizar a análise da oferta já aceita.
-        if (!isIncomingOfferScreen(screenText)) {
+        if (!isIncomingOfferScreen(root, screenText)) {
             hideOverlay(pkg)
             acceptedSignatures.remove(pkg)
             pendingOffers.remove(pkg)
+            acceptedOfferSignatures.remove(pkg)
             return
         }
 
@@ -167,7 +178,8 @@ class OfferAccessibilityService : AccessibilityService() {
             acceptedSignatures.remove(pkg)
             return
         }
-        // Oferta completa: mostra imediatamente; assinatura evita redesenho repetido.
+        val clickedAccept = event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && isAcceptActionNode(event.source)
+        // Oferta completa: a assinatura impede alterações causadas pela navegação.
         val signature = listOf(
             "%.2f".format(java.util.Locale.US, offer.fare),
             "%.2f".format(java.util.Locale.US, offer.pickupKm),
@@ -175,13 +187,23 @@ class OfferAccessibilityService : AccessibilityService() {
             "%.1f".format(java.util.Locale.US, offer.minutes),
             offer.passengerRating.orEmpty()
         ).joinToString("|")
+        if (clickedAccept) {
+            acceptedOfferSignatures[pkg] = signature
+            hideOverlay(pkg)
+            return
+        }
+        if (acceptedOfferSignatures[pkg] == signature) {
+            hideOverlay(pkg)
+            return
+        }
+        acceptedOfferSignatures.remove(pkg)
         if (acceptedSignatures[pkg] != signature) {
             acceptedSignatures[pkg] = signature
             calculateAndShow(offer, findFareBounds(root), pkg)
         }
     }
 
-    private fun isIncomingOfferScreen(rawText: String): Boolean {
+    private fun isIncomingOfferScreen(root: AccessibilityNodeInfo, rawText: String): Boolean {
         val normalized = java.text.Normalizer.normalize(rawText, java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{Mn}+"), "")
             .lowercase(java.util.Locale.ROOT)
@@ -197,7 +219,35 @@ class OfferAccessibilityService : AccessibilityService() {
             "cheguei", "encontro com", "iniciar viagem"
         ).any { normalized.contains(it) }
 
-        return hasAcceptAction && hasFare && hasOfferMetrics && !isNavigationOrTrip
+        return hasAcceptAction && hasVisibleAcceptAction(root) && hasFare && hasOfferMetrics && !isNavigationOrTrip
+    }
+
+    private fun normalizeActionText(value: CharSequence?): String {
+        return java.text.Normalizer.normalize(value?.toString().orEmpty(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\\\p{Mn}+"), "")
+            .lowercase(java.util.Locale.ROOT)
+            .trim()
+    }
+
+    private fun isAcceptActionNode(node: AccessibilityNodeInfo?): Boolean {
+        if (node == null) return false
+        val label = normalizeActionText(node.text).ifBlank { normalizeActionText(node.contentDescription) }
+        return Regex("""\\b(aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b""").containsMatchIn(label)
+    }
+
+    private fun hasVisibleAcceptAction(node: AccessibilityNodeInfo): Boolean {
+        if (node.isVisibleToUser) {
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            if (!bounds.isEmpty && isAcceptActionNode(node)) return true
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = hasVisibleAcceptAction(child)
+            child.recycle()
+            if (found) return true
+        }
+        return false
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
@@ -220,6 +270,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
         return try {
             windows.firstNotNullOfOrNull { window ->
+                if (!window.isActive && !window.isFocused) return@firstNotNullOfOrNull null
                 val candidate = window.root ?: return@firstNotNullOfOrNull null
                 val rootPackage = candidate.packageName?.toString()?.lowercase().orEmpty()
                 if (rootPackage == pkg.lowercase()) candidate
@@ -401,6 +452,7 @@ class OfferAccessibilityService : AccessibilityService() {
         overlayParams.clear()
         pendingOffers.clear()
         acceptedSignatures.clear()
+        acceptedOfferSignatures.clear()
         bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         bubble = null
         super.onDestroy()
