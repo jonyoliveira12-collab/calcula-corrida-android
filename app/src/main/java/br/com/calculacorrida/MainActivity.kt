@@ -50,7 +50,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
-            setPadding(dp(12), dp(8), dp(12), dp(18))
+            setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
         val header = LinearLayout(this).apply {
@@ -58,10 +58,10 @@ class MainActivity : Activity() {
             setPadding(dp(5), dp(7), dp(5), dp(12))
         }
         val brandRow = horizontal()
-        brandRow.addView(label("JD", 17f, Color.BLACK, true).apply {
+        brandRow.addView(label("JD", 19f, Color.BLACK, true).apply {
             gravity = Gravity.CENTER
-            background = rounded(gold, 10, gold)
-            setPadding(dp(9), dp(5), dp(9), dp(5))
+            background = rounded(gold, 14, Color.rgb(245, 205, 112))
+            setPadding(dp(11), dp(8), dp(11), dp(8))
         })
         val brandText = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -69,9 +69,21 @@ class MainActivity : Activity() {
             addView(label("JHONDRIVER", 21f, white, true))
             addView(label("INTELIGÊNCIA PARA CADA CORRIDA", 9f, muted, true))
         }
-        brandRow.addView(brandText)
-        brandRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        brandRow.addView(pill("PREMIUM", gold))
+        brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
+        val avatar = ImageView(this).apply {
+            val size = dp(44)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { leftMargin = dp(8) }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = rounded(Color.rgb(55, 45, 28), 24, gold)
+            clipToOutline = true
+            val savedPhoto = getSharedPreferences("settings", MODE_PRIVATE).getString("profile_photo_uri", null)
+            if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
+            if (drawable == null) setImageResource(android.R.drawable.ic_menu_camera)
+            contentDescription = "Foto do motorista. Toque para alterar."
+            setOnClickListener { chooseProfilePhoto() }
+        }
+        brandRow.addView(avatar)
+        brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
         header.addView(brandRow)
         root.addView(header)
 
@@ -92,7 +104,7 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(18, 19, 20), 18, border)
             setPadding(dp(3), dp(5), dp(3), dp(5))
         }
-        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(68)))
+        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(72)))
 
         setContentView(root)
         showTab("Início")
@@ -149,7 +161,8 @@ class MainActivity : Activity() {
         val welcome = card()
         val row = horizontal()
         row.addView(label("DIA DE TRABALHO", 11f, muted, true), LinearLayout.LayoutParams(0, -2, 1f))
-        row.addView(pill("● ONLINE", green))
+        val online = isOperationalOnline()
+        row.addView(pill(if (online) "● ONLINE" else "● OFF", if (online) green else red))
         welcome.addView(row)
         welcome.addView(label("Seu painel de corridas", 22f, white, true, 12, 3))
         welcome.addView(label("Acompanhe seu desempenho em tempo real.", 12f, muted, false, 0, 12))
@@ -255,6 +268,35 @@ class MainActivity : Activity() {
             }
         })
         content.addView(perms, margin(0, 10))
+    }
+
+    private fun chooseProfilePhoto() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, 4102)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 4102 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+            getSharedPreferences("settings", MODE_PRIVATE).edit()
+                .putString("profile_photo_uri", uri.toString()).apply()
+            showTab(selectedTab)
+        }
+    }
+
+    private fun isOperationalOnline(): Boolean {
+        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+        return prefs.getBoolean("copilot_enabled", false) &&
+            prefs.getBoolean("traffic_enabled", false) &&
+            Settings.canDrawOverlays(this) && isAccessibilityEnabled()
     }
 
     private fun ensureRequiredPermissions(): Boolean {
@@ -493,10 +535,30 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         content.addView(label("Perfil e ajustes", 24f, white, true, 5, 12))
 
-        // Usuário
+        // Perfil do motorista: foto selecionável e identificação da conta.
         val userCard = card()
-        userCard.addView(label("CONTA", 11f, gold, true))
-        userCard.addView(label(SessionManager(this).getEmail() ?: "usuario@email.com", 16f, white, true, 8, 0))
+        val profileRow = horizontal()
+        val profileAvatar = ImageView(this).apply {
+            val size = dp(66)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { rightMargin = dp(14) }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = rounded(Color.rgb(55, 45, 28), 36, gold)
+            clipToOutline = true
+            val savedPhoto = prefs.getString("profile_photo_uri", null)
+            if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
+            if (drawable == null) setImageResource(android.R.drawable.ic_menu_camera)
+            setOnClickListener { chooseProfilePhoto() }
+            contentDescription = "Alterar foto do motorista"
+        }
+        profileRow.addView(profileAvatar)
+        val profileInfo = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(label("MEU PERFIL", 11f, gold, true))
+            addView(label(SessionManager(this@MainActivity).getEmail() ?: "Motorista JHONDRIVER", 14f, white, true, 6, 2))
+            addView(action("ALTERAR FOTO", false) { chooseProfilePhoto() })
+        }
+        profileRow.addView(profileInfo, LinearLayout.LayoutParams(0, -2, 1f))
+        userCard.addView(profileRow)
         content.addView(userCard, margin(0, 10))
 
         // Metas
