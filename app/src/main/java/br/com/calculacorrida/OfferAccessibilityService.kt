@@ -234,7 +234,7 @@ class OfferAccessibilityService : AccessibilityService() {
             view = OfferTagView(this).apply { elevation = dp(8).toFloat() }
             val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
             params = WindowManager.LayoutParams(
-                dp(overlayWidth), dp(112), type,
+                dp(overlayWidth), dp(132), type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             )
@@ -333,7 +333,15 @@ class OfferAccessibilityService : AccessibilityService() {
         val view = ensureOverlay(sourcePackage, anchor) ?: return
         val appName = driverAppName(sourcePackage) ?: "APP"
         view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, passengerRating, color, appName)
+        view.setAiInsight("Consultando copiloto...")
         view.visibility = View.VISIBLE
+        // IA complementa os indicadores matemáticos sem bloquear a leitura da oferta.
+        Thread {
+            val insight = AiOfferClient.analyze(this, r)
+            if (!insight.isNullOrBlank()) Handler(Looper.getMainLooper()).post {
+                if (overlays[sourcePackage] === view && view.visibility == View.VISIBLE) view.setAiInsight(insight)
+            }
+        }.start()
         // Não há temporizador: a oferta fica fixa até o usuário fechar sua própria etiqueta.
     }
 
