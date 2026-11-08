@@ -211,13 +211,19 @@ class OfferAccessibilityService : AccessibilityService() {
         collectText(node, ownText)
         val candidate = ownText.toString().trim()
         var best: String? = if (OfferTextParser.parse(candidate) != null) candidate else null
+        var bestHasRating = best?.let { OfferTextParser.parse(it)?.passengerRating != null } ?: false
 
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             val childCandidate = try { findBestOfferText(child) } catch (_: Exception) { null }
             try { child.recycle() } catch (_: Exception) {}
-            if (childCandidate != null && (best == null || childCandidate.length < best!!.length)) {
-                best = childCandidate
+            if (childCandidate != null) {
+                val hasRating = OfferTextParser.parse(childCandidate)?.passengerRating != null
+                if ((hasRating && !bestHasRating) ||
+                    (hasRating == bestHasRating && (best == null || childCandidate.length < best!!.length))) {
+                    best = childCandidate
+                    bestHasRating = hasRating
+                }
             }
         }
         return best
@@ -347,7 +353,9 @@ class OfferAccessibilityService : AccessibilityService() {
     }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    override fun onInterrupt() { hideOverlay() }
+    // Uma interrupção transitória do serviço não deve fazer a etiqueta piscar/sumir.
+    // O desligamento explícito do Semáforo continua ocultando a etiqueta.
+    override fun onInterrupt() { }
 
     override fun onDestroy() {
         overlay?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
