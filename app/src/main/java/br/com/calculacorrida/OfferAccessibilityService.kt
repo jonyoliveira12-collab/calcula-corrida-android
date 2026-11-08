@@ -105,7 +105,7 @@ class OfferAccessibilityService : AccessibilityService() {
         return when {
             p.contains("uber") -> "UBER"
             p.contains("didiglobal") || p.contains("99") -> "99"
-            p.contains("indrive") || p.contains("taxi") -> "INDRIVE"
+            p.contains("indrive") || p.contains("indriver") || p.contains("taxi") -> "INDRIVE"
             else -> null
         }
     }
@@ -196,16 +196,10 @@ class OfferAccessibilityService : AccessibilityService() {
             windows.firstNotNullOfOrNull { window ->
                 val candidate = window.root ?: return@firstNotNullOfOrNull null
                 val rootPackage = candidate.packageName?.toString()?.lowercase().orEmpty()
-                if (rootPackage == pkg.lowercase() || isSupportedDriverApp(rootPackage)) candidate
+                if (rootPackage == pkg.lowercase() || driverAppName(rootPackage) != null) candidate
                 else { candidate.recycle(); null }
             }
         } catch (_: Exception) { null }
-    }
-
-    private fun showDiagnostic(message: String) {
-        val view = ensureOverlay(null) ?: return
-        view.setDiagnostic(message)
-        view.visibility = View.VISIBLE
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
