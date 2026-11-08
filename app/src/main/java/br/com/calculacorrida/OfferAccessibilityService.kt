@@ -248,7 +248,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val recognized = visionText.text
                                 val normalized = java.text.Normalizer.normalize(recognized,
                                     java.text.Normalizer.Form.NFD)
-                                    .replace(Regex("\\\\p{Mn}+"), "")
+                                    .replace(Regex("\\p{Mn}+"), "")
                                     .lowercase(java.util.Locale.ROOT)
                                 val hasAccept = Regex("""\\b(aceitar|aceite|accept|aceptar|tenho\\s+interesse|confirmar)\\b""")
                                     .containsMatchIn(normalized)
