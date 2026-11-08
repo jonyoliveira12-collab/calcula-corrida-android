@@ -235,10 +235,9 @@ class OfferAccessibilityService : AccessibilityService() {
                             val hardwareBuffer = result.hardwareBuffer
                             bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, result.colorSpace)
                                 ?.copy(Bitmap.Config.ARGB_8888, false)
-                            hardwareBuffer.close()
                         } catch (_: Exception) {
                         }
-                        result.hardwareBuffer.close()
+                        try { result.hardwareBuffer.close() } catch (_: Exception) {}
                         val captured = bitmap
                         if (captured == null) {
                             screenshotInProgress = false
