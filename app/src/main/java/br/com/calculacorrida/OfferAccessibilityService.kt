@@ -157,17 +157,14 @@ class OfferAccessibilityService : AccessibilityService() {
             offer.passengerRating?.toDoubleOrNull(),
             prefs.getFloat("min_rating", 4.80f).toDouble(),
             prefs.getFloat("good_rating", 4.90f).toDouble()
-        ) ?: run {
-            hideOverlay()
-            return
-        }
+        ) ?: return // Dados incompletos não apagam uma etiqueta válida já exibida.
         // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
         JourneyStore.record(this, offer, result, lastPackage)
         showOffer(result, offer.passengerRating, anchor)
     }
 
     private fun readOfferByScreenshot() {
-        if (Build.VERSION.SDK_INT < 30) { hideOverlay(); return }
+        if (Build.VERSION.SDK_INT < 30) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastOcrAt < 1500L) return
         lastOcrAt = now
@@ -175,20 +172,18 @@ class OfferAccessibilityService : AccessibilityService() {
             override fun onSuccess(result: ScreenshotResult) {
                 val bmp = try { Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Exception) { null }
                 result.hardwareBuffer.close()
-                if (bmp == null) { showDiagnostic("FALHA AO CAPTURAR TELA"); return }
+                if (bmp == null) return
                 recognizer.process(InputImage.fromBitmap(bmp, 0))
                     .addOnSuccessListener { vision ->
                         val parsed = OfferTextParser.parse(vision.text)
-                        if (parsed == null) { hideOverlay() }
-                        else {
-                            val pref = getSharedPreferences("settings", Context.MODE_PRIVATE)
-                            calculateAndShow(parsed, null)
-                        }
+                        // OCR de tela inteira pode não encontrar o cartão em todo evento.
+                        // Ausência de leitura não significa que a oferta deixou de existir.
+                        if (parsed != null) calculateAndShow(parsed, null)
                     }
-                    .addOnFailureListener { showDiagnostic("ERRO NO OCR DA OFERTA") }
+                    .addOnFailureListener { /* Mantém a última etiqueta válida na tela. */ }
                     .addOnCompleteListener { bmp.recycle() }
             }
-            override fun onFailure(errorCode: Int) { showDiagnostic("CAPTURA NÃO AUTORIZADA: " + errorCode) }
+            override fun onFailure(errorCode: Int) { /* Falha temporária não apaga a etiqueta. */ }
         })
     }
 
