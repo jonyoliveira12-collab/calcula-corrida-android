@@ -123,27 +123,21 @@ class OfferAccessibilityService : AccessibilityService() {
             return
         }
         if (!isSupportedDriverApp(pkg)) {
-            if (lastPackage.isNotEmpty()) hideOverlay()
-            lastPackage = ""
+            // Eventos de notificações, mapas e janelas auxiliares não podem apagar
+            // uma oferta válida. A etiqueta só fecha pelo X ou ao desligar o Semáforo.
             return
         }
         lastPackage = pkg
-        // In split-screen, rootInActiveWindow may belong to Maps. Search the driver's own window.
+        // Em tela dividida, rootInActiveWindow pode pertencer ao Maps.
+        // Localiza a menor subárvore que contém UMA oferta completa, evitando
+        // misturar preço/distância/tempo de cartões diferentes da tela.
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow ?: return
-        val text = StringBuilder()
-        collectText(root, text)
-        val screenText = text.toString()
-        if (screenText.isNotBlank() && screenText != lastText) {
-            lastText = screenText
-            val offer = OfferTextParser.parse(screenText)
-            if (offer != null) {
-                calculateAndShow(offer, findFareBounds(root))
-                return
-            }
+        val offerText = findBestOfferText(root) ?: return
+        if (offerText != lastText) {
+            lastText = offerText
+            val offer = OfferTextParser.parse(offerText) ?: return
+            calculateAndShow(offer, findFareBounds(root))
         }
-        // Estar online no app não significa que uma oferta chegou.
-        // Faz OCR em intervalos curtos e só mostra o semáforo quando encontrar dados reais.
-        readOfferByScreenshot()
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?) {
@@ -205,6 +199,34 @@ class OfferAccessibilityService : AccessibilityService() {
         val view = ensureOverlay(null) ?: return
         view.setDiagnostic(message)
         view.visibility = View.VISIBLE
+    }
+
+    /**
+     * Escolhe o menor bloco da árvore que contém preço, distância e duração válidos.
+     * A tela inteira pode conter cartões antigos, mapa e mais de uma oferta; nunca
+     * devemos combinar campos de subárvores diferentes.
+     */
+    private fun findBestOfferText(node: AccessibilityNodeInfo): String? {
+        val ownText = StringBuilder()
+        collectText(node, ownText)
+        val candidate = ownText.toString().trim()
+        var best: String? = if (OfferTextParser.parse(candidate) != null) candidate else null
+        var bestHasRating = best?.let { OfferTextParser.parse(it)?.passengerRating != null } ?: false
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val childCandidate = try { findBestOfferText(child) } catch (_: Exception) { null }
+            try { child.recycle() } catch (_: Exception) {}
+            if (childCandidate != null) {
+                val hasRating = OfferTextParser.parse(childCandidate)?.passengerRating != null
+                if ((hasRating && !bestHasRating) ||
+                    (hasRating == bestHasRating && (best == null || childCandidate.length < best!!.length))) {
+                    best = childCandidate
+                    bestHasRating = hasRating
+                }
+            }
+        }
+        return best
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
@@ -331,7 +353,9 @@ class OfferAccessibilityService : AccessibilityService() {
     }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    override fun onInterrupt() { hideOverlay() }
+    // Uma interrupção transitória do serviço não deve fazer a etiqueta piscar/sumir.
+    // O desligamento explícito do Semáforo continua ocultando a etiqueta.
+    override fun onInterrupt() { }
 
     override fun onDestroy() {
         overlay?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
