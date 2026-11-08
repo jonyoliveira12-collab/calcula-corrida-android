@@ -185,7 +185,9 @@ class OfferAccessibilityService : AccessibilityService() {
             "%.2f".format(java.util.Locale.US, offer.pickupKm),
             "%.2f".format(java.util.Locale.US, offer.tripKm),
             "%.1f".format(java.util.Locale.US, offer.minutes),
-            offer.passengerRating.orEmpty()
+            offer.passengerRating.orEmpty(),
+            offer.pickupAddress.orEmpty(),
+            offer.destinationAddress.orEmpty()
         ).joinToString("|")
         if (clickedAccept) {
             acceptedOfferSignatures[pkg] = signature
@@ -215,8 +217,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")
             .findAll(normalized).count() >= 2
         val isNavigationOrTrip = listOf(
-            "navegar", "encerrar viagem", "finalizar viagem", "em viagem",
-            "cheguei", "encontro com", "iniciar viagem"
+            "encerrar viagem", "finalizar viagem", "em viagem", "cheguei"
         ).any { normalized.contains(it) }
 
         return hasAcceptAction && hasVisibleAcceptAction(root) && hasFare && hasOfferMetrics && !isNavigationOrTrip
