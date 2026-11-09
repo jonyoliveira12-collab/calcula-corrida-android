@@ -57,77 +57,21 @@ class OfferAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        active = this
         NetworkGate.register(this, networkCallback)
-        val featurePrefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        if (Settings.canDrawOverlays(this) && bubble == null && featurePrefs.getBoolean("copilot_enabled", false)) {
-            val v = TextView(this).apply {
-                text = "CC"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-                gravity = Gravity.CENTER
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(218, 166, 67)); setStroke(dp(2), Color.WHITE) }
-                isClickable = true
-                contentDescription = "Botão CC. Arraste para mover ou toque para abrir o aplicativo."
-            }
-            val t = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
-            val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-            val p = WindowManager.LayoutParams(
-                dp(46), dp(46), t,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
-            )
-            p.gravity = Gravity.TOP or Gravity.LEFT
-            p.x = prefs.getInt("bubble_x", dp(8)).coerceAtLeast(0)
-            p.y = prefs.getInt("bubble_y", dp(220)).coerceAtLeast(0)
-            var downX = 0f
-            var downY = 0f
-            var initialX = p.x
-            var initialY = p.y
-            var moved = false
-            v.setOnTouchListener { view, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downX = event.rawX; downY = event.rawY
-                        initialX = p.x; initialY = p.y; moved = false
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        val dx = (event.rawX - downX).toInt()
-                        val dy = (event.rawY - downY).toInt()
-                        if (kotlin.math.abs(dx) > dp(4) || kotlin.math.abs(dy) > dp(4)) moved = true
-                        if (moved) {
-                            p.x = (initialX + dx).coerceIn(0, (resources.displayMetrics.widthPixels - dp(46)).coerceAtLeast(0))
-                            p.y = (initialY + dy).coerceIn(0, (resources.displayMetrics.heightPixels - dp(46)).coerceAtLeast(0))
-                            try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view, p) } catch (_: Exception) {}
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        if (moved) {
-                            prefs.edit().putInt("bubble_x", p.x).putInt("bubble_y", p.y).apply()
-                        } else {
-                            val intent = packageManager.getLaunchIntentForPackage(packageName)
-                            intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            if (intent != null) startActivity(intent)
-                        }
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> true
-                    else -> false
-                }
-            }
-            try { (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, p); bubble = v } catch (_: Exception) { }
-        }
+    }
+
+    companion object {
+        private var active: OfferAccessibilityService? = null
+        fun stopReading() { active?.apply { hideAllOverlays(); disableSelf() } }
     }
 
     private fun driverAppName(pkg: String): String? {
-        val p = pkg.lowercase()
-        return when {
-            p.contains("uber") -> "UBER"
-            p.contains("didiglobal") || p.contains("99") -> "99"
-            p.contains("indrive") || p.contains("indriver") || p.contains("taxi") -> "INDRIVE"
-            p.contains("ifood") -> "IFOOD"
+        return when (pkg.lowercase(java.util.Locale.ROOT)) {
+            "com.ubercab.driver" -> "UBER"
+            "com.taxis99", "com.didiglobal.driver" -> "99"
+            "sinet.startup.indriver" -> "INDRIVE"
+            "br.com.ifood.driver.app" -> "IFOOD"
             else -> null
         }
     }
@@ -151,18 +95,11 @@ class OfferAccessibilityService : AccessibilityService() {
         val copilotEnabled = prefs.getBoolean("copilot_enabled", false)
         val trafficEnabled = prefs.getBoolean("traffic_enabled", false)
 
-        if (!copilotEnabled) {
-            bubble?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
-            bubble = null
-        } else if (bubble == null && Settings.canDrawOverlays(this)) {
-            onServiceConnected()
-        }
-        if (!trafficEnabled) {
+        if (driverAppName(pkg) == null || (!copilotEnabled && !trafficEnabled)) {
             hideAllOverlays()
             return
         }
-
-        if (driverAppName(pkg) == null) return
+        overlays.keys.filter { it != pkg }.forEach { hideOverlay(it) }
         // A tela inteira via OCR pode misturar dois apps no tablet. Para evitar
         // ofertas híbridas, aceitamos somente os dados da árvore do próprio app.
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow?.takeIf {
@@ -222,6 +159,11 @@ class OfferAccessibilityService : AccessibilityService() {
     // de acessibilidade. Nesses casos, fazemos OCR da tela ANTES do aceite.
     private fun requestOfferScreenshot(pkg: String) {
         if (Build.VERSION.SDK_INT < 30 || screenshotInProgress) return
+        if (rootInActiveWindow?.packageName?.toString() != pkg) return
+        // Full-display OCR is unsafe in split screen; use the app tree instead.
+        val bounds = Rect()
+        rootInActiveWindow?.getBoundsInScreen(bounds) ?: return
+        if (bounds.width() < resources.displayMetrics.widthPixels * 0.9) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenshotAt < 700L) return
         lastScreenshotAt = now
@@ -245,6 +187,9 @@ class OfferAccessibilityService : AccessibilityService() {
                         }
                         textRecognizer.process(InputImage.fromBitmap(captured, 0))
                             .addOnSuccessListener { visionText ->
+                                if (rootInActiveWindow?.packageName?.toString() != pkg) return@addOnSuccessListener
+                                val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+                                if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = visionText.text
                                 val normalized = java.text.Normalizer.normalize(recognized,
                                     java.text.Normalizer.Form.NFD)
@@ -525,14 +470,19 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun hideAllOverlays() {
-        overlays.values.forEach { it.visibility = View.GONE }
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        overlays.values.forEach { try { wm.removeView(it) } catch (_: Exception) {} }
+        overlays.clear()
+        overlayParams.clear()
+        acceptedSignatures.clear()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    override fun onInterrupt() { /* Mantém as etiquetas válidas durante interrupções breves. */ }
+    override fun onInterrupt() { hideAllOverlays() }
 
     override fun onDestroy() {
+        active = null
         NetworkGate.unregister(this, networkCallback)
         overlays.values.forEach { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
         overlays.clear()

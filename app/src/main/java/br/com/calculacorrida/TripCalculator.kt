@@ -29,6 +29,8 @@ object TripCalculator {
         minPassengerRating: Double = 4.80,
         goodPassengerRating: Double = 4.90
     ): TripResult? {
+        if (listOf(fare, pickupKm, tripKm, minutes, badPerKm, goodPerKm, badPerHour, goodPerHour).any { !it.isFinite() }) return null
+        if (passengerRating != null && (!passengerRating.isFinite() || passengerRating !in 0.0..5.0)) return null
         if (fare <= 0 || pickupKm < 0 || tripKm <= 0 || minutes <= 0) return null
         val totalKm = pickupKm + tripKm
 

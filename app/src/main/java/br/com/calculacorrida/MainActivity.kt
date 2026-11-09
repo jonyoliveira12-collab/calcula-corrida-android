@@ -18,16 +18,16 @@ import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
 
-    private val bg = Color.rgb(242, 246, 255)
-    private val panel = Color.rgb(255, 255, 255)
-    private val gold = Color.rgb(83, 101, 232)
-    private val white = Color.rgb(35, 43, 68)
-    private val muted = Color.rgb(105, 117, 145)
+    private val bg = Color.rgb(10, 10, 12)
+    private val panel = Color.rgb(23, 23, 26)
+    private val gold = Color.rgb(239, 190, 65)
+    private val white = Color.rgb(247, 244, 232)
+    private val muted = Color.rgb(176, 172, 158)
     private val green = Color.rgb(20, 166, 123)
     private val red = Color.rgb(226, 75, 100)
     private val amber = Color.rgb(242, 157, 45)
-    private val border = Color.rgb(213, 222, 244)
-    private val bgInput = Color.rgb(240, 244, 252)
+    private val border = Color.rgb(132, 103, 42)
+    private val bgInput = Color.rgb(35, 35, 39)
 
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
@@ -66,10 +66,10 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(11), dp(12), dp(11))
             background = GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(47, 73, 139), Color.rgb(91, 83, 177), Color.rgb(34, 139, 143))
+                intArrayOf(Color.rgb(16, 16, 19), Color.rgb(54, 42, 20), Color.rgb(17, 17, 20))
             ).apply {
                 cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), Color.rgb(126, 151, 224))
+                setStroke(dp(1), Color.rgb(190, 145, 42))
             }
             elevation = dp(5).toFloat()
         }
@@ -120,10 +120,10 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(255, 255, 255), Color.rgb(237, 243, 255))
+                intArrayOf(Color.rgb(23, 23, 26), Color.rgb(18, 18, 21))
             ).apply {
                 cornerRadius = dp(19).toFloat()
-                setStroke(dp(1), Color.rgb(202, 213, 240))
+                setStroke(dp(1), Color.rgb(132, 103, 42))
             }
             elevation = dp(8).toFloat()
             setPadding(dp(3), dp(5), dp(3), dp(5))
@@ -194,14 +194,37 @@ class MainActivity : Activity() {
         val online = isOperationalOnline()
         row.addView(pill(if (online) "● ONLINE" else "● OFF", if (online) green else red))
         welcome.addView(row)
-        welcome.addView(label("Seu painel inteligente", 22f, white, true, 12, 3))
+        welcome.addView(label("Inteligência para cada percurso", 22f, white, true, 12, 3))
         welcome.addView(label("Todas as suas ofertas em um só lugar.", 12f, muted, false, 0, 12))
+        val records = JourneyStore.getRecords(this)
         val metrics = horizontal()
-        metrics.addView(metric("GANHOS", "R$ 0,00"), weight())
-        metrics.addView(metric("POR HORA", "R$ 0,00"), weight())
-        metrics.addView(metric("CORRIDAS", "0"), weight())
+        metrics.addView(metric("OFERTAS LIDAS", records.size.toString()), weight())
+        metrics.addView(metric("MODO", "Análise"), weight())
         welcome.addView(metrics)
         content.addView(welcome, margin(0, 10))
+
+        val latest = card()
+        latest.addView(label("⚡ ÚLTIMA OFERTA", 20f, gold, true, 4, 12))
+        val offer = records.firstOrNull()
+        if (offer == null) {
+            latest.addView(label("Aguardando uma oferta", 17f, white, true))
+            latest.addView(label("Ative a leitura e abra seu app de motorista. Os indicadores aparecerão aqui.", 13f, muted, false))
+        } else {
+            fun amount(key: String) = String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", offer.optDouble(key))
+            val totals = horizontal()
+            totals.addView(metric("VALOR", "R$ " + amount("fare")), weight())
+            totals.addView(metric("TOTAL KM", amount("totalKm")), weight())
+            totals.addView(metric("MINUTOS", amount("minutes")), weight())
+            latest.addView(totals)
+            val rates = horizontal()
+            rates.addView(metric("R$/KM", "R$ " + amount("perKm")), weight())
+            rates.addView(metric("R$/HORA", "R$ " + amount("perHour")), weight())
+            latest.addView(rates)
+            val classification = offer.optString("classification")
+            latest.addView(pill(when (classification) { "GOOD" -> "BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; else -> "AVALIE A CORRIDA" }, when (classification) { "GOOD" -> green; "BAD" -> red; else -> amber }))
+            latest.addView(label("Inclui deslocamento até o passageiro quando informado na oferta. Valores brutos, antes dos custos.", 11f, muted, false, 8, 0))
+        }
+        content.addView(latest, margin(0, 10))
 
         val copilot = card()
         val copilotRow = horizontal()
@@ -566,6 +589,16 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         content.addView(label("Perfil e ajustes", 24f, white, true, 5, 12))
 
+        val privacy = card()
+        privacy.addView(label("Pausar para usar bancos", 18f, gold, true))
+        privacy.addView(label("Desliga a leitura de ofertas. Para voltar a trabalhar, reative a acessibilidade nas configurações do Android.", 13f, muted, false))
+        privacy.addView(action("DESLIGAR LEITURA", true) {
+            prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).apply()
+            OfferAccessibilityService.stopReading()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        })
+        content.addView(privacy, margin(0, 10))
+
         // Perfil do motorista: foto selecionável e identificação da conta.
         val userCard = card()
         val profileRow = horizontal()
@@ -706,7 +739,7 @@ class MainActivity : Activity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(247, 250, 255), Color.rgb(235, 244, 255))
+            intArrayOf(Color.rgb(23, 23, 26), Color.rgb(247, 250, 255), Color.rgb(235, 244, 255))
         ).apply {
             cornerRadius = dp(20).toFloat()
             setStroke(dp(1), Color.rgb(215, 224, 244))

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-<item><shape android:shape="rectangle"><gradient android:angle="135" android:startColor="#18345F" android:centerColor="#24517D" android:endColor="#147D82"/></shape></item>
+<item><shape android:shape="rectangle"><gradient android:angle="135" android:startColor="#08080A" android:centerColor="#30200B" android:endColor="#08080A"/></shape></item>
 <item android:drawable="@drawable/login_illustration"/>
 <item android:gravity="top|right" android:width="210dp" android:height="210dp" android:top="-105dp" android:right="-75dp"><shape android:shape="oval"><solid android:color="#33FFFFFF"/></shape></item>
 </layer-list>

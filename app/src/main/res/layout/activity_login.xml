@@ -39,7 +39,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="INTELIGÊNCIA PARA CADA PERCURSO"
-                android:textColor="#D9E8FF"
+                android:textColor="#E9C76C"
                 android:textSize="9sp"
                 android:letterSpacing="0.12"
                 android:layout_marginTop="3dp"/>
@@ -57,15 +57,15 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sua próxima corrida começa aqui"
-                android:textColor="#26345F"
+                android:text="Acesse sua conta"
+                android:textColor="#FFF8E4"
                 android:textSize="19sp"
                 android:textStyle="bold"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Entre para ver suas oportunidades com inteligência."
-                android:textColor="#7180A3"
+                android:textColor="#BCB6A5"
                 android:textSize="12sp"
                 android:layout_marginTop="4dp"
                 android:layout_marginBottom="16dp"/>
@@ -74,7 +74,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="E-MAIL"
-                android:textColor="#52628D"
+                android:textColor="#E9C76C"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="5dp"/>
@@ -87,8 +87,8 @@
                 android:singleLine="true"
                 android:paddingHorizontal="14dp"
                 android:textSize="14sp"
-                android:textColor="#25345B"
-                android:textColorHint="#98A3BC"
+                android:textColor="#FFF8E4"
+                android:textColorHint="#AAA69B"
                 android:background="@drawable/login_input"/>
             <CheckBox
                 android:id="@+id/rememberEmailCheck"
@@ -96,15 +96,15 @@
                 android:layout_height="wrap_content"
                 android:text="Lembrar meu e-mail"
                 android:textSize="11sp"
-                android:textColor="#647294"
-                android:buttonTint="#596FE8"
+                android:textColor="#BCB6A5"
+                android:buttonTint="#E9C76C"
                 android:checked="true"
                 android:layout_marginTop="2dp"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="SENHA"
-                android:textColor="#52628D"
+                android:textColor="#E9C76C"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:layout_marginTop="9dp"
@@ -118,15 +118,15 @@
                 android:singleLine="true"
                 android:paddingHorizontal="14dp"
                 android:textSize="14sp"
-                android:textColor="#25345B"
-                android:textColorHint="#98A3BC"
+                android:textColor="#FFF8E4"
+                android:textColorHint="#AAA69B"
                 android:background="@drawable/login_input"/>
             <TextView
                 android:id="@+id/forgotPasswordText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Esqueci minha senha"
-                android:textColor="#586CE0"
+                android:textColor="#E9C76C"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:gravity="end"
@@ -141,7 +141,7 @@
                 android:text="ENTRAR"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"
+                android:textColor="#16120A"
                 android:background="@drawable/login_primary_button"
                 android:backgroundTint="@null"
                 android:layout_marginTop="12dp"/>
@@ -152,7 +152,7 @@
                 android:text="CRIAR CONTA"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="#4058C8"
+                android:textColor="#E9C76C"
                 android:background="@drawable/login_secondary_button"
                 android:backgroundTint="@null"
                 android:layout_marginTop="7dp"/>
@@ -168,7 +168,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="ACESSO SEGURO  •  JHONDRIVER"
-            android:textColor="#68769A"
+            android:textColor="#BCB6A5"
             android:textSize="9sp"
             android:letterSpacing="0.12"
             android:gravity="center"
