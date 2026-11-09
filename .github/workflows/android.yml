@@ -32,7 +32,6 @@ jobs:
     permissions:
       contents: write
     env:
-      JHONDRIVER_KEYSTORE_PATH: ${{ runner.temp }}/jhondriver-signing.keystore
       JHONDRIVER_KEYSTORE_PASSWORD: ${{ secrets.JHONDRIVER_KEYSTORE_PASSWORD }}
       JHONDRIVER_KEY_ALIAS: ${{ secrets.JHONDRIVER_KEY_ALIAS }}
       JHONDRIVER_KEY_PASSWORD: ${{ secrets.JHONDRIVER_KEY_PASSWORD }}
@@ -55,6 +54,8 @@ jobs:
             echo "Configure the four private JHONDRIVER signing secrets before publishing."
             exit 1
           fi
+          export JHONDRIVER_KEYSTORE_PATH="$RUNNER_TEMP/jhondriver-signing.keystore"
+          echo "JHONDRIVER_KEYSTORE_PATH=$JHONDRIVER_KEYSTORE_PATH" >> "$GITHUB_ENV"
           umask 077
           printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$JHONDRIVER_KEYSTORE_PATH"
           keytool -exportcert -keystore "$JHONDRIVER_KEYSTORE_PATH" -storepass:env JHONDRIVER_KEYSTORE_PASSWORD -alias "$JHONDRIVER_KEY_ALIAS" -file "$RUNNER_TEMP/signing-cert.der"
