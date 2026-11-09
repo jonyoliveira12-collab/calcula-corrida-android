@@ -15,6 +15,11 @@ android {
         versionName = "0.3.0"
     }
 
+    buildTypes.getByName("debug") {
+        applicationIdSuffix = ".teste"
+        versionNameSuffix = "-teste"
+    }
+
     // Signing material is injected from private Actions secrets, never from source control.
     val signingPath = providers.environmentVariable("JHONDRIVER_KEYSTORE_PATH").orNull
     val signingPassword = providers.environmentVariable("JHONDRIVER_KEYSTORE_PASSWORD").orNull
