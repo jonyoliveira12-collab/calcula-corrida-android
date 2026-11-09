@@ -4,9 +4,14 @@
     android:layout_height="match_parent"
     android:fillViewport="true"
     android:background="@drawable/login_background">
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:id="@+id/authContent"
+        android:layout_gravity="center"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
         android:paddingStart="24dp"
@@ -19,10 +24,10 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="vertical"
-            android:layout_marginBottom="18dp">
+            android:layout_marginBottom="14dp">
             <ImageView
-                android:layout_width="76dp"
-                android:layout_height="76dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:src="@drawable/jhondriver_logo"
                 android:contentDescription="Logo JHONDRIVER"
                 android:scaleType="fitCenter"
@@ -32,7 +37,7 @@
                 android:layout_height="wrap_content"
                 android:text="JHONDRIVER"
                 android:textColor="#FFFFFF"
-                android:textSize="27sp"
+                android:textSize="25sp"
                 android:letterSpacing="0.13"
                 android:textStyle="bold"/>
             <TextView
@@ -50,7 +55,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:orientation="vertical"
-            android:padding="22dp"
+            android:padding="20dp"
             android:background="@drawable/login_card"
             android:elevation="8dp">
 
@@ -64,11 +69,11 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Entre para ver suas oportunidades com inteligência."
+                android:text="Inteligência para cada percurso."
                 android:textColor="#BCB6A5"
                 android:textSize="12sp"
                 android:layout_marginTop="4dp"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="12dp"/>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -167,11 +172,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ACESSO SEGURO  •  JHONDRIVER"
+            android:text="CÁLCULO INTELIGENTE   •   MAIS LUCRO   •   EM TEMPO REAL"
             android:textColor="#BCB6A5"
             android:textSize="9sp"
             android:letterSpacing="0.12"
             android:gravity="center"
             android:layout_marginTop="16dp"/>
     </LinearLayout>
+    </FrameLayout>
 </ScrollView>

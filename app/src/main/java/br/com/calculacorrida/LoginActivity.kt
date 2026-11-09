@@ -56,6 +56,17 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         setContentView(R.layout.activity_login)
+        val auth = findViewById<android.widget.LinearLayout>(R.id.authContent)
+        fun fitLogin() {
+            val available = (resources.displayMetrics.widthPixels - 32 * resources.displayMetrics.density).toInt()
+            auth.layoutParams = auth.layoutParams.apply { width = minOf((380 * resources.displayMetrics.density).toInt(), available) }
+        }
+        fitLogin()
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(auth) { v, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding((20 * resources.displayMetrics.density).toInt(), bars.top + (12 * resources.displayMetrics.density).toInt(), (20 * resources.displayMetrics.density).toInt(), bars.bottom + (12 * resources.displayMetrics.density).toInt())
+            insets
+        }
 
         emailInput = findViewById(R.id.emailInput)
         passwordInput = findViewById(R.id.passwordInput)

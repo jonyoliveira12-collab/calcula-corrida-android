@@ -84,14 +84,14 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
             addView(label("JHONDRIVER", 21f, Color.WHITE, true))
-            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, Color.rgb(221, 233, 255), true))
+            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, gold, true))
         }
         brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         val avatar = ImageView(this).apply {
             val size = dp(44)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { leftMargin = dp(8) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(224, 233, 255), 24, gold)
+            background = rounded(panel, 24, gold)
             clipToOutline = true
             val savedPhoto = getSharedPreferences("settings", MODE_PRIVATE).getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -130,6 +130,11 @@ class MainActivity : Activity() {
         }
         root.addView(bottom, LinearLayout.LayoutParams(-1, dp(72)))
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding(dp(12) + bars.left, dp(8) + bars.top, dp(12) + bars.right, dp(4) + bars.bottom)
+            insets
+        }
         setContentView(root)
         showTab("Início")
     }
@@ -176,6 +181,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(4), dp(4), dp(4), dp(4))
+                if (active) background = rounded(Color.rgb(65, 47, 12), 14, gold)
                 isClickable = true
                 setOnClickListener { showTab(item.first) }
             }
@@ -187,140 +193,86 @@ class MainActivity : Activity() {
 
     private fun buildHome() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-
-        val welcome = card()
-        val row = horizontal()
-        row.addView(label("DIA DE TRABALHO", 11f, muted, true), LinearLayout.LayoutParams(0, -2, 1f))
-        val online = isOperationalOnline()
-        row.addView(pill(if (online) "● ONLINE" else "● OFF", if (online) green else red))
-        welcome.addView(row)
-        welcome.addView(label("Inteligência para cada percurso", 22f, white, true, 12, 3))
-        welcome.addView(label("Todas as suas ofertas em um só lugar.", 12f, muted, false, 0, 12))
         val records = JourneyStore.getRecords(this)
-        val metrics = horizontal()
-        metrics.addView(metric("OFERTAS LIDAS", records.size.toString()), weight())
-        metrics.addView(metric("MODO", "Análise"), weight())
-        welcome.addView(metrics)
-        content.addView(welcome, margin(0, 10))
+        val wide = resources.configuration.screenWidthDp >= 600
+        val status = horizontal().apply { setPadding(dp(4), dp(12), dp(4), dp(4)) }
+        status.addView(label("PAINEL DO MOTORISTA", 11f, gold, true), weight())
+        val online = isOperationalOnline()
+        status.addView(pill(if (online) "● ONLINE" else "● LEITURA PAUSADA", if (online) green else muted))
+        content.addView(status)
 
-        val latest = card()
-        latest.addView(label("⚡ ÚLTIMA OFERTA", 20f, gold, true, 4, 12))
+        val controls = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
+        fun feature(title: String, key: String) {
+            val tile = card()
+            val row = horizontal()
+            row.addView(label(title, 15f, white, true), weight())
+            row.addView(Switch(this).apply {
+                contentDescription = title
+                isChecked = prefs.getBoolean(key, false)
+                thumbTintList = ColorStateList.valueOf(white)
+                trackTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(gold, Color.rgb(80,80,85)))
+                setOnCheckedChangeListener { _, enabled ->
+                    if (enabled && !ensureRequiredPermissions()) {
+                        isChecked = false
+                        prefs.edit().putBoolean(key, false).apply()
+                    } else prefs.edit().putBoolean(key, enabled).apply()
+                }
+            })
+            tile.addView(row)
+            controls.addView(tile, if (wide) LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(10); rightMargin = dp(6) } else margin(0, 8))
+        }
+        feature("✧ Copiloto", "copilot_enabled")
+        feature("● Semáforo", "traffic_enabled")
+        content.addView(controls)
+
+        val offerCard = card().apply { background = rounded(panel, 22, gold) }
+        offerCard.addView(label("⚡ ÚLTIMA OFERTA", 21f, gold, true, 0, 18))
         val offer = records.firstOrNull()
-        if (offer == null) {
-            latest.addView(label("Aguardando uma oferta", 17f, white, true))
-            latest.addView(label("Ative a leitura e abra seu app de motorista. Os indicadores aparecerão aqui.", 13f, muted, false))
+        fun number(key: String): String = offer?.let { String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", it.optDouble(key)) } ?: "—"
+        val totals = horizontal()
+        totals.addView(metric("VALOR", if (offer == null) "—" else "R$ " + number("fare")), weight())
+        totals.addView(metric("PERCURSO TOTAL", number("totalKm") + " km"), weight())
+        totals.addView(metric("TEMPO TOTAL", number("minutes") + " min"), weight())
+        offerCard.addView(totals)
+        offerCard.addView(View(this).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(18); bottomMargin = dp(18) })
+        val rates = horizontal()
+        rates.addView(metric("R$/KM", if (offer == null) "—" else "R$ " + number("perKm")), weight())
+        rates.addView(metric("R$/HORA", if (offer == null) "—" else "R$ " + number("perHour")), weight())
+        offerCard.addView(rates)
+        val classification = offer?.optString("classification")
+        offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else white, true, 18, 8).apply {
+            gravity = Gravity.CENTER
+            background = rounded(when (classification) { "GOOD" -> Color.rgb(16, 85, 36); "BAD" -> Color.rgb(99, 26, 26); "REVIEW" -> Color.rgb(87, 62, 14); else -> Color.rgb(31,31,34) }, 12, border)
+        }, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(18) })
+        offerCard.addView(label(if (offer == null) "Ative a leitura e abra o aplicativo de motorista." else "Valores brutos • inclui chegada quando informada na oferta.", 12f, muted, false, 12, 0))
+
+        val filters = card()
+        filters.addView(label("☷ FILTRO DE GANHO", 16f, gold, true, 0, 14))
+        filters.addView(label("Mínimo por km", 13f, muted, false))
+        filters.addView(label(money(prefs.getFloat("min_per_km", 1.8f)), 23f, gold, true, 4, 16))
+        filters.addView(label("Mínimo por hora", 13f, muted, false))
+        filters.addView(label(money(prefs.getFloat("good_per_hour", 60f)), 23f, gold, true, 4, 8))
+        filters.addView(action("AJUSTAR LIMITES  ›", false) { showTab("Semáforo") })
+        if (wide) {
+            val main = horizontal().apply { gravity = Gravity.TOP }
+            main.addView(offerCard, LinearLayout.LayoutParams(0, -2, 2f).apply { topMargin = dp(14); rightMargin = dp(12) })
+            main.addView(filters, LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(14) })
+            content.addView(main)
         } else {
-            fun amount(key: String) = String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", offer.optDouble(key))
-            val totals = horizontal()
-            totals.addView(metric("VALOR", "R$ " + amount("fare")), weight())
-            totals.addView(metric("TOTAL KM", amount("totalKm")), weight())
-            totals.addView(metric("MINUTOS", amount("minutes")), weight())
-            latest.addView(totals)
-            val rates = horizontal()
-            rates.addView(metric("R$/KM", "R$ " + amount("perKm")), weight())
-            rates.addView(metric("R$/HORA", "R$ " + amount("perHour")), weight())
-            latest.addView(rates)
-            val classification = offer.optString("classification")
-            latest.addView(pill(when (classification) { "GOOD" -> "BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; else -> "AVALIE A CORRIDA" }, when (classification) { "GOOD" -> green; "BAD" -> red; else -> amber }))
-            latest.addView(label("Inclui deslocamento até o passageiro quando informado na oferta. Valores brutos, antes dos custos.", 11f, muted, false, 8, 0))
+            content.addView(offerCard, margin(0, 14))
+            content.addView(filters, margin(0, 12))
         }
-        content.addView(latest, margin(0, 10))
-
-        val copilot = card()
-        val copilotRow = horizontal()
-        copilotRow.addView(iconTile("✧"))
-        copilotRow.addView(verticalText("Copiloto", "Análise automática de ofertas"), LinearLayout.LayoutParams(0, -2, 1f))
-        val aiSwitch = Switch(this).apply {
-            isChecked = prefs.getBoolean("copilot_enabled", false)
-            buttonTintList = ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked ->
-                if (checked && !ensureRequiredPermissions()) {
-                    isChecked = false
-                    prefs.edit().putBoolean("copilot_enabled", false).apply()
-                } else {
-                    prefs.edit().putBoolean("copilot_enabled", checked).apply()
-                    if (checked) requestAccessibilityIfNeeded()
-                }
-            }
-        }
-        copilotRow.addView(aiSwitch)
-        copilot.addView(copilotRow)
-        copilot.addView(label("O copiloto lê os dados visíveis da oferta e apresenta os cálculos. Não aceita nem recusa corridas.", 11f, muted, false, 0, 5))
-        content.addView(copilot, margin(0, 10))
-
-        // Semáforo
-        val traffic = card()
-        val trafficRow = horizontal()
-        trafficRow.addView(iconTile("🚦"))
-        trafficRow.addView(verticalText("Semáforo de Valores", "Uber • 99 • classificação por faixa"), LinearLayout.LayoutParams(0, -2, 1f))
-        val trafficSwitch = Switch(this).apply {
-            isChecked = prefs.getBoolean("traffic_enabled", false)
-            buttonTintList = ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked ->
-                if (checked && !ensureRequiredPermissions()) {
-                    isChecked = false
-                    prefs.edit().putBoolean("traffic_enabled", false).apply()
-                } else {
-                    prefs.edit().putBoolean("traffic_enabled", checked).apply()
-                    if (checked) requestAccessibilityIfNeeded()
-                }
-            }
-        }
-        trafficRow.addView(trafficSwitch)
-        trafficRow.addView(action("⚙", false) { showTab("Semáforo") })
-        traffic.addView(trafficRow)
-        traffic.addView(label(
-            prefs.getString("label_bad", "Vixe não dá") + "    " +
-            prefs.getString("label_review", "Hum, talvez") + "    " +
-            prefs.getString("label_good", "Bora carai"),
-            11f, gold, true, 8, 0
-        ))
-        content.addView(traffic, margin(0, 10))
-
-        // Jornada
-        val journey = card()
-        val jrow = horizontal()
-        jrow.addView(iconTile("◷"))
-        jrow.addView(verticalText("Jornada", "Monitore seu tempo de trabalho."), LinearLayout.LayoutParams(0, -2, 1f))
-        jrow.addView(label("›", 25f, muted, false))
-        journey.addView(jrow)
-        journey.addView(action("VER RELATÓRIO", false) { showTab("Histórico") })
-        content.addView(journey, margin(0, 10))
-
-        // Faixas
-        val bands = card()
-        val bhead = horizontal()
-        bhead.addView(label("Suas Faixas", 17f, white, true), LinearLayout.LayoutParams(0, -2, 1f))
-        bhead.addView(action("⚙ AJUSTAR", false) { showTab("Perfil") })
-        bands.addView(bhead)
-        bands.addView(label("Confira os valores de cada faixa.", 12f, muted, false, 0, 10))
-        val table = horizontal()
-        table.addView(rangeColumn(prefs.getString("label_bad", "Vixe não dá") ?: "Vixe não dá", red, "< " + money(prefs.getFloat("bad_per_km", 1.5f)), "< " + money(prefs.getFloat("min_per_hour", 50f))), weight())
-        table.addView(rangeColumn(prefs.getString("label_review", "Hum, talvez") ?: "Hum, talvez", amber, money(prefs.getFloat("bad_per_km", 1.5f)) + " a " + money(prefs.getFloat("min_per_km", 1.8f)), money(prefs.getFloat("min_per_hour", 50f)) + " a " + money(prefs.getFloat("good_per_hour", 60f))), weight())
-        table.addView(rangeColumn(prefs.getString("label_good", "Bora carai") ?: "Bora carai", green, "≥ " + money(prefs.getFloat("min_per_km", 1.8f)), "≥ " + money(prefs.getFloat("good_per_hour", 60f))), weight())
-        bands.addView(table)
-        bands.addView(label("R$/km          R$/hora", 10f, muted, false, 0, 0))
-        content.addView(bands, margin(0, 10))
-
-        // Permissões
-        val perms = card()
-        val permsRow = horizontal()
-        permsRow.addView(iconTile("🔐"))
-        permsRow.addView(verticalText("Permissões", "Acessibilidade e Sobreposição"), LinearLayout.LayoutParams(0, -2, 1f))
-        perms.addView(permsRow)
-
-        val accOn = isAccessibilityEnabled()
-        val overlayOn = Settings.canDrawOverlays(this)
-
-        perms.addView(permissionRow("Acessibilidade", accOn) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        })
-        perms.addView(permissionRow("Sobreposição de tela", overlayOn) {
-            if (!overlayOn) {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            }
-        })
-        content.addView(perms, margin(0, 10))
+        val summaries = horizontal()
+        val count = card().apply { addView(metric("OFERTAS ANALISADAS", records.size.toString())) }
+        val average = card().apply { addView(metric("MÉDIA R$/KM", if (records.isEmpty()) "—" else "R$ " + String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", records.map { it.optDouble("perKm") }.average()))) }
+        summaries.addView(count, LinearLayout.LayoutParams(0,-2,1f).apply { topMargin=dp(12);rightMargin=dp(6) })
+        summaries.addView(average, LinearLayout.LayoutParams(0,-2,1f).apply { topMargin=dp(12);leftMargin=dp(6) })
+        content.addView(summaries)
+        val settings = card()
+        settings.addView(label("PRONTO PARA TRABALHAR?", 14f, white, true))
+        settings.addView(label("Autorize a leitura e a sobreposição nos ajustes. Para usar bancos, desligue a leitura.", 12f, muted, false, 6, 2))
+        settings.addView(action("PERMISSÕES E AJUSTES  ›", false) { showTab("Perfil") })
+        content.addView(settings, margin(0,12))
     }
 
     private fun chooseProfilePhoto() {
@@ -606,7 +558,7 @@ class MainActivity : Activity() {
             val size = dp(66)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { rightMargin = dp(14) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(230, 237, 255), 36, gold)
+            background = rounded(panel, 36, gold)
             clipToOutline = true
             val savedPhoto = prefs.getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -739,10 +691,10 @@ class MainActivity : Activity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(23, 23, 26), Color.rgb(247, 250, 255), Color.rgb(235, 244, 255))
+            intArrayOf(Color.rgb(23, 23, 26), Color.rgb(18, 18, 20), Color.rgb(10, 10, 12))
         ).apply {
             cornerRadius = dp(20).toFloat()
-            setStroke(dp(1), Color.rgb(215, 224, 244))
+            setStroke(dp(1), border)
         }
         elevation = dp(6).toFloat()
         layoutParams = margin(0, 10)
@@ -795,7 +747,7 @@ class MainActivity : Activity() {
     private fun metric(title: String, value: String): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         addView(label(title, 10f, muted, true))
-        addView(label(value, 18f, white, true, 4, 0))
+        addView(label(value, 20f, gold, true, 6, 0))
     }
 
     private fun financeStat(title: String, value: String): LinearLayout = LinearLayout(this).apply {

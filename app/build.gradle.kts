@@ -11,8 +11,9 @@ android {
         applicationId = "br.com.calculacorrida"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.3.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes.getByName("debug") {
@@ -49,6 +50,8 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
