@@ -65,11 +65,11 @@ jobs:
             adb shell wm density 240
             gradle --no-daemon connectedDebugAndroidTest
             mkdir -p visual-check
-            adb pull /sdcard/Android/data/br.com.calculacorrida.teste/files/screenshots/. visual-check/
+            adb pull /data/local/tmp/jhonvisual/. visual-check/
             adb shell wm size 1080x1920
             adb shell wm density 420
-            gradle --no-daemon connectedDebugAndroidTest --rerun-tasks
-            adb pull /sdcard/Android/data/br.com.calculacorrida.teste/files/screenshots/. visual-check/
+            gradle --no-daemon connectedDebugAndroidTest
+            adb pull /data/local/tmp/jhonvisual/. visual-check/
       - uses: actions/upload-artifact@v4
         if: always()
         with:

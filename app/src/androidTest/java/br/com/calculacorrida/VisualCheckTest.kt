@@ -25,8 +25,12 @@ class VisualCheckTest {
         fun capture(name: String) {
             val bitmap = instrumentation.uiAutomation.takeScreenshot()
             assertNotNull(bitmap)
-            val dir = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-            File(dir, "$name-$size.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+            instrumentation.uiAutomation.executeShellCommand("mkdir -p /data/local/tmp/jhonvisual").close()
+            val pipes = instrumentation.uiAutomation.executeShellCommandRw("cat > /data/local/tmp/jhonvisual/$name-$size.png")
+            android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use { it.readBytes() }
             bitmap.recycle()
         }
         launch(LoginActivity::class.java)
