@@ -15,6 +15,24 @@ android {
         versionName = "0.3.0"
     }
 
+    // Signing material is injected from private Actions secrets, never from source control.
+    val signingPath = providers.environmentVariable("JHONDRIVER_KEYSTORE_PATH").orNull
+    val signingPassword = providers.environmentVariable("JHONDRIVER_KEYSTORE_PASSWORD").orNull
+    val signingAlias = providers.environmentVariable("JHONDRIVER_KEY_ALIAS").orNull
+    val signingKeyPassword = providers.environmentVariable("JHONDRIVER_KEY_PASSWORD").orNull
+    if (!signingPath.isNullOrBlank()) {
+        require(!signingPassword.isNullOrBlank() && !signingAlias.isNullOrBlank() && !signingKeyPassword.isNullOrBlank()) {
+            "Missing private signing configuration"
+        }
+        signingConfigs.create("privateRelease") {
+            storeFile = file(signingPath)
+            storePassword = signingPassword
+            keyAlias = signingAlias
+            keyPassword = signingKeyPassword
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("privateRelease")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
