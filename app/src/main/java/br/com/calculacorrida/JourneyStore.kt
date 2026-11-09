@@ -42,6 +42,7 @@ object JourneyStore {
             put("timestamp", now)
             put("signature", signature)
             put("app", when {
+                driverPackage == "manual" -> "Manual"
                 driverPackage.contains("uber", true) -> "Uber"
                 driverPackage.contains("99") -> "99"
                 driverPackage.contains("didi", true) -> "DiDi"

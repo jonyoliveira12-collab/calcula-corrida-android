@@ -69,6 +69,12 @@ class LoginActivity : AppCompatActivity() {
             insets
         }
 
+        auth.addView(android.widget.Button(this).apply {
+            text = "ANALISAR SEM CONTA"
+            setTextColor(android.graphics.Color.rgb(239,190,65))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.rgb(23,23,26))
+            setOnClickListener { startActivity(Intent(this@LoginActivity,ManualOfferActivity::class.java)) }
+        })
         emailInput = findViewById(R.id.emailInput)
         passwordInput = findViewById(R.id.passwordInput)
         loginButton = findViewById(R.id.loginButton)

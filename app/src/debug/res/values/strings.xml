@@ -1,4 +1,1 @@
-<resources>
-    <string name="app_name">JHONDRIVER TESTE</string>
-    <string name="reading_service_name">JHONDRIVER TESTE - Leitura de ofertas</string>
-</resources>
+<resources><string name="app_name">JHONDRIVER</string></resources>

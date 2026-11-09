@@ -1,38 +1,32 @@
-# JHONDRIVER
+# JHONDRIVER 0.4.0
 
-Aplicativo Android para análise de ofertas de corrida.
+Edição com análise manual e por imagem escolhida pelo usuário. Nome de exibição: JHONDRIVER. A edição de avaliação mantém seu identificador existente (`br.com.calculacorrida.teste`), evitando confundir uma mudança cosmética com uma correção de segurança.
 
-## Assinatura privada e atualização sem desinstalar
+## Mudança de funcionamento
 
-A publicação usa exclusivamente a chave original, fornecida por secrets privados do GitHub Actions. O certificado é conferido antes da compilação: SHA-256 `01537f8902325696735cd4db6710ec2186eb21f8007e11ed74d757f8af30d5b8`. Isso corresponde à chave que estava no repositório; a compatibilidade com uma instalação concreta depende de ela ter sido assinada com esse mesmo certificado.
+Foram removidos do código e do manifesto o serviço de acessibilidade, captura automática da tela, janelas de sobreposição, bolinha CC e cliente de IA das ofertas. Não há leitura automática de outros aplicativos. O usuário digita os valores ou escolhe/compartilha uma imagem; OCR ocorre no aparelho e os valores precisam ser revisados antes do cálculo. Nenhuma imagem é enviada ao servidor. A análise pode ser aberta sem conta na tela de login. Conta e atualizações continuam usando internet.
 
-No repositório, abra **Settings → Secrets and variables → Actions → New repository secret** e cadastre:
+As imagens selecionadas não são copiadas para o histórico. Somente os valores confirmados são salvos localmente. O usuário pode apagar o histórico no aplicativo. O seletor do Android concede acesso apenas à imagem escolhida, sem solicitar acesso geral à galeria.
 
-| Secret | Conteúdo |
-| --- | --- |
-| `JHONDRIVER_KEYSTORE_BASE64` | Arquivo da chave original convertido em base64, sem quebras de linha |
-| `JHONDRIVER_KEYSTORE_PASSWORD` | Senha do arquivo original |
-| `JHONDRIVER_KEY_ALIAS` | Alias original |
-| `JHONDRIVER_KEY_PASSWORD` | Senha da chave original |
+## Segurança e compatibilidade
 
-Use a cópia original da chave e suas credenciais existentes. Não cole esses dados em issues, commits, conversas ou logs. Não gere outra chave para preencher esses secrets. Se a chave original não estiver disponível, mantenha a publicação bloqueada e planeje uma migração.
+O pipeline verifica manifesto, permissões e ausência das classes removidas no APK. Isso não equivale a aprovação do Google Play Protect nem garante aceitação pelo Nubank ou outro banco. Não desative proteções do aparelho para instalar ou usar esta edição. Alertas devem ser investigados com o banco/Google pelos canais oficiais.
 
-Os testes de pull requests não recebem secrets. A publicação em `main` só acontece depois dos testes e falha se faltar configuração ou se o certificado for diferente. A chave temporária é apagada ao final. O APK de teste local usa assinatura debug e não deve ser distribuído como atualização do aplicativo existente.
+## Atualizações e assinatura
 
-A remoção da chave do estado atual do repositório **não apaga a exposição no histórico**. Guardá-la em Secrets evita novas publicações, mas não torna a chave antiga novamente secreta. Será necessário planejar uma rotação compatível para distribuição futura; esta alteração conserva a assinatura existente para evitar uma reinstalação imediata.
+O aviso de atualização está implementado e só oferece uma versão superior com mesmo pacote e certificado declarados no manifesto público da release. Versões antigas precisam de uma instalação manual inicial compatível. A publicação oficial permanece bloqueada até cadastrar os quatro segredos privados em Settings → Secrets and variables → Actions:
+
+- `JHONDRIVER_KEYSTORE_BASE64`: chave original em base64.
+- `JHONDRIVER_KEYSTORE_PASSWORD`: senha do arquivo.
+- `JHONDRIVER_KEY_ALIAS`: alias da chave.
+- `JHONDRIVER_KEY_PASSWORD`: senha da chave.
+
+Não envie chaves/senhas por mensagens, issues ou commits. A compilação de publicação confere o certificado original `01537f8902325696735cd4db6710ec2186eb21f8007e11ed74d757f8af30d5b8`. A exposição anterior no histórico não foi desfeita; a distribuição oficial precisa de planejamento de rotação. O APK debug de avaliação não atualiza o aplicativo oficial.
 
 ## Validação
 
 `gradle testDebugUnitTest assembleDebug`
 
-Testes cobrem valores por km/hora, metros, dois trechos, resumo sem duplicação, moeda com ponto/vírgula, leituras ambíguas e entradas inválidas. OCR, interface e compatibilidade com aplicativos bancários precisam de testes no dispositivo. O botão **Desligar leitura** desativa o serviço; não garante que todos os bancos aceitem o aplicativo instalado.
+`python .github/scripts/audit_apk.py app/build/outputs/apk/debug/app-debug.apk`
 
-## Aviso de atualização
-
-As versões que contêm o verificador consultam as releases públicas do GitHub ao abrir o app, com intervalo mínimo de uma hora durante a mesma sessão. Em Perfil, Verificar atualização permite uma consulta imediata. Só aparecem APKs de versão superior, mesmo identificador e mesmo certificado, indicados por um `update.json` de canal stable. A instalação continua exigindo confirmação no Android.
-
-Quem instalou uma versão antiga sem esse recurso precisa receber e instalar uma atualização manual compatível uma vez. Cadastrar os quatro secrets de assinatura e publicar o APK assinado com a chave original continuam sendo pré-requisitos. A versão TESTE é separada e não recebe a atualização do aplicativo principal.
-
-## Diagnóstico da leitura
-
-A bolinha CC aparece no JHONDRIVER e nos apps de motorista reconhecidos enquanto Copiloto ou Semáforo estiver ativo. Pode ser arrastada; um toque abre o app. É removida ao sair desses apps. Desligar leitura desativa o serviço de acessibilidade. O painel informa o status da leitura sem salvar o texto bruto da tela. A consulta periódica ocorre apenas na janela ativa dos apps de motorista permitidos. Android 14+ usa captura da janela específica para não misturar apps em tela dividida; Android 11–13 exige tela cheia para o fallback por imagem.
+Teste instrumentado: `ManualOfferTest` confirma ausência das permissões/serviço e cálculo manual de R$ 18,40, 12,6 km e 28 min. Aprovação do Play Protect e compatibilidade bancária exigem validação externa.

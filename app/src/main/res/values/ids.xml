@@ -1,0 +1,5 @@
+<resources>
+<item type="id" name="manualFare"/><item type="id" name="manualPickup"/>
+<item type="id" name="manualTrip"/><item type="id" name="manualMinutes"/>
+<item type="id" name="manualCalculate"/><item type="id" name="manualResult"/>
+</resources>
