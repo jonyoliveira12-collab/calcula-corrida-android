@@ -44,6 +44,93 @@ class OfferAccessibilityService : AccessibilityService() {
     private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     @Volatile private var screenshotInProgress = false
     @Volatile private var lastScreenshotAt = 0L
+    private val readerHandler = Handler(Looper.getMainLooper())
+    private var foregroundPackage: String? = null
+    private var stopped = false
+    private val poll = object : Runnable {
+        override fun run() {
+            if (stopped) return
+            val pkg = rootInActiveWindow?.let { root ->
+                val name = root.packageName?.toString()
+                root.recycle()
+                name
+            }
+            updateForeground(pkg)
+            if (pkg != null && driverAppName(pkg) != null && readingEnabled()) readOffer(pkg, null)
+            readerHandler.postDelayed(this, 1000L)
+        }
+    }
+
+    private fun readingEnabled(): Boolean {
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        return prefs.getBoolean("copilot_enabled", false) || prefs.getBoolean("traffic_enabled", false)
+    }
+
+    private fun readerStatus(message: String) {
+        getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+            .putString("reader_status", message).putLong("reader_seen_at", System.currentTimeMillis()).apply()
+    }
+
+    private fun removeBubble() {
+        bubble?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
+        bubble = null
+    }
+
+    private fun updateForeground(pkg: String?) {
+        if (foregroundPackage != pkg) {
+            foregroundPackage = pkg
+            hideAllOverlays()
+        }
+        if (!readingEnabled() || pkg == null || (pkg != packageName && driverAppName(pkg) == null)) {
+            removeBubble()
+            return
+        }
+        if (!Settings.canDrawOverlays(this)) {
+            readerStatus("Falta permitir sobreposição de tela")
+            return
+        }
+        if (bubble != null) return
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val params = WindowManager.LayoutParams(dp(48), dp(48), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT).apply {
+                gravity = Gravity.TOP or Gravity.LEFT
+                x = prefs.getInt("bubble_x", dp(8)).coerceIn(0, (resources.displayMetrics.widthPixels - dp(48)).coerceAtLeast(0))
+                y = prefs.getInt("bubble_y", dp(170)).coerceIn(0, (resources.displayMetrics.heightPixels - dp(48)).coerceAtLeast(0))
+            }
+        val view = TextView(this).apply {
+            text = "CC"; textSize = 15f; gravity = Gravity.CENTER
+            setTextColor(Color.rgb(255, 218, 108)); typeface = Typeface.DEFAULT_BOLD
+            contentDescription = "Copiloto CC. Arraste para mover; toque para abrir os ajustes."
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(18,18,20)); setStroke(dp(2), Color.rgb(239,190,65)) }
+        }
+        var startX = 0; var startY = 0; var downX = 0f; var downY = 0f; var moved = false
+        view.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { startX=params.x; startY=params.y; downX=event.rawX; downY=event.rawY; moved=false }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx=(event.rawX-downX).toInt(); val dy=(event.rawY-downY).toInt()
+                    if (kotlin.math.abs(dx)>dp(5) || kotlin.math.abs(dy)>dp(5)) moved=true
+                    if (moved) {
+                        params.x=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels-dp(48)).coerceAtLeast(0))
+                        params.y=(startY+dy).coerceIn(0,(resources.displayMetrics.heightPixels-dp(48)).coerceAtLeast(0))
+                        try { wm.updateViewLayout(view,params) } catch (_: Exception) {}
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (moved) prefs.edit().putInt("bubble_x",params.x).putInt("bubble_y",params.y).apply()
+                    else packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        startActivity(intent)
+                    }
+                }
+            }
+            true
+        }
+        try { wm.addView(view,params); bubble=view } catch (_: Exception) { readerStatus("Não foi possível mostrar a bolinha CC") }
+    }
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
             Handler(Looper.getMainLooper()).post { hideAllOverlays() }
@@ -59,11 +146,15 @@ class OfferAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         active = this
         NetworkGate.register(this, networkCallback)
+        stopped = false
+        readerStatus("Serviço conectado; aguardando app de motorista")
+        readerHandler.removeCallbacks(poll)
+        readerHandler.post(poll)
     }
 
     companion object {
         private var active: OfferAccessibilityService? = null
-        fun stopReading() { active?.apply { hideAllOverlays(); disableSelf() } }
+        fun stopReading() { active?.apply { stopped = true; readerHandler.removeCallbacks(poll); hideAllOverlays(); removeBubble(); disableSelf() } }
     }
 
     private fun driverAppName(pkg: String): String? {
@@ -78,33 +169,21 @@ class OfferAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        val relevantTypes = setOf(
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
-            AccessibilityEvent.TYPE_VIEW_CLICKED,
-            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
-        )
-        if (event.eventType !in relevantTypes) return
-        val pkg = event.packageName?.toString() ?: return
-        if (!NetworkGate.isOnline(this)) {
-            hideAllOverlays()
-            return
-        }
-        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val copilotEnabled = prefs.getBoolean("copilot_enabled", false)
-        val trafficEnabled = prefs.getBoolean("traffic_enabled", false)
+        val root = rootInActiveWindow
+        val pkg = root?.packageName?.toString() ?: event.packageName?.toString()
+        root?.recycle()
+        updateForeground(pkg)
+        if (pkg != null && driverAppName(pkg) != null && readingEnabled()) readOffer(pkg, event)
+    }
 
-        if (driverAppName(pkg) == null || (!copilotEnabled && !trafficEnabled)) {
-            hideAllOverlays()
-            return
-        }
-        overlays.keys.filter { it != pkg }.forEach { hideOverlay(it) }
+    private fun readOffer(pkg: String, event: AccessibilityEvent?) {
+        if (!readingEnabled() || foregroundPackage != pkg) return
         // A tela inteira via OCR pode misturar dois apps no tablet. Para evitar
         // ofertas híbridas, aceitamos somente os dados da árvore do próprio app.
         val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow?.takeIf {
             it.packageName?.toString()?.equals(pkg, ignoreCase = true) == true
         } ?: run { requestOfferScreenshot(pkg); return }
+        try {
         val text = StringBuilder()
         collectText(root, text)
         val screenText = text.toString()
@@ -117,6 +196,7 @@ class OfferAccessibilityService : AccessibilityService() {
             acceptedSignatures.remove(pkg)
             pendingOffers.remove(pkg)
             acceptedOfferSignatures.remove(pkg)
+            readerStatus("${driverAppName(pkg)} aberto; aguardando oferta legível")
             requestOfferScreenshot(pkg)
             return
         }
@@ -125,10 +205,11 @@ class OfferAccessibilityService : AccessibilityService() {
         if (offer == null) {
             hideOverlay(pkg)
             acceptedSignatures.remove(pkg)
+            readerStatus("Oferta incompleta ou ambígua; tentando leitura por imagem")
             requestOfferScreenshot(pkg)
             return
         }
-        val clickedAccept = event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && isAcceptActionNode(event.source)
+        val clickedAccept = event?.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && isAcceptActionNode(event.source)
         // Oferta completa: a assinatura impede alterações causadas pela navegação.
         val signature = listOf(
             "%.2f".format(java.util.Locale.US, offer.fare),
@@ -153,24 +234,29 @@ class OfferAccessibilityService : AccessibilityService() {
             acceptedSignatures[pkg] = signature
             calculateAndShow(offer, findFareBounds(root), pkg)
         }
+        } finally { root.recycle() }
     }
 
     // Alguns cartões da Uber/99 são desenhados como imagem e não aparecem na árvore
     // de acessibilidade. Nesses casos, fazemos OCR da tela ANTES do aceite.
     private fun requestOfferScreenshot(pkg: String) {
-        if (Build.VERSION.SDK_INT < 30 || screenshotInProgress) return
-        if (rootInActiveWindow?.packageName?.toString() != pkg) return
-        // Full-display OCR is unsafe in split screen; use the app tree instead.
+        if (Build.VERSION.SDK_INT < 30) { readerStatus("Neste Android a leitura depende do texto acessível da oferta"); return }
+        if (screenshotInProgress || foregroundPackage != pkg || !readingEnabled()) return
+        val root = findDriverWindowRoot(pkg) ?: return
+        val windowId = root.windowId
         val bounds = Rect()
-        rootInActiveWindow?.getBoundsInScreen(bounds) ?: return
-        if (bounds.width() < resources.displayMetrics.widthPixels * 0.9) return
+        root.getBoundsInScreen(bounds)
+        root.recycle()
+        if (Build.VERSION.SDK_INT < 34 && bounds.width() < resources.displayMetrics.widthPixels * 0.9) {
+            readerStatus("Abra o app de motorista em tela cheia para usar OCR neste Android")
+            return
+        }
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenshotAt < 700L) return
         lastScreenshotAt = now
         screenshotInProgress = true
         try {
-            takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor,
-                object : AccessibilityService.TakeScreenshotCallback {
+            val callback = object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
                         var bitmap: Bitmap? = null
                         try {
@@ -187,7 +273,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         }
                         textRecognizer.process(InputImage.fromBitmap(captured, 0))
                             .addOnSuccessListener { visionText ->
-                                if (rootInActiveWindow?.packageName?.toString() != pkg) return@addOnSuccessListener
+                                if (stopped || foregroundPackage != pkg) return@addOnSuccessListener
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = visionText.text
@@ -197,9 +283,10 @@ class OfferAccessibilityService : AccessibilityService() {
                                     .lowercase(java.util.Locale.ROOT)
                                 val hasAccept = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
                                     .containsMatchIn(normalized)
-                                val offer = if (hasAccept && Regex("""r\$\s*[0-9]""").containsMatchIn(normalized))
+                                val offer = if (hasAccept && Regex("""r\s*\$\s*[0-9]""").containsMatchIn(normalized))
                                     OfferTextParser.parse(recognized) else null
                                 if (offer == null) {
+                                    readerStatus("Imagem lida; oferta sem valor, percurso ou tempo confiável")
                                     hideOverlay(pkg)
                                     acceptedSignatures.remove(pkg)
                                     acceptedOfferSignatures.remove(pkg)
@@ -220,7 +307,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                     }
                                 }
                             }
-                            .addOnFailureListener { }
+                            .addOnFailureListener { readerStatus("Falha ao reconhecer a imagem da oferta") }
                             .addOnCompleteListener {
                                 captured.recycle()
                                 screenshotInProgress = false
@@ -229,10 +316,14 @@ class OfferAccessibilityService : AccessibilityService() {
 
                     override fun onFailure(errorCode: Int) {
                         screenshotInProgress = false
+                        readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
                     }
-                })
+                }
+            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotExecutor, callback)
+            else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor, callback)
         } catch (_: Exception) {
             screenshotInProgress = false
+            readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
         }
     }
 
@@ -244,7 +335,7 @@ class OfferAccessibilityService : AccessibilityService() {
         // O cartão do Uber pode usar "Tenho interesse" em vez de "Aceitar".
         val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
             .containsMatchIn(normalized)
-        val hasFare = Regex("""r\$\s*[0-9]""").containsMatchIn(normalized)
+        val hasFare = Regex("""r\s*\$\s*[0-9]""").containsMatchIn(normalized)
         val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")
             .findAll(normalized).count() >= 2
         val isNavigationOrTrip = listOf(
@@ -294,6 +385,7 @@ class OfferAccessibilityService : AccessibilityService() {
             prefs.getFloat("min_rating", 4.80f).toDouble(),
             prefs.getFloat("good_rating", 4.90f).toDouble()
         ) ?: return // Dados incompletos não apagam uma etiqueta válida já exibida.
+        readerStatus("Oferta detectada em ${driverAppName(sourcePackage)}")
         // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
         JourneyStore.record(this, offer, result, sourcePackage)
         showOffer(result, offer.passengerRating, anchor, sourcePackage)
@@ -312,8 +404,11 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
-        node.text?.let { out.append(it).append(' ') }
-        node.contentDescription?.let { out.append(it).append(' ') }
+        if (!node.isVisibleToUser) return
+        val text = node.text?.toString()?.trim().orEmpty()
+        val description = node.contentDescription?.toString()?.trim().orEmpty()
+        if (text.isNotEmpty()) out.append(text).append('\n')
+        if (description.isNotEmpty() && description != text) out.append(description).append('\n')
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { child ->
                 collectText(child, out)
@@ -479,10 +574,13 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    override fun onInterrupt() { hideAllOverlays() }
+    override fun onInterrupt() { hideAllOverlays(); removeBubble(); readerStatus("Leitura interrompida pelo Android") }
 
     override fun onDestroy() {
+        stopped = true
+        readerHandler.removeCallbacksAndMessages(null)
         active = null
+        readerStatus("Leitura desligada")
         NetworkGate.unregister(this, networkCallback)
         overlays.values.forEach { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
         overlays.clear()

@@ -136,11 +136,13 @@ class MainActivity : Activity() {
             insets
         }
         setContentView(root)
+        AppUpdates.check(this)
         showTab("Início")
     }
 
     override fun onResume() {
         super.onResume()
+        if (!isFinishing) AppUpdates.check(this)
         if (!NetworkGate.isOnline(this)) {
             startActivity(Intent(this, LoginActivity::class.java))
             Toast.makeText(this, "Conexão perdida. Reconecte-se à internet para continuar.", Toast.LENGTH_LONG).show()
@@ -195,6 +197,12 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val records = JourneyStore.getRecords(this)
         val wide = resources.configuration.screenWidthDp >= 600
+        val diagnostics = card()
+        val serviceOn = isAccessibilityEnabled()
+        diagnostics.addView(label("LEITURA DE OFERTAS", 12f, gold, true))
+        diagnostics.addView(label(if (!serviceOn) "Acessibilidade desligada: ative nos ajustes" else prefs.getString("reader_status", "Serviço ativado; aguardando conexão") ?: "Aguardando oferta", 13f, white, false, 6, 2))
+        diagnostics.addView(action("ABRIR AJUSTES DE LEITURA  ›", false) { showTab("Perfil") })
+        content.addView(diagnostics, margin(0,10))
         val status = horizontal().apply { setPadding(dp(4), dp(12), dp(4), dp(4)) }
         status.addView(label("PAINEL DO MOTORISTA", 11f, gold, true), weight())
         val online = isOperationalOnline()
@@ -550,6 +558,11 @@ class MainActivity : Activity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         })
         content.addView(privacy, margin(0, 10))
+        val updates = card()
+        updates.addView(label("Atualizações", 18f, gold, true))
+        updates.addView(label("Você será avisado ao abrir o app quando houver uma versão compatível publicada.", 13f, muted, false))
+        updates.addView(action("VERIFICAR ATUALIZAÇÃO", false) { AppUpdates.check(this, manual = true) })
+        content.addView(updates, margin(0, 10))
 
         // Perfil do motorista: foto selecionável e identificação da conta.
         val userCard = card()

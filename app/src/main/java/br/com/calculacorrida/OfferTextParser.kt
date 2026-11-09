@@ -14,7 +14,7 @@ object OfferTextParser {
         val destinationAddress: String? = null
     )
 
-    private val moneyRegex = Regex("""R\$\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:,[0-9]{1,2})?|[0-9]+\.[0-9]{1,2})(?![0-9.,])""", RegexOption.IGNORE_CASE)
+    private val moneyRegex = Regex("""R\s*\$\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:,[0-9]{1,2})?|[0-9]+\.[0-9]{1,2})(?![0-9.,])""", RegexOption.IGNORE_CASE)
     private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE)
     private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(?:min(?:uto)?s?)\b""", RegexOption.IGNORE_CASE)
     private val legRegex = Regex(
@@ -29,8 +29,13 @@ object OfferTextParser {
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
-        val fares = moneyRegex.findAll(text).mapNotNull { it.groupValues[1].let(::toNumber) }.distinct().toList()
-        // Multiple different prices can be bonuses, balances or another offer: do not guess.
+        val fares = moneyRegex.findAll(text).filter { match ->
+            val after = text.substring(match.range.last + 1).trimStart()
+            val before = text.substring(0, match.range.first).trimEnd()
+            // A rate or a separately labelled bonus is not the total fare.
+            !Regex("""^(?:/|por\s+)(?:km|h(?:ora)?s?|min)\b""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
+                !Regex("""(?:\+|b[oô]nus\s*[:+]?|adicional\s*[:+]?)$""", RegexOption.IGNORE_CASE).containsMatchIn(before)
+        }.mapNotNull { it.groupValues[1].let(::toNumber) }.distinct().toList()
         val fare = fares.singleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: return null
 
         fun km(value: String, unit: String): Double? {

@@ -56,6 +56,7 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         setContentView(R.layout.activity_login)
+        AppUpdates.check(this)
         val auth = findViewById<android.widget.LinearLayout>(R.id.authContent)
         fun fitLogin() {
             val available = (resources.displayMetrics.widthPixels - 32 * resources.displayMetrics.density).toInt()

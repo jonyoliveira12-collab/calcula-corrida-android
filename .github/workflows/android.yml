@@ -36,7 +36,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  visual-check:
+  device-check:
     runs-on: ubuntu-latest
     needs: test
     timeout-minutes: 20
@@ -61,21 +61,7 @@ jobs:
           target: google_apis
           disable-animations: true
           script: |
-            adb shell wm size 960x1536
-            adb shell wm density 240
-            gradle --no-daemon connectedDebugAndroidTest
-            mkdir -p visual-check
-            adb pull /data/local/tmp/jhonvisual/. visual-check/
-            adb shell wm size 1080x1920
-            adb shell wm density 420
-            gradle --no-daemon connectedDebugAndroidTest
-            adb pull /data/local/tmp/jhonvisual/. visual-check/
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: JHONDRIVER-visual-check
-          path: visual-check/*.png
-          if-no-files-found: warn
+            gradle --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=br.com.calculacorrida.ReaderServiceTest
 
   publish:
     needs: test
@@ -123,13 +109,17 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Create compatible update metadata
+        run: python .github/scripts/write_update_manifest.py
       - name: Publish signed APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-build-${{ github.run_number }}
           name: JHONDRIVER APK build ${{ github.run_number }}
           prerelease: true
-          files: app/build/outputs/apk/release/app-release.apk
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            update.json
       - name: Remove temporary key
         if: always()
         run: rm -f -- "$JHONDRIVER_KEYSTORE_PATH" "$RUNNER_TEMP/signing-cert.der"

@@ -29,6 +29,16 @@ class OfferCalculationTest {
         assertNull(OfferTextParser.parse("R$ 18,40 R$ 3,00 28 min 12,6 km"))
         assertNull(OfferTextParser.parse("R$ 18,40 3 min 1 km 12 km"))
     }
+    @Test fun fareIsNotConfusedWithRateOrBonus() {
+        assertEquals(18.40, OfferTextParser.parse("R$ 18,40 R$ 1,46/km 28 min 12,6 km")!!.fare, 0.000001)
+        assertEquals(18.40, OfferTextParser.parse("R $ 18,40 + R$ 3,00 28 min 12,6 km")!!.fare, 0.000001)
+    }
+    @Test fun updateRequiresSamePackageSignerAndNewerVersion() {
+        assertTrue(UpdatePolicy.isCompatibleUpdate("app",4,setOf("abc"),"app",5,"ABC"))
+        assertFalse(UpdatePolicy.isCompatibleUpdate("app.teste",4,setOf("abc"),"app",5,"abc"))
+        assertFalse(UpdatePolicy.isCompatibleUpdate("app",4,setOf("abc"),"app",5,"other"))
+        assertFalse(UpdatePolicy.isCompatibleUpdate("app",4,setOf("abc"),"app",4,"abc"))
+    }
     @Test fun invalidInputsAreRejected() {
         assertNull(TripCalculator.calculate(Double.NaN, 0.0, 12.6, 28.0))
         assertNull(TripCalculator.calculate(18.4, 0.0, 12.6, Double.POSITIVE_INFINITY))
