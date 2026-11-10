@@ -356,8 +356,10 @@ class OfferAccessibilityService : AccessibilityService() {
         getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_last_app",driverAppName(pkg)).putLong("reader_last_capture",System.currentTimeMillis()).apply()
         screenshotInProgress = true
         val requestTime=now
+        val captureArrived=java.util.concurrent.atomic.AtomicBoolean(false)
+        getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status","Solicitando imagem da janela ${bounds.width()}×${bounds.height()}").apply()
         readerHandler.postDelayed({
-            if(screenshotInProgress && lastScreenshotAt==requestTime) {
+            if(!captureArrived.get() && screenshotInProgress && lastScreenshotAt==requestTime) {
                 screenshotInProgress=false
                 readerStatus("Captura demorou; repetindo automaticamente")
             }
@@ -365,6 +367,8 @@ class OfferAccessibilityService : AccessibilityService() {
         try {
             val callback = object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+                        captureArrived.set(true)
+                        if(lastScreenshotAt==requestTime)getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status","Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms").apply()
                         var bitmap: Bitmap? = null
                         try {
                             val hardwareBuffer = result.hardwareBuffer
@@ -388,6 +392,8 @@ class OfferAccessibilityService : AccessibilityService() {
                     }
 
                     override fun onFailure(errorCode: Int) {
+                        captureArrived.set(true)
+                        if(lastScreenshotAt==requestTime)getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status","Falha da captura: código $errorCode").apply()
                         if(lastScreenshotAt==requestTime) screenshotInProgress = false
                         readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
                     }
@@ -402,6 +408,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun recognizeCaptured(pkg:String,windowId:Int,bounds:Rect,captured:Bitmap,requestTime:Long,index:Int=0) {
         val angles=intArrayOf(0,90,270,180)
+        val ocrStarted=android.os.SystemClock.elapsedRealtime()
         var retry=false
         try {
                         textRecognizer.process(InputImage.fromBitmap(captured, angles[index]))
@@ -412,6 +419,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val recognized = visionText.text
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized) else null
+                                prefs.edit().putString("reader_ocr_status","Rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms").apply()
                                 if(offer==null && index<angles.lastIndex) {
                                     retry=true
                                     recognizeCaptured(pkg,windowId,bounds,captured,requestTime,index+1)

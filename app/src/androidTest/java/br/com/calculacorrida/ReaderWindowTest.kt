@@ -35,6 +35,7 @@ class ReaderWindowTest {
                 listOf("com.taxis99","32,45","0","normal"),
                 listOf("com.ubercab.driver","40,08","0","floating"),
                 listOf("sinet.startup.inDriver","60,00","1","normal"))
+            val slow=mutableListOf<String>()
             for((driver,expected,rotation,layout) in scenarios) {
             listOf("com.ubercab.driver","com.taxis99","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
             shell("appops set $driver SYSTEM_ALERT_WINDOW allow")
@@ -53,22 +54,26 @@ class ReaderWindowTest {
             // Reset the card after focus moves: an earlier focused-window read cannot satisfy the test.
             context.getSharedPreferences("settings",0).edit().putBoolean("card_details",driver!="com.taxis99").commit()
             Thread.sleep(500)
-            val start=android.os.SystemClock.elapsedRealtime()
+            val drawnAt=shell("run-as $driver cat files/offer-drawn-at").toLong()
+            val settings=context.getSharedPreferences("settings",0)
+            val deadline=android.os.SystemClock.elapsedRealtime()+20000
+            while(settings.getLong("reader_last_detection",0)<drawnAt && android.os.SystemClock.elapsedRealtime()<deadline)Thread.sleep(50)
+            val detectedAt=settings.getLong("reader_last_detection",0)
             var found=false
-            for(attempt in 0..59){
+            for(attempt in 0..9){
                 found=ui.windows.any { window-> val root=window.root?:return@any false
                     try {root.findAccessibilityNodeInfosByText(expected).isNotEmpty()}finally{root.recycle()}}
                 if(found)break
-                Thread.sleep(250)
+                Thread.sleep(100)
             }
-            assertTrue("OCR $driver $layout rotation=$rotation: "+context.getSharedPreferences("settings",0).getString("reader_status",""),found)
-            val drawnAt=shell("run-as $driver cat files/offer-drawn-at").toLong()
-            val detectedAt=context.getSharedPreferences("settings",0).getLong("reader_last_detection",0)
+            val diagnostic=listOf("reader_status","reader_capture_status","reader_ocr_status").joinToString(" / "){settings.getString(it,"").orEmpty()}
+            assertTrue("OCR $driver $layout rotation=$rotation: $diagnostic",found)
             val elapsed=detectedAt-drawnAt
-            instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream","$driver/$layout DETECTION_MS=$elapsed\n")})
+            instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream","$driver/$layout DETECTION_MS=$elapsed $diagnostic\n")})
             assertTrue("Fresh detection for $driver/$layout: $elapsed ms",elapsed>=0)
-            assertTrue("Detection latency for $driver/$layout: $elapsed ms",elapsed<5000)
+            if(elapsed>=5000)slow.add("$driver/$layout: $elapsed ms ($diagnostic)")
             }
+            assertTrue("Slow detections: ${slow.joinToString()}",slow.isEmpty())
         } finally {
             instrumentation.runOnMainSync { focusWindow?.let {wm.removeView(it)} }
             context.getSharedPreferences("settings",0).edit().putBoolean("card_details",false).commit()
