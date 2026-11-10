@@ -41,7 +41,12 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             label=="ACEITAR" -> "Dentro dos seus limites"
             else -> "Confira os indicadores"
         }) else "")
-        banner.setTextColor(color);banner.textSize=12f;banner.background=null;banner.setPadding(dp(4),dp(2),dp(4),dp(2))
+        val badgeColor=when(label){"ACEITAR","BOA CORRIDA","BOA"->Color.rgb(20,125,69);"ATENÇÃO","ANALISAR"->Color.rgb(243,182,66);else->Color.rgb(201,47,63)}
+        banner.setTextColor(if(label=="ATENÇÃO" || label=="ANALISAR")Color.rgb(30,24,8) else Color.WHITE)
+        banner.textSize=12f
+        banner.maxLines=if(prefs.getBoolean("card_compact_reason",false))2 else 1
+        banner.background=rounded(badgeColor,badgeColor)
+        banner.setPadding(dp(10),dp(4),dp(10),dp(4))
         summary.text="$source  ${duration(minutes)} • ${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
         summary.setTextColor(fg)
         header.gravity=Gravity.CENTER_VERTICAL
@@ -73,7 +78,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         if(prefs.getBoolean("card_ai",false))body.addView(ai)
         body.background=rounded(fill,color)
         val above=prefs.getString("card_banner_position","above")=="above"
-        fun addBanner(){if(prefs.getBoolean("card_banner",true))addView(banner,LayoutParams(-1,-2).apply{bottomMargin=dp(4);topMargin=dp(4)})}
+        fun addBanner(){if(prefs.getBoolean("card_banner",true))addView(banner,LayoutParams(-2,-2).apply{gravity=Gravity.START;bottomMargin=dp(4);topMargin=dp(4)})}
         if(above)addBanner();addView(body,LayoutParams(-1,-2));if(!above)addBanner()
         contentDescription="$source • $label. R$ ${fareValue?.let(::amount)}. Até passageiro: ${pickupMinutes?.let(::duration)}. Total: ${duration(minutes)} • ${amount(totalKm)} km. Nota ${rating?.replace('.',',')?:"não identificada"}. R$ ${amount(valuePerKm)}/km. R$ ${amount(valuePerHour)}/h"
     }

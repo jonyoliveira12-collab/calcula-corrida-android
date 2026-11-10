@@ -30,6 +30,7 @@ class ReaderWindowTest {
             while(!context.getSharedPreferences("settings",0).getBoolean("reader_model_ready",false) && android.os.SystemClock.elapsedRealtime()<modelDeadline)Thread.sleep(100)
             assertTrue("Local OCR initialized",context.getSharedPreferences("settings",0).getBoolean("reader_model_ready",false))
             val scenarios=listOf(
+                listOf("com.ubercab.driver","40,33","0","partial"),
                 listOf("com.ubercab.driver","47,27","0","small"),
                 listOf("com.ubercab.driver","55,76","1","normal"),
                 listOf("com.taxis99","32,45","0","normal"),

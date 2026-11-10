@@ -75,4 +75,23 @@ class OfferCardTest {
             }
         } finally {prefs.edit().putString("card_theme",original).commit()}
     }
+    @Test fun verdictIsACompactFilledBadgeForEveryClassification() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        instrumentation.runOnMainSync {
+            val view=OfferTagView(context)
+            for((label,shown) in listOf("RECUSAR" to "● RECUSAR","ATENÇÃO" to "● ANALISAR","ACEITAR" to "● BOA")) {
+                view.setOffer(label,19.0,12.0,1.0641666667,40.3263157895,"4.99",Color.RED,"UBER",12.77)
+                val badge=view.getChildAt(0) as android.widget.TextView
+                assertEquals(shown,badge.text.toString())
+                assertNotNull(badge.background)
+                assertEquals(android.view.ViewGroup.LayoutParams.WRAP_CONTENT,badge.layoutParams.width)
+                val width=(310*context.resources.displayMetrics.density).toInt()
+                view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(0,android.view.View.MeasureSpec.UNSPECIFIED))
+                assertTrue(badge.measuredWidth<width)
+                assertTrue(view.contentDescription.toString().contains("R$ 1,06/km"))
+                assertTrue(view.contentDescription.toString().contains("R$ 40,33/h"))
+            }
+        }
+    }
 }

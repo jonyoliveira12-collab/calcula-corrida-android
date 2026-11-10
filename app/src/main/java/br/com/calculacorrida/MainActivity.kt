@@ -32,6 +32,33 @@ class MainActivity : Activity() {
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
     private var selectedTab = "Início"
+    private val liveOfferHandler=android.os.Handler(android.os.Looper.getMainLooper())
+    private var observingOffers=false
+    private val refreshLatestOffer=Runnable {
+        if(observingOffers && !isFinishing && ::content.isInitialized && selectedTab=="Início") {
+            val scroll=content.parent as? ScrollView
+            val y=scroll?.scrollY ?: 0
+            showTab("Início")
+            scroll?.let {host->host.post {host.scrollTo(0,y)}}
+        }
+    }
+    private val liveOfferListener=android.content.SharedPreferences.OnSharedPreferenceChangeListener {_,key->
+        if(key=="offers" && observingOffers) {
+            liveOfferHandler.removeCallbacks(refreshLatestOffer)
+            liveOfferHandler.postDelayed(refreshLatestOffer,100)
+        }
+    }
+    override fun onStart() {
+        super.onStart()
+        observingOffers=true
+        getSharedPreferences("journey",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(liveOfferListener)
+    }
+    override fun onStop() {
+        observingOffers=false
+        getSharedPreferences("journey",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(liveOfferListener)
+        liveOfferHandler.removeCallbacks(refreshLatestOffer)
+        super.onStop()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -33,6 +33,7 @@ public class OfferFixtureActivity extends Activity {
                 canvas.drawColor(dark?0xff20242c:Color.WHITE);paint.setColor(dark?Color.WHITE:Color.BLACK);
                 float d=getResources().getDisplayMetrics().density;paint.setTextSize(18*d);
                 String[] lines={"R$ 28,81","31 min • 19.1 km","4,76 (164)","6 min (2.2 km)","25 minutos (16.9 km)","Tenho interesse"};
+                if("partial".equals(layout))lines=new String[]{"R$ 12,77","19 min • 12.0 km","4,99 (1763)","8 min (5.0 km)","11 minutos (7.0 km)","Tenho interesse"};
                 if("small".equals(layout))lines=new String[]{"R$ 11,03","14 min • 10.8 km","4,92 (120)","4 min (2.9 km)","10 minutos (7.9 km)","Aceitar"};
                 if(floating)lines=new String[]{"R$ 17,37","26 min • 16.4 km","4,98 (303)","12 min (9.3 km)","14 minutos (7.1 km)","Tenho interesse"};
                 if(getPackageName().equals("com.taxis99"))lines=new String[]{"Não afeta a TA","R$11,90","R$2,95 Tarifa base dinâmica inicial.","4,79 · +999 corridas · Perfil Premium","10min (4,4km)","12min (6km)"};
@@ -42,7 +43,7 @@ public class OfferFixtureActivity extends Activity {
             }
         };
         offer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-        offer.setContentDescription("Synthetic driver offer pixels");
+        offer.setContentDescription("partial".equals(layout)?"R$ 12,77 8 min (5.0 km) Nota 4,99 Tenho interesse":"Synthetic driver offer pixels");
         offer.setClickable(true);
         if(floating) {
             setContentView(new View(this));

@@ -328,6 +328,16 @@ class OfferAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun discardPreviousOfferIfFareChanged(pkg:String,text:String) {
+        val fare=OfferTextParser.fareOrNull(text) ?: return
+        val previous=acceptedSignatures[pkg]?.substringBefore('|')?.toDoubleOrNull() ?: return
+        if(kotlin.math.abs(fare-previous)>0.005) {
+            hideOverlay(pkg)
+            acceptedSignatures.remove(pkg)
+            lastOfferSeen.remove(pkg)
+        }
+    }
+
     private fun readOffer(pkg: String) {
         if(!readingEnabled())return
         val frame=driverFrames[pkg] ?: return
@@ -340,7 +350,11 @@ class OfferAccessibilityService : AccessibilityService() {
             requestOfferScreenshot(pkg)
             return
         }
-        val offer=OfferTextParser.parse(screenText) ?: run {requestOfferScreenshot(pkg);return}
+        val offer=OfferTextParser.parse(screenText) ?: run {
+            discardPreviousOfferIfFareChanged(pkg,screenText)
+            readerStatus("Conferindo os trechos da oferta antes de calcular")
+            requestOfferScreenshot(pkg);return
+        }
         lastOfferSeen[pkg]=android.os.SystemClock.elapsedRealtime()
         val signature=listOf(
             "%.2f".format(java.util.Locale.US,offer.fare),"%.2f".format(java.util.Locale.US,offer.pickupKm),
@@ -462,6 +476,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized) else null
                                 prefs.edit().putString("reader_ocr_status","Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms").apply()
+                                if(offer==null)discardPreviousOfferIfFareChanged(pkg,recognized)
                                 if(offer==null && index<angles.lastIndex) {
                                     retry=true
                                     recognizeCaptured(pkg,windowId,bounds,captured,requestTime,if(index==0 && image===captured)2 else index+1)

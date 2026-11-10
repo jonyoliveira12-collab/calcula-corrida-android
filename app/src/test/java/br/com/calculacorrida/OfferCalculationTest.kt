@@ -22,16 +22,16 @@ class OfferCalculationTest {
         assertEquals(28.0, offer.minutes, 0.000001)
     }
     @Test fun decimalDotAndBrazilianThousands() {
-        assertEquals(18.40, OfferTextParser.parse("R$ 18.40 28 min 12,6 km")!!.fare, 0.000001)
-        assertEquals(1234.56, OfferTextParser.parse("R$ 1.234,56 28 min 12,6 km")!!.fare, 0.000001)
+        assertEquals(18.40, OfferTextParser.parse("R$ 18.40 28 min • 12,6 km")!!.fare, 0.000001)
+        assertEquals(1234.56, OfferTextParser.parse("R$ 1.234,56 28 min • 12,6 km")!!.fare, 0.000001)
     }
     @Test fun ambiguousOrPartialCardsAreRejected() {
-        assertNull(OfferTextParser.parse("R$ 18,40 R$ 3,00 28 min 12,6 km"))
+        assertNull(OfferTextParser.parse("R$ 18,40 R$ 3,00 28 min • 12,6 km"))
         assertNull(OfferTextParser.parse("R$ 18,40 3 min 1 km 12 km"))
     }
     @Test fun fareIsNotConfusedWithRateOrBonus() {
-        assertEquals(18.40, OfferTextParser.parse("R$ 18,40 R$ 1,46/km 28 min 12,6 km")!!.fare, 0.000001)
-        assertEquals(18.40, OfferTextParser.parse("R $ 18,40 + R$ 3,00 28 min 12,6 km")!!.fare, 0.000001)
+        assertEquals(18.40, OfferTextParser.parse("R$ 18,40 R$ 1,46/km 28 min • 12,6 km")!!.fare, 0.000001)
+        assertEquals(18.40, OfferTextParser.parse("R $ 18,40 + R$ 3,00 28 min • 12,6 km")!!.fare, 0.000001)
     }
     @Test fun updateRequiresSamePackageSignerAndNewerVersion() {
         assertTrue(UpdatePolicy.isCompatibleUpdate("app",4,setOf("abc"),"app",5,"ABC"))
@@ -109,6 +109,39 @@ Rua de teste B"""
             val text="R$ $fare $summary Est. de R$1,02/km $note $legs Tenho interesse"
             assertTrue(IncomingOfferPolicy.isIncoming("com.ubercab.driver",text))
             assertNotNull(OfferTextParser.parse(text))
+        }
+    }
+    @Test fun pickupAloneCannotBecomeTheWholeTrip() {
+        for(partial in listOf("R$ 12,77 8 min (5.0 km) Nota 4,99 Tenho interesse", "R$ 12,77 8 min 5.0 km Nota 4,99 Aceitar")) {
+            assertEquals(12.77,OfferTextParser.fareOrNull(partial)!!,0.000001)
+            assertNull("Pickup alone must not produce a GOOD trip",OfferTextParser.parse(partial))
+        }
+    }
+    @Test fun screenshotTotalsAreUsedForBothOffers() {
+        val first=OfferTextParser.parse("R$ 12,77 19 min • 12.0 km Est. de R$1,06/km 4,99 (1763) 8 min (5.0 km) 11 minutos (7.0 km) Tenho interesse")!!
+        val r=TripCalculator.calculate(first.fare,first.pickupKm,first.tripKm,first.minutes)!!
+        assertEquals(19.0,r.minutes,0.000001);assertEquals(12.0,r.totalKm,0.000001)
+        assertEquals(1.0641666667,r.perKm,0.000001);assertEquals(40.3263157895,r.perHour,0.000001)
+        assertEquals(Rating.BAD,r.rating)
+        val second=OfferTextParser.parse("R$ 12,02 19 min • 11.4 km 8 min (4.4 km) 11 minutos (7.0 km) Aceitar")!!
+        val s=TripCalculator.calculate(second.fare,second.pickupKm,second.tripKm,second.minutes)!!
+        assertEquals(1.0543859649,s.perKm,0.000001);assertEquals(37.9578947368,s.perHour,0.000001)
+    }
+    @Test fun summaryWithoutSeparatorsAndWithOneDetailStillKeepsTheTotal() {
+        val offer=OfferTextParser.parse("R$ 12,77 19 min 12.0 km Est. de R$1,06/km 8 min (5.0 km) Tenho interesse")!!
+        assertEquals(19.0,offer.minutes,0.000001)
+        assertEquals(12.0,offer.pickupKm+offer.tripKm,0.000001)
+        assertNull("The lone detail could be pickup or destination",offer.pickupMinutes)
+        assertNull(OfferTextParser.parse("R$ 12,77 8 min • 5.0 km 8 min (5.0 km) 11 min (7.0 km) Aceitar"))
+    }
+    @Test fun changingClassificationNeverChangesTheCalculation() {
+        val bad=TripCalculator.calculate(12.77,5.0,7.0,19.0,1.5,1.8,50.0,60.0,4.99)!!
+        val review=TripCalculator.calculate(12.77,5.0,7.0,19.0,1.0,1.2,30.0,60.0,4.99)!!
+        val good=TripCalculator.calculate(12.77,5.0,7.0,19.0,0.5,1.0,20.0,40.0,4.99)!!
+        assertEquals(listOf(Rating.BAD,Rating.REVIEW,Rating.GOOD),listOf(bad,review,good).map{it.rating})
+        listOf(review,good).forEach {
+            assertEquals(bad.totalKm,it.totalKm,0.0);assertEquals(bad.minutes,it.minutes,0.0)
+            assertEquals(bad.perKm,it.perKm,0.0);assertEquals(bad.perHour,it.perHour,0.0)
         }
     }
 }
