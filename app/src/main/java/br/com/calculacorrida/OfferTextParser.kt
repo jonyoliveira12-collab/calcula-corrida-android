@@ -134,7 +134,8 @@ object OfferTextParser {
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (besideTrips != null) return normalizeRating(besideTrips)
-        return null
+        val withCount = Regex("""(?<![0-9.,])([0-5][,.][0-9]{2})\s*\(\s*[0-9]+\s*\)""").find(text)?.groupValues?.get(1)
+        return withCount?.let(::normalizeRating)
     }
 
     private fun normalizeRating(value: String): String? {

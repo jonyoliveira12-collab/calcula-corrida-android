@@ -53,4 +53,37 @@ class OfferCalculationTest {
         assertNull(TripCalculator.calculate(18.4, 0.0, 12.6, Double.POSITIVE_INFINITY))
         assertNull(TripCalculator.calculate(18.4, 0.0, 0.0, 28.0))
     }
+    @Test fun landscapeUberOfferWithIncludedBonusesAndIconlessRating() {
+        val offer=OfferTextParser.parse("""Priority
+R$ 28,81
+31 min • 19.1 km • Est. de R$1,51/km
+4,76 (164) Verificado
++R$ 6,00 incluído
++ R$ 3,57 incluída para retirada prioritária
+6 min (2.2 km)
+Rua Angela Ganz
+25 minutos (16.9 km)
+Rua Vicente Alves Padilha
+Tenho interesse""")!!
+        assertEquals("4.76",offer.passengerRating)
+        assertEquals(28.81,offer.fare,0.000001)
+        assertEquals(31.0,offer.minutes,0.000001)
+        assertEquals(19.1,offer.pickupKm+offer.tripKm,0.000001)
+        val r=TripCalculator.calculate(offer.fare,offer.pickupKm,offer.tripKm,offer.minutes)!!
+        assertEquals(55.76129,r.perHour,0.00001)
+    }
+    @Test fun narrowSplitPaneOfferWithWrappedRate() {
+        val offer=OfferTextParser.parse("""R$ 8,96
+18 min • 6.6 km • Est. de R$1,36/
+km
+4,90 (177) Verificado
+4 min (1.3 km)
+1 parada
+14 minutos (5.3 km)
+Aceitar""")!!
+        assertEquals("4.90",offer.passengerRating)
+        assertEquals(18.0,offer.minutes,0.000001)
+        assertEquals(6.6,offer.pickupKm+offer.tripKm,0.000001)
+        assertNull(OfferTextParser.parse("R$ 8,96 R$3,89 18 min • 6.6 km Aceitar"))
+    }
 }

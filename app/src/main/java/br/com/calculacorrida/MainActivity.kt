@@ -379,6 +379,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildTrafficSettings() {
+        content.addView(action("Estilo do cartão • prévia e campos", true) { startActivity(android.content.Intent(this, CardStyleActivity::class.java)) })
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         content.addView(label("Semáforo de Valores", 24f, white, true, 5, 2))
         content.addView(label("Configure os limites. Cada oferta será classificada automaticamente.", 13f, muted, false, 0, 12))
