@@ -6,6 +6,7 @@ android {
     defaultConfig { applicationId = "com.ubercab.driver"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "fixture" }
     flavorDimensions += "driver"
     productFlavors {
+        create("backdrop") { dimension = "driver"; applicationId = "br.com.calculacorrida.fixture.backdrop" }
         create("uber") { dimension = "driver"; applicationId = "com.ubercab.driver" }
         create("ninetynine") { dimension = "driver"; applicationId = "com.taxis99" }
         create("indrive") { dimension = "driver"; applicationId = "sinet.startup.inDriver" }

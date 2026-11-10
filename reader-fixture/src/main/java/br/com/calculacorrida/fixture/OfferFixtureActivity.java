@@ -13,6 +13,12 @@ import android.graphics.PixelFormat;
 public class OfferFixtureActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if(getPackageName().endsWith(".backdrop")) {
+            android.widget.TextView background=new android.widget.TextView(this);
+            background.setText("Aplicativo de fundo");
+            setContentView(background);
+            return;
+        }
         final String layout=getIntent().getStringExtra("layout");
         final boolean floating="floating".equals(layout);
         View offer=new View(this) {
@@ -49,7 +55,7 @@ public class OfferFixtureActivity extends Activity {
             WindowManager.LayoutParams icon=new WindowManager.LayoutParams((int)(48*d),(int)(48*d),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
             icon.gravity=Gravity.TOP|Gravity.LEFT;
             View bubble=new View(this);bubble.setBackgroundColor(Color.GRAY);wm.addView(bubble,icon);
-            startActivity(new android.content.Intent(android.provider.Settings.ACTION_SETTINGS));
+            startActivity(new android.content.Intent().setClassName("br.com.calculacorrida.fixture.backdrop","br.com.calculacorrida.fixture.OfferFixtureActivity"));
         } else setContentView(offer);
     }
 }

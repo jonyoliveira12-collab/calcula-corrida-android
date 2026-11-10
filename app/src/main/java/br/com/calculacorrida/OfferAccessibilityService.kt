@@ -219,8 +219,12 @@ class OfferAccessibilityService : AccessibilityService() {
         val prefs=getSharedPreferences("settings",MODE_PRIVATE)
         prefs.edit().putBoolean("reader_model_ready",false).apply()
         screenshotExecutor.execute {
-            val warm=Bitmap.createBitmap(320,120,Bitmap.Config.ARGB_8888)
-            android.graphics.Canvas(warm).apply {drawColor(Color.WHITE);drawText("JHONDRIVER",12f,60f,android.graphics.Paint().apply{color=Color.BLACK;textSize=32f})}
+            val warm=Bitmap.createBitmap(640,480,Bitmap.Config.ARGB_8888)
+            android.graphics.Canvas(warm).apply {
+                drawColor(Color.WHITE)
+                val paint=android.graphics.Paint().apply{color=Color.BLACK;textSize=32f}
+                listOf("JHONDRIVER","R$ 10,00","1 min (1 km)","2 min (2 km)","Nota 4,90","Aceitar").forEachIndexed {i,text->drawText(text,12f,60f+i*60f,paint)}
+            }
             try {
                 textRecognizer.process(InputImage.fromBitmap(warm,0)).addOnCompleteListener { task ->
                     warm.recycle()
