@@ -35,13 +35,16 @@ Deno.serve(async (req: Request) => {
         !["GOOD", "REVIEW", "BAD"].includes(classification)) return reply({ error: "Dados da oferta inválidos." }, 400);
     const metrics = { fare, totalKm, minutes, perKm: fare / totalKm, perHour: fare * 60 / minutes,
       passengerRating: rating, classification };
-    const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+    const configuredModel = Deno.env.get("GEMINI_MODEL")?.trim();
+    // The legacy model can remain listed while generateContent already returns 404.
+    const model = !configuredModel || configuredModel === "gemini-2.5-flash"
+      ? "gemini-3.5-flash-lite" : configuredModel;
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: "Você é o copiloto de um motorista no Brasil. Os indicadores matemáticos são a fonte de verdade. Dê orientação curta, com no máximo 18 palavras, em português. Não invente dados ausentes, não prometa lucro ou ganhos e não ordene aceitar ou recusar. Não refaça nem altere os números." }] },
         contents: [{ role: "user", parts: [{ text: JSON.stringify(metrics) }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 160, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0.2, maxOutputTokens: 256 },
       }), signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
