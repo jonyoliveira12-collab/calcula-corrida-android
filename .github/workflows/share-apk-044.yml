@@ -1,0 +1,47 @@
+name: Share verified JHONDRIVER 0.4.4
+
+on:
+  push:
+    branches: [share/apk-0.4.4-browser]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify the tested source run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source_status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/42787295305" --jq '.head_sha + " " + .conclusion')
+          test "$source_status" = "5794321e7132ac44c1e2e7bd5e8ee5b2a3268328 success"
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 42787295305
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify the exact APK already delivered
+        run: |
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.4.4.apk
+          echo '49ba17da06e4067186d84917e06517ed4968b64ba34514765beb03299a85e3c0  verified-apk/JHONDRIVER-0.4.4.apk' | sha256sum --check
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-0.4.4
+          target_commitish: ${{ github.sha }}
+          name: JHONDRIVER 0.4.4
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: verified-apk/JHONDRIVER-0.4.4.apk
+          body: |
+            APK de avaliação 0.4.4, idêntico ao arquivo já entregue e validado no run 42787295305.
+            Testes de cálculo e oito testes instrumentados no Android 16 aprovados.
+            SHA-256: 49ba17da06e4067186d84917e06517ed4968b64ba34514765beb03299a85e3c0
+            Instalar sobre outra versão pode exigir reinstalação por assinatura diferente, apagando dados locais.
+            Não há garantia de compatibilidade bancária. Esta publicação não ativa a atualização automática oficial.
