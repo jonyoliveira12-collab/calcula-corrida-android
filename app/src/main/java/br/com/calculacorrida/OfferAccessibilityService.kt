@@ -507,8 +507,7 @@ class OfferAccessibilityService : AccessibilityService() {
             if(bounds.isEmpty)continue
             val root=window.root ?: rootInActiveWindow?.let { if(it.windowId==window.id) it else {it.recycle();null} }
             if(root!=null)try {
-                if(root.packageName?.toString()?.equals(pkg,true)==true &&
-                    (root.isVisibleToUser || window.isActive || window.isFocused)) {
+                if(root.packageName?.toString()?.equals(pkg,true)==true) {
                     val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
                     val score=if(offerOverlay)1_000_000_000L+bounds.width().toLong()*bounds.height() else bounds.width().toLong()*bounds.height()
                     if(score>bestScore){bestScore=score;best=window.id to bounds}
@@ -531,7 +530,7 @@ class OfferAccessibilityService : AccessibilityService() {
             try {
                 val pkg=root.packageName?.toString() ?: continue
                 val bounds=Rect().also{window.getBoundsInScreen(it)}
-                if(!bounds.isEmpty && (root.isVisibleToUser || window.isActive || window.isFocused) && driverAppName(pkg)!=null)packages.add(pkg)
+                if(!bounds.isEmpty && driverAppName(pkg)!=null)packages.add(pkg)
             } finally {root.recycle()}
         }
         // Some OEMs briefly return no interactive roots while the active root is available.

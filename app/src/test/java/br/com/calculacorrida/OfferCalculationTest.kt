@@ -92,9 +92,9 @@ R$11,90 1,2x
 R$2,95 Tarifa base dinâmica inicial.
 4,79 · +999 corridas · Perfil Premium
 10min (4,4km)
-Rua Belém, 44
+Rua de teste A
 12min (6km)
-Rua Getúlio Vargas, 73"""
+Rua de teste B"""
         assertTrue(IncomingOfferPolicy.isIncoming("com.taxis99",text))
         assertFalse(IncomingOfferPolicy.isIncoming("com.ubercab.driver",text))
         val o=OfferTextParser.parse(text)!!

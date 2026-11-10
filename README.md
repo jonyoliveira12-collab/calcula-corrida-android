@@ -70,3 +70,28 @@ code, account or networking. It is never included in or distributed with the
 JHONDRIVER APK. The instrumentation test rotates the emulator and moves focus
 to another overlay before checking OCR. Synthetic fixtures cannot certify
 coverage of all real driver-app versions, multiwindow layouts or bank acceptance.
+
+
+### Reader correction (0.4.3)
+
+The reader also handles allowlisted TYPE_SYSTEM windows used by driver offer
+overlays. A substantial offer overlay takes priority over a small driver bubble.
+Window identity and window bounds are checked independently of transient node
+bounds. Interactive-window retrieval flags are restored when the service connects.
+See https://developer.android.com/reference/android/accessibilityservice/AccessibilityService#getWindows() .
+
+99 countdown offers with two route legs and an explicit offer marker can be read
+without an Accept label. Dynamic base-fare labels are excluded from the total fare.
+OCR retries rotated inputs after an incomplete first result. Polling recovers after
+transient platform exceptions and screenshot requests have a recovery timeout.
+
+CC remains available in the background with pause/resume/stop controls. A known
+Nubank foreground package suppresses reading/overlays; this does not certify bank
+compatibility. Home includes a heartbeat and a copyable numeric/status diagnostic
+without screenshot content, addresses, authentication tokens or private keys.
+The card uses a small colored verdict with no large filled warning banner and a
+20-second hold period (20/30/60 seconds selectable).
+
+CI synthetic fixtures cover portrait, landscape, 99 countdown pricing, inDrive, and
+a separate Uber overlay over Android Settings alongside a smaller driver bubble.
+No user screenshots are published in the repository or bundled in the APK.
