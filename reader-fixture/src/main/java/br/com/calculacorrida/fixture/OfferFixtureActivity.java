@@ -17,7 +17,12 @@ public class OfferFixtureActivity extends Activity {
         final boolean floating="floating".equals(layout);
         View offer=new View(this) {
             final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+            boolean marked=false;
             @Override protected void onDraw(Canvas canvas) {
+                if(!marked) {
+                    marked=true;
+                    try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getFilesDir(),"offer-drawn-at"))) {out.write(Long.toString(System.currentTimeMillis()).getBytes(java.nio.charset.StandardCharsets.UTF_8));}catch(java.io.IOException e){throw new RuntimeException(e);}
+                }
                 boolean dark=floating || getPackageName().equals("com.taxis99");
                 canvas.drawColor(dark?0xff20242c:Color.WHITE);paint.setColor(dark?Color.WHITE:Color.BLACK);
                 float d=getResources().getDisplayMetrics().density;paint.setTextSize(18*d);

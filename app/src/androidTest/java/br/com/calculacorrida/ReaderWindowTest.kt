@@ -26,6 +26,9 @@ class ReaderWindowTest {
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",true).putBoolean("reader_disclosure_accepted",true).commit()
             shell("settings put secure enabled_accessibility_services ${context.packageName}/br.com.calculacorrida.OfferAccessibilityService")
             shell("settings put secure accessibility_enabled 1")
+            val modelDeadline=android.os.SystemClock.elapsedRealtime()+30000
+            while(!context.getSharedPreferences("settings",0).getBoolean("reader_model_ready",false) && android.os.SystemClock.elapsedRealtime()<modelDeadline)Thread.sleep(100)
+            assertTrue("Local OCR initialized",context.getSharedPreferences("settings",0).getBoolean("reader_model_ready",false))
             val scenarios=listOf(
                 listOf("com.ubercab.driver","47,27","0","small"),
                 listOf("com.ubercab.driver","55,76","1","normal"),
@@ -59,9 +62,12 @@ class ReaderWindowTest {
                 Thread.sleep(250)
             }
             assertTrue("OCR $driver $layout rotation=$rotation: "+context.getSharedPreferences("settings",0).getString("reader_status",""),found)
-            val elapsed=android.os.SystemClock.elapsedRealtime()-start
-            println("LANDSCAPE_UNFOCUSED_OCR_MS=$elapsed")
-            assertTrue(elapsed<15000)
+            val drawnAt=shell("run-as $driver cat files/offer-drawn-at").toLong()
+            val detectedAt=context.getSharedPreferences("settings",0).getLong("reader_last_detection",0)
+            val elapsed=detectedAt-drawnAt
+            instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream","$driver/$layout DETECTION_MS=$elapsed\n")})
+            assertTrue("Fresh detection for $driver/$layout: $elapsed ms",elapsed>=0)
+            assertTrue("Detection latency for $driver/$layout: $elapsed ms",elapsed<5000)
             }
         } finally {
             instrumentation.runOnMainSync { focusWindow?.let {wm.removeView(it)} }

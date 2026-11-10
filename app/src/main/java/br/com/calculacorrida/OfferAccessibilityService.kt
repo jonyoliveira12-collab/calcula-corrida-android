@@ -210,7 +210,19 @@ class OfferAccessibilityService : AccessibilityService() {
         getSharedPreferences("settings", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(appearanceListener)
         NetworkGate.register(this, networkCallback)
         stopped = false
-        readerStatus("Serviço conectado; aguardando app de motorista")
+        val prefs=getSharedPreferences("settings",MODE_PRIVATE)
+        prefs.edit().putBoolean("reader_model_ready",false).apply()
+        screenshotExecutor.execute {
+            val warm=Bitmap.createBitmap(320,120,Bitmap.Config.ARGB_8888)
+            android.graphics.Canvas(warm).apply {drawColor(Color.WHITE);drawText("JHONDRIVER",12f,60f,android.graphics.Paint().apply{color=Color.BLACK;textSize=32f})}
+            try {
+                textRecognizer.process(InputImage.fromBitmap(warm,0)).addOnCompleteListener { task ->
+                    warm.recycle()
+                    if(!stopped)prefs.edit().putBoolean("reader_model_ready",task.isSuccessful).apply()
+                }
+            } catch (_:Exception) {warm.recycle()}
+        }
+        readerStatus("Serviço conectado; preparando leitor automático")
         readerHandler.removeCallbacks(poll)
         readerHandler.post(poll)
     }
