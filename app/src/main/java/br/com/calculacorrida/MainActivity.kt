@@ -213,7 +213,7 @@ class MainActivity : Activity() {
         diagnostics.addView(label(if (!serviceOn) "Acessibilidade desligada: ative nos ajustes" else prefs.getString("reader_status", "Serviço ativado; aguardando conexão") ?: "Aguardando oferta", 13f, white, false, 6, 2))
         val heartbeat=prefs.getLong("reader_heartbeat",0)
         val alive=serviceOn && System.currentTimeMillis()-heartbeat in 0..10000
-        diagnostics.addView(label(if(alive) "Serviço respondendo em segundo plano" else "Serviço sem resposta recente; confira a acessibilidade",12f,if(alive)green else red))
+        diagnostics.addView(label(if(alive) "Serviço respondendo em segundo plano" else "Serviço sem resposta recente; confira a acessibilidade",12f,if(alive)green else red,false))
         diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
             prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
         })

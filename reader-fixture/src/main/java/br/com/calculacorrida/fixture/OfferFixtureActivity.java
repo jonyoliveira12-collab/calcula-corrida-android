@@ -34,7 +34,12 @@ public class OfferFixtureActivity extends Activity {
             float d=getResources().getDisplayMetrics().density;
             WindowManager.LayoutParams p=new WindowManager.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels-16*d),(int)(240*d),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
             p.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL;
-            ((WindowManager)getSystemService(WINDOW_SERVICE)).addView(offer,p);
+            WindowManager wm=(WindowManager)getSystemService(WINDOW_SERVICE);
+            wm.addView(offer,p);
+            // A later tiny driver bubble must not be chosen instead of the offer window.
+            WindowManager.LayoutParams icon=new WindowManager.LayoutParams((int)(48*d),(int)(48*d),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
+            icon.gravity=Gravity.TOP|Gravity.LEFT;
+            View bubble=new View(this);bubble.setBackgroundColor(Color.GRAY);wm.addView(bubble,icon);
             startActivity(new android.content.Intent(android.provider.Settings.ACTION_SETTINGS));
         } else setContentView(offer);
     }

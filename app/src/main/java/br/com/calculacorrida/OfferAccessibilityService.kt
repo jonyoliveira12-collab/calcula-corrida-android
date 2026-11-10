@@ -363,20 +363,39 @@ class OfferAccessibilityService : AccessibilityService() {
                             if(lastScreenshotAt==requestTime) screenshotInProgress = false
                             return
                         }
-                        textRecognizer.process(InputImage.fromBitmap(captured, 0))
+                        readerHandler.post { recognizeCaptured(pkg,windowId,bounds,captured,requestTime) }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        if(lastScreenshotAt==requestTime) screenshotInProgress = false
+                        readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
+                    }
+                }
+            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotExecutor, callback)
+            else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor, callback)
+        } catch (_: Exception) {
+            if(lastScreenshotAt==requestTime) screenshotInProgress = false
+            readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
+        }
+    }
+
+    private fun recognizeCaptured(pkg:String,windowId:Int,bounds:Rect,captured:Bitmap,requestTime:Long,index:Int=0) {
+        val angles=intArrayOf(0,90,270,180)
+        var retry=false
+        try {
+                        textRecognizer.process(InputImage.fromBitmap(captured, angles[index]))
                             .addOnSuccessListener { visionText ->
                                 if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) return@addOnSuccessListener
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = visionText.text
-                                val normalized = java.text.Normalizer.normalize(recognized,
-                                    java.text.Normalizer.Form.NFD)
-                                    .replace(Regex("\\p{Mn}+"), "")
-                                    .lowercase(java.util.Locale.ROOT)
-                                val hasAccept = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
-                                    .containsMatchIn(normalized)
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized) else null
+                                if(offer==null && index<angles.lastIndex) {
+                                    retry=true
+                                    recognizeCaptured(pkg,windowId,bounds,captured,requestTime,index+1)
+                                    return@addOnSuccessListener
+                                }
                                 if (offer == null) {
                                     readerStatus("Imagem lida; oferta sem valor, percurso ou tempo confiável")
                                     // A partial OCR frame must not erase a complete recent offer.
@@ -402,21 +421,15 @@ class OfferAccessibilityService : AccessibilityService() {
                             }
                             .addOnFailureListener { readerStatus("Falha ao reconhecer a imagem da oferta") }
                             .addOnCompleteListener {
-                                captured.recycle()
-                                if(lastScreenshotAt==requestTime) screenshotInProgress = false
+                                if(!retry) {
+                                    captured.recycle()
+                                    if(lastScreenshotAt==requestTime) screenshotInProgress = false
+                                }
                             }
-                    }
-
-                    override fun onFailure(errorCode: Int) {
-                        if(lastScreenshotAt==requestTime) screenshotInProgress = false
-                        readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
-                    }
-                }
-            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotExecutor, callback)
-            else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor, callback)
         } catch (_: Exception) {
-            if(lastScreenshotAt==requestTime) screenshotInProgress = false
-            readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
+            captured.recycle()
+            if(lastScreenshotAt==requestTime)screenshotInProgress=false
+            readerStatus("Reconhecimento indisponível; repetindo leitura")
         }
     }
 
@@ -486,6 +499,8 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun driverWindow(pkg: String): Pair<Int,Rect>? {
+        var best:Pair<Int,Rect>?=null
+        var bestScore=-1L
         for(window in windows) {
             if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
             val bounds=Rect().also{window.getBoundsInScreen(it)}
@@ -493,9 +508,14 @@ class OfferAccessibilityService : AccessibilityService() {
             val root=window.root ?: rootInActiveWindow?.let { if(it.windowId==window.id) it else {it.recycle();null} }
             if(root!=null)try {
                 if(root.packageName?.toString()?.equals(pkg,true)==true &&
-                    (root.isVisibleToUser || window.isActive || window.isFocused))return window.id to bounds
+                    (root.isVisibleToUser || window.isActive || window.isFocused)) {
+                    val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
+                    val score=if(offerOverlay)1_000_000_000L+bounds.width().toLong()*bounds.height() else bounds.width().toLong()*bounds.height()
+                    if(score>bestScore){bestScore=score;best=window.id to bounds}
+                }
             } finally {root.recycle()}
         }
+        if(best!=null)return best
         val root=rootInActiveWindow ?: return null
         return try {
             val bounds=Rect().also{root.getBoundsInScreen(it)}
@@ -526,14 +546,12 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
-        for(window in windows) {
-            if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
-            val candidate=window.root ?: continue
-            if(candidate.packageName?.toString()?.equals(pkg,true)==true &&
-                (candidate.isVisibleToUser || window.isActive || window.isFocused))return candidate
+        val target=driverWindow(pkg) ?: return null
+        windows.firstOrNull{it.id==target.first}?.root?.let {candidate->
+            if(candidate.packageName?.toString()?.equals(pkg,true)==true)return candidate
             candidate.recycle()
         }
-        return rootInActiveWindow?.let {if(it.packageName?.toString()?.equals(pkg,true)==true)it else {it.recycle();null}}
+        return rootInActiveWindow?.let {if(it.windowId==target.first && it.packageName?.toString()?.equals(pkg,true)==true)it else {it.recycle();null}}
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth:Int=0) {
