@@ -279,7 +279,16 @@ class OfferAccessibilityService : AccessibilityService() {
         val bounds = Rect()
         root.getBoundsInScreen(bounds)
         root.recycle()
-        if (Build.VERSION.SDK_INT < 34 && bounds.width() < resources.displayMetrics.widthPixels * 0.9) {
+        if (Build.VERSION.SDK_INT < 34 && (foregroundPackage != pkg ||
+            bounds.width() < resources.displayMetrics.widthPixels * 0.9 ||
+            bounds.height() < resources.displayMetrics.heightPixels * 0.85 ||
+            windows.any { window ->
+                if (window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) false
+                else window.root?.let { other ->
+                    try { other.isVisibleToUser && other.packageName?.toString() != pkg }
+                    finally { other.recycle() }
+                } ?: false
+            })) {
             readerStatus("Abra o app de motorista em tela cheia para usar OCR neste Android")
             return
         }
