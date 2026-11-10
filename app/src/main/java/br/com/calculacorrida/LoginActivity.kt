@@ -69,16 +69,24 @@ class LoginActivity : AppCompatActivity() {
             insets
         }
 
-        auth.addView(android.widget.Button(this).apply {
-            text = "ANALISAR SEM CONTA"
-            setTextColor(android.graphics.Color.rgb(239,190,65))
-            backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.rgb(23,23,26))
-            setOnClickListener { startActivity(Intent(this@LoginActivity,ManualOfferActivity::class.java)) }
-        })
         emailInput = findViewById(R.id.emailInput)
         passwordInput = findViewById(R.id.passwordInput)
+        val eye = findViewById<android.widget.ImageButton>(R.id.togglePasswordButton)
+        eye.setOnClickListener {
+            val show = passwordInput.transformationMethod is android.text.method.PasswordTransformationMethod
+            val cursor = passwordInput.selectionStart.coerceAtLeast(0)
+            passwordInput.transformationMethod = if (show) null else android.text.method.PasswordTransformationMethod.getInstance()
+            passwordInput.setSelection(cursor.coerceAtMost(passwordInput.text.length))
+            eye.setImageResource(if (show) R.drawable.ic_visibility_off else R.drawable.ic_visibility)
+            eye.contentDescription = if (show) "Esconder senha" else "Mostrar senha"
+            eye.isSelected = show
+        }
         loginButton = findViewById(R.id.loginButton)
         registerButton = findViewById(R.id.registerButton)
+        registerButton.setTextColor(android.graphics.Color.rgb(255,224,125))
+        registerButton.backgroundTintList = null
+        registerButton.background = getDrawable(R.drawable.login_secondary_button)
+        registerButton.alpha = 1f
         progressBar = findViewById(R.id.progressBar)
         rememberEmailCheck = findViewById(R.id.rememberEmailCheck)
         forgotPasswordText = findViewById(R.id.forgotPasswordText)
@@ -131,7 +139,7 @@ class LoginActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 } else {
-                    sessionManager.saveUser(email, result.accessToken)
+                    sessionManager.saveUser(email, result.accessToken, result.refreshToken)
                     Toast.makeText(
                         this@LoginActivity,
                         if (isRegistration) "Conta criada com sucesso!" else "Login realizado!",
@@ -235,7 +243,7 @@ class LoginActivity : AppCompatActivity() {
 
             val accessToken = json.optString("access_token").takeIf { it.isNotBlank() }
             val hasSession = accessToken != null
-            return AuthResult(hasSession, accessToken)
+            return AuthResult(hasSession, accessToken, json.optString("refresh_token").takeIf { it.isNotBlank() })
         }
     }
 
@@ -247,11 +255,23 @@ class LoginActivity : AppCompatActivity() {
         forgotPasswordText.alpha = if (loading) 0.5f else 1f
     }
 
+    override fun onPause() {
+        if (::passwordInput.isInitialized) {
+            passwordInput.transformationMethod = android.text.method.PasswordTransformationMethod.getInstance()
+            findViewById<android.widget.ImageButton>(R.id.togglePasswordButton)?.apply {
+                setImageResource(R.drawable.ic_visibility)
+                contentDescription = "Mostrar senha"
+                isSelected = false
+            }
+        }
+        super.onPause()
+    }
+
     override fun onDestroy() {
         activityScope.cancel()
         httpClient.dispatcher.cancelAll()
         super.onDestroy()
     }
 
-    private data class AuthResult(val hasSession: Boolean, val accessToken: String?)
+    private data class AuthResult(val hasSession: Boolean, val accessToken: String?, val refreshToken: String?)
 }

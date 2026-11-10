@@ -11,7 +11,8 @@ object OfferTextParser {
         val minutes: Double,
         val passengerRating: String?,
         val pickupAddress: String? = null,
-        val destinationAddress: String? = null
+        val destinationAddress: String? = null,
+        val pickupMinutes: Double? = null
     )
 
     private val moneyRegex = Regex("""R\s*\$\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:,[0-9]{1,2})?|[0-9]+\.[0-9]{1,2})(?![0-9.,])""", RegexOption.IGNORE_CASE)
@@ -33,7 +34,7 @@ object OfferTextParser {
             val after = text.substring(match.range.last + 1).trimStart()
             val before = text.substring(0, match.range.first).trimEnd()
             // A rate or a separately labelled bonus is not the total fare.
-            !Regex("""^(?:/|por\s+)(?:km|h(?:ora)?s?|min)\b""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
+            !Regex("""^(?:/\s*|por\s+)(?:km|h(?:ora)?s?|min)\b""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
                 !Regex("""(?:\+|b[oô]nus\s*[:+]?|adicional\s*[:+]?)$""", RegexOption.IGNORE_CASE).containsMatchIn(before)
         }.mapNotNull { it.groupValues[1].let(::toNumber) }.distinct().toList()
         val fare = fares.singleOrNull()?.takeIf { it.isFinite() && it > 0 } ?: return null
@@ -57,15 +58,18 @@ object OfferTextParser {
         val pickupKm: Double
         val tripKm: Double
         val totalMinutes: Double
+        var pickupMinutes: Double? = null
 
         if (summary != null && parenthesizedLegs.size >= 2) {
             // No cartão do Uber mostrado: o resumo (8 min • 3,5 km) já é o TOTAL.
             // As linhas detalhadas separam chegada (3 min/1,4 km) e viagem (5 min/2,1 km).
             // Somar o resumo novamente duplicaria a distância e o tempo de chegada.
+            pickupMinutes = parenthesizedLegs.first().first
             pickupKm = parenthesizedLegs.first().second
             tripKm = parenthesizedLegs.drop(1).sumOf { it.second }
             totalMinutes = parenthesizedLegs.sumOf { it.first }
         } else if (summary != null && parenthesizedLegs.size == 1) {
+            pickupMinutes = parenthesizedLegs.first().first
             pickupKm = parenthesizedLegs.first().second
             tripKm = (summary.second - pickupKm).coerceAtLeast(0.0)
             totalMinutes = summary.first
@@ -74,6 +78,7 @@ object OfferTextParser {
             tripKm = summary.second
             totalMinutes = summary.first
         } else if (parenthesizedLegs.size >= 2) {
+            pickupMinutes = parenthesizedLegs.first().first
             pickupKm = parenthesizedLegs.first().second
             tripKm = parenthesizedLegs.drop(1).sumOf { it.second }
             totalMinutes = parenthesizedLegs.sumOf { it.first }
@@ -92,6 +97,7 @@ object OfferTextParser {
             // Two unparenthesized legs are common on driver offer cards.
             // A partial or ambiguous card must not produce a confident calculation.
             if (distances.size != durations.size || distances.size !in 1..2) return null
+            pickupMinutes = if (durations.size == 2) durations[0] else null
             pickupKm = if (distances.size == 2) distances[0] else 0.0
             tripKm = distances.last()
             totalMinutes = durations.sum()
@@ -105,7 +111,7 @@ object OfferTextParser {
         val destinationAddress = if (legMatches.size >= 2) {
             extractAddress(text.substring(legMatches[1].range.last + 1))
         } else null
-        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text), pickupAddress, destinationAddress)
+        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text), pickupAddress, destinationAddress, pickupMinutes?.takeIf { it <= totalMinutes })
     }
 
     private fun extractAddress(segment: String): String? {

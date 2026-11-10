@@ -1,1 +1,5 @@
-<resources><string name="app_name">JHONDRIVER</string></resources>
+<resources>
+<string name="app_name">JHONDRIVER</string>
+<string name="reading_service_name">JHONDRIVER - Leitura automática de ofertas</string>
+<string name="accessibility_description">Lê dados e imagem da oferta nos aplicativos de motorista selecionados para calcular valor por km e hora. Não aceita nem recusa corridas. A IA recebe somente os indicadores numéricos, com seu consentimento.</string>
+</resources>

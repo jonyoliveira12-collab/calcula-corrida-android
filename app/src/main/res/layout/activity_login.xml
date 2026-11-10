@@ -114,18 +114,36 @@
                 android:textStyle="bold"
                 android:layout_marginTop="9dp"
                 android:layout_marginBottom="5dp"/>
-            <EditText
-                android:id="@+id/passwordInput"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:hint="Digite sua senha"
-                android:inputType="textPassword"
-                android:singleLine="true"
-                android:paddingHorizontal="14dp"
-                android:textSize="14sp"
-                android:textColor="#FFF8E4"
-                android:textColorHint="#AAA69B"
-                android:background="@drawable/login_input"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/login_input">
+                <EditText
+                    android:id="@+id/passwordInput"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    android:hint="Digite sua senha"
+                    android:inputType="textPassword"
+                    android:autofillHints="password"
+                    android:singleLine="true"
+                    android:paddingHorizontal="14dp"
+                    android:textSize="14sp"
+                    android:textColor="#FFF8E4"
+                    android:textColorHint="#BBB7AB"
+                    android:background="@android:color/transparent"/>
+                <ImageButton
+                    android:id="@+id/togglePasswordButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_visibility"
+                    android:tint="#FFE07D"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Mostrar senha"/>
+            </LinearLayout>
             <TextView
                 android:id="@+id/forgotPasswordText"
                 android:layout_width="match_parent"
@@ -153,11 +171,11 @@
             <Button
                 android:id="@+id/registerButton"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="48dp"
                 android:text="CRIAR CONTA"
-                android:textSize="12sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#E9C76C"
+                android:textColor="#FFE07D"
                 android:background="@drawable/login_secondary_button"
                 android:backgroundTint="@null"
                 android:layout_marginTop="7dp"/>

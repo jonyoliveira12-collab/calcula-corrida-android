@@ -1,32 +1,54 @@
-# JHONDRIVER 0.4.0
+# JHONDRIVER 0.4.1 — análise automática
 
-Edição com análise manual e por imagem escolhida pelo usuário. Nome de exibição: JHONDRIVER. A edição de avaliação mantém seu identificador existente (`br.com.calculacorrida.teste`), evitando confundir uma mudança cosmética com uma correção de segurança.
+A função principal é ler automaticamente a oferta exibida pela Uber/99/inDrive/iFood, calcular os indicadores no aparelho e apresentar o cartão sobre o app de motorista. O botão CC funciona com o app em segundo plano, enquanto Copiloto ou Semáforo e as permissões necessárias estiverem ativos. A edição 0.4.0 por imagem foi retirada; não há mais fluxo para escolher foto de oferta.
 
-## Mudança de funcionamento
+## Métricas e IA
 
-Foram removidos do código e do manifesto o serviço de acessibilidade, captura automática da tela, janelas de sobreposição, bolinha CC e cliente de IA das ofertas. Não há leitura automática de outros aplicativos. O usuário digita os valores ou escolhe/compartilha uma imagem; OCR ocorre no aparelho e os valores precisam ser revisados antes do cálculo. Nenhuma imagem é enviada ao servidor. A análise pode ser aberta sem conta na tela de login. Conta e atualizações continuam usando internet.
+O cartão mostra valor da oferta, minutos até o passageiro quando identificados, tempo total, distância, nota quando identificada, R$/km e R$/hora com centavos. A distância total e o tempo incluem chegada e viagem quando ambos os trechos aparecem. Dados ausentes não são inventados. R$/hora é projeção bruta da oferta, não promessa de ganho nem lucro líquido.
 
-As imagens selecionadas não são copiadas para o histórico. Somente os valores confirmados são salvos localmente. O usuário pode apagar o histórico no aplicativo. O seletor do Android concede acesso apenas à imagem escolhida, sem solicitar acesso geral à galeria.
+A leitura/OCR e os cálculos acontecem localmente. Depois de consentimento explícito, a IA recebe somente números e classificação, sem imagens, endereços, nomes ou conversas. A Edge Function `analyze-offer` na Supabase deve validar a sessão e usar `GEMINI_API_KEY` nos secrets do servidor. O APK usa apenas a chave publicável e a sessão do usuário. Nenhuma chave privada de IA deve entrar no APK, repositório ou conversa.
 
-## Segurança e compatibilidade
+A função `analyze-offer` foi publicada no projeto `hyoaomusfpeccdchgoik`, versão 1, com validação JWT obrigatória e verificação da sessão na função. As funções existentes `hello-world` e `quick-responder` foram preservadas. O código está em `supabase/functions/analyze-offer/index.ts`. Verificação ao vivo: OPTIONS retornou 200 com chave GEMINI_API_KEY configurada (somente presença, sem revelar valor); POST sem autenticação retornou 401. Ainda será necessária uma chamada autenticada válida para confirmar a resposta do Gemini.
 
-O pipeline verifica manifesto, permissões e ausência das classes removidas no APK. Isso não equivale a aprovação do Google Play Protect nem garante aceitação pelo Nubank ou outro banco. Não desative proteções do aparelho para instalar ou usar esta edição. Alertas devem ser investigados com o banco/Google pelos canais oficiais.
+O cliente mostra estados distintos para função ausente, falta de configuração, sessão expirada e indisponibilidade. As métricas locais continuam independentes da IA. Novos logins guardam o refresh token em armazenamento privado do app e renovam a sessão em resposta a um 401, sem registrar tokens nos logs.
 
-## Atualizações e assinatura
+## Permissões, segundo plano e bancos
 
-O aviso de atualização está implementado e só oferece uma versão superior com mesmo pacote e certificado declarados no manifesto público da release. Versões antigas precisam de uma instalação manual inicial compatível. A publicação oficial permanece bloqueada até cadastrar os quatro segredos privados em Settings → Secrets and variables → Actions:
+O serviço declara uma lista explícita de pacotes de motorista e do próprio JHONDRIVER. Texto/imagem de ofertas só é processado quando o app de motorista reconhecido está ativo. A bolha e o cartão são removidos em outros apps. Android 14+ usa captura da janela específica; o fallback Android 11–13 exige app de motorista em tela cheia. Android anterior usa somente o texto de acessibilidade. O serviço não aceita nem recusa corridas, não faz gestos nem cliques automáticos.
 
-- `JHONDRIVER_KEYSTORE_BASE64`: chave original em base64.
-- `JHONDRIVER_KEYSTORE_PASSWORD`: senha do arquivo.
-- `JHONDRIVER_KEY_ALIAS`: alias da chave.
-- `JHONDRIVER_KEY_PASSWORD`: senha da chave.
+A auditoria do pipeline confere essa configuração e permissões não relacionadas. Ela NÃO significa aprovação do Play Protect ou garantia de compatibilidade com Nubank. A causa exata do bloqueio do banco ainda não foi confirmada. Não desative proteções para usar o app. Não foi tentado disfarçar a identidade nem contornar a proteção do banco.
 
-Não envie chaves/senhas por mensagens, issues ou commits. A compilação de publicação confere o certificado original `01537f8902325696735cd4db6710ec2186eb21f8007e11ed74d757f8af30d5b8`. A exposição anterior no histórico não foi desfeita; a distribuição oficial precisa de planejamento de rotação. O APK debug de avaliação não atualiza o aplicativo oficial.
+O nome exibido é JHONDRIVER. O pacote de avaliação permanece `br.com.calculacorrida.teste`; o aplicativo oficial mantém `br.com.calculacorrida`.
 
-## Validação
+## Login
+
+O botão de olho mostra/esconde a senha e volta a escondê-la quando a tela perde o foco. CRIAR CONTA tem texto dourado de alto contraste e borda visível.
+
+## Publicação e atualizações
+
+A publicação oficial exige os secrets privados `JHONDRIVER_KEYSTORE_BASE64`, `JHONDRIVER_KEYSTORE_PASSWORD`, `JHONDRIVER_KEY_ALIAS` e `JHONDRIVER_KEY_PASSWORD` no GitHub Actions, mantendo o certificado original conferido pelo pipeline. A exposição anterior da chave no histórico não foi desfeita e ainda exige planejamento de rotação. A configuração privada e publicação oficial continuam pendentes.
+
+O aviso de atualização procura releases com pacote/certificado compatíveis e versão maior. A pessoa confirma o download/instalação. Versões antigas sem verificador precisam de uma instalação manual inicial. O APK debug de avaliação não substitui o app oficial.
+
+## Verificação
 
 `gradle testDebugUnitTest assembleDebug`
 
-`python .github/scripts/audit_apk.py app/build/outputs/apk/debug/app-debug.apk`
+`gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest`
 
-Teste instrumentado: `ManualOfferTest` confirma ausência das permissões/serviço e cálculo manual de R$ 18,40, 12,6 km e 28 min. Aprovação do Play Protect e compatibilidade bancária exigem validação externa.
+Os testes verificam cálculos, chegada/nota ausentes, bolinha CC e controles do login. Uma oferta real da Uber e o acesso bancário ainda precisam de testes no dispositivo do usuário. O código do Rota Pro não foi acessado; apenas sua descrição pública e guia de permissões foram consultados.
+
+## Avisos observados na Supabase
+
+A inspeção de segurança retornou permissões EXECUTE públicas para `handle_new_user` e `rls_auto_enable`, além de proteção de senhas vazadas desativada. Não alteramos o esquema nem os privilégios dessas funções durante esta restauração. Revisar com cuidado para preservar os fluxos de cadastro existentes.
+
+- [Permissões anônimas em funções SECURITY DEFINER](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable)
+- [Permissões de usuários autenticados](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)
+- [Proteção contra senhas vazadas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+
+## Referência funcional pesquisada
+
+A descrição pública do Rota Pro confirma uso de acessibilidade para ler ofertas, exibir o cartão e calcular métricas. A documentação de configuração cita acessibilidade, sobreposição, notificações e ajustes de bateria. Isso não informa sua implementação interna nem explica a aceitação por cada banco.
+
+- [Descrição no Google Play](https://play.google.com/store/apps/details?id=app.rotapro&hl=pt-BR)
+- [Guia de permissões](https://rotapro.app/ajuda/primeiros-passos/)

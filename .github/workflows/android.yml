@@ -25,7 +25,7 @@ jobs:
       - name: Test and compile without signing secrets
         run: gradle --no-daemon testDebugUnitTest assembleDebug
 
-      - name: Audit manual-edition permissions and code
+      - name: Check automatic reader configuration
         run: python .github/scripts/audit_apk.py app/build/outputs/apk/debug/app-debug.apk
       - name: Verify APK identity and signature
         run: |
@@ -63,7 +63,7 @@ jobs:
           target: google_apis
           disable-animations: true
           script: |
-            gradle --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=br.com.calculacorrida.ManualOfferTest
+            gradle --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest
 
   publish:
     needs: test
@@ -102,7 +102,7 @@ jobs:
           echo "01537f8902325696735cd4db6710ec2186eb21f8007e11ed74d757f8af30d5b8  $RUNNER_TEMP/signing-cert.der" | sha256sum --check
       - name: Build signed update
         run: gradle --no-daemon assembleRelease
-      - name: Audit signed manual edition
+      - name: Check signed automatic reader configuration
         run: python .github/scripts/audit_apk.py app/build/outputs/apk/release/app-release.apk
       - name: Verify signed APK
         run: |

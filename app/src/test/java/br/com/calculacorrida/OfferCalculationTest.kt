@@ -39,6 +39,15 @@ class OfferCalculationTest {
         assertFalse(UpdatePolicy.isCompatibleUpdate("app",4,setOf("abc"),"app",5,"other"))
         assertFalse(UpdatePolicy.isCompatibleUpdate("app",4,setOf("abc"),"app",4,"abc"))
     }
+    @Test fun arrivalTimeAndRatingAreReadWithoutInventingMissingData() {
+        val detailed = OfferTextParser.parse("R$ 18,40 3 min (1,4 km) 25 min (11,2 km) Nota 4,95 Aceitar")!!
+        assertEquals(3.0, detailed.pickupMinutes!!, 0.000001)
+        assertEquals(28.0, detailed.minutes, 0.000001)
+        assertEquals("4.95", detailed.passengerRating)
+        val summary = OfferTextParser.parse("R$ 18,40 28 min • 12,6 km Aceitar")!!
+        assertNull(summary.pickupMinutes)
+        assertNull(summary.passengerRating)
+    }
     @Test fun invalidInputsAreRejected() {
         assertNull(TripCalculator.calculate(Double.NaN, 0.0, 12.6, 28.0))
         assertNull(TripCalculator.calculate(18.4, 0.0, 12.6, Double.POSITIVE_INFINITY))

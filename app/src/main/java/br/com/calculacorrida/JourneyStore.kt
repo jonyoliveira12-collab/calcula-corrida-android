@@ -53,6 +53,7 @@ object JourneyStore {
             put("tripKm", result.tripKm)
             put("totalKm", result.totalKm)
             put("minutes", result.minutes)
+            put("pickupMinutes", offer.pickupMinutes ?: JSONObject.NULL)
             put("perKm", result.perKm)
             put("perHour", result.perHour)
             put("passengerRating", offer.passengerRating ?: "")
