@@ -47,7 +47,14 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var screenshotInProgress = false
     @Volatile private var lastScreenshotAt = 0L
     private val readerHandler = Handler(Looper.getMainLooper())
-    private var foregroundPackage: String? = null
+    private data class DriverFrame(val id:Int,val bounds:Rect,val text:String,val fareBounds:Rect?,val score:Long)
+    private val windowExecutor=Executors.newSingleThreadExecutor()
+    private val windowRefreshPending=java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile private var driverFrames:Map<String,DriverFrame> = emptyMap()
+    @Volatile private var foregroundSnapshot:String?=null
+    @Volatile private var applicationSnapshots:Set<String> = emptySet()
+    @Volatile private var snapshotAt=0L
+    @Volatile private var foregroundPackage: String? = null
     @Volatile private var stopped = false
     private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key.startsWith("card_") || key == "overlay_scale" || key == "reader_paused")) {
@@ -65,13 +72,9 @@ class OfferAccessibilityService : AccessibilityService() {
                 lastHeartbeat=android.os.SystemClock.elapsedRealtime()
                 prefs.edit().putLong("reader_heartbeat",System.currentTimeMillis()).apply()
             }
-            val pkg = rootInActiveWindow?.let { root ->
-                val name = root.packageName?.toString()
-                root.recycle()
-                name
-            }
-            updateForeground(pkg)
-            if (readingEnabled()) visibleDriverPackages().forEach { readOffer(it, null) }
+            requestWindowRefresh()
+            updateForeground(foregroundSnapshot)
+            if (readingEnabled()) visibleDriverPackages().forEach { readOffer(it) }
             overlays.keys.toList().forEach { reflowOverlay(it) }
             val now = android.os.SystemClock.elapsedRealtime()
             lastOfferSeen.filterValues { now - it > getSharedPreferences("settings",MODE_PRIVATE).getInt("card_hold_seconds",20).coerceIn(10,120)*1000L }.keys.toList().forEach { expired ->
@@ -126,8 +129,8 @@ class OfferAccessibilityService : AccessibilityService() {
         if (bubble != null) {
             bubbleParams?.let { params ->
                 bubbleOwner?.let { target ->
-                    val root = findDriverWindowRoot(target)
-                    if (root != null) { val pane=Rect();root.getBoundsInScreen(pane);root.recycle()
+                    val pane = driverWindow(target)?.second
+                    if (pane != null) {
                         if(pane.width()>=dp(160) && pane.height()>=dp(100)) {
                         val oldX=params.x;val oldY=params.y
                         params.x=params.x.coerceIn(pane.left,(pane.right-dp(48)).coerceAtLeast(pane.left))
@@ -247,81 +250,104 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private var lastEventScan=0L
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null) return
+        if(event==null || stopped)return
         val now=android.os.SystemClock.elapsedRealtime()
-        if(event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED && now-lastEventScan<100L)return
+        if(event.eventType==AccessibilityEvent.TYPE_VIEW_CLICKED && driverAppName(event.packageName?.toString().orEmpty())!=null) {
+            val copy=AccessibilityEvent.obtain(event)
+            windowExecutor.execute {
+                try {
+                    val node=copy.source
+                    val accepted=try {isAcceptActionNode(node)}finally{node?.recycle()}
+                    val pkg=copy.packageName?.toString()
+                    if(accepted && pkg!=null)readerHandler.post {
+                        acceptedSignatures[pkg]?.let {acceptedOfferSignatures[pkg]=it}
+                        hideOverlay(pkg)
+                    }
+                } finally {copy.recycle()}
+            }
+        }
+        if(now-lastEventScan<100)return
         lastEventScan=now
-        try {
-        val root = rootInActiveWindow
-        val pkg = root?.packageName?.toString() ?: event.packageName?.toString()
-        root?.recycle()
-        updateForeground(pkg)
-        if (readingEnabled()) visibleDriverPackages().forEach { readOffer(it, if (event.packageName?.toString() == it) event else null) }
-        } catch (_: Exception) { readerStatus("Janela atualizando; nova tentativa automática") }
+        requestWindowRefresh()
     }
 
-    private fun readOffer(pkg: String, event: AccessibilityEvent?) {
-        if (!readingEnabled() || pkg !in visibleDriverPackages()) return
-        // A tela inteira via OCR pode misturar dois apps no tablet. Para evitar
-        // ofertas híbridas, aceitamos somente os dados da árvore do próprio app.
-        val root = findDriverWindowRoot(pkg) ?: rootInActiveWindow?.takeIf {
-            it.packageName?.toString()?.equals(pkg, ignoreCase = true) == true
-        } ?: run { requestOfferScreenshot(pkg); return }
-        try {
-        val text = StringBuilder()
-        collectText(root, text)
-        val screenText = text.toString()
+    private fun requestWindowRefresh() {
+        if(stopped || !readerConfigured() || !windowRefreshPending.compareAndSet(false,true))return
+        windowExecutor.execute {
+            val started=android.os.SystemClock.elapsedRealtime()
+            try {
+                val frames=linkedMapOf<String,DriverFrame>()
+                val applications=linkedSetOf<String>()
+                var activePkg:String?=null
+                val activeRoot=rootInActiveWindow
+                try {
+                    activePkg=activeRoot?.packageName?.toString()
+                    for(window in windows) {
+                        if(window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
+                        val root=window.root ?: continue
+                        try {
+                            val pkg=root.packageName?.toString() ?: continue
+                            if(window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION)applications.add(pkg)
+                            if(driverAppName(pkg)==null)continue
+                            val bounds=Rect().also{window.getBoundsInScreen(it)}
+                            if(bounds.isEmpty)continue
+                            val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
+                            val score=(if(offerOverlay)1_000_000_000L else 0L)+bounds.width().toLong()*bounds.height()
+                            if(score<=(frames[pkg]?.score?:-1))continue
+                            val text=StringBuilder()
+                            if(readingEnabled() && bounds.width()>=dp(160) && bounds.height()>=dp(100))collectText(root,text)
+                            frames[pkg]=DriverFrame(window.id,bounds,text.toString(),if(text.isNotEmpty())findFareBounds(root)else null,score)
+                        } finally {root.recycle()}
+                    }
+                    val pkg=activeRoot?.packageName?.toString()
+                    if(activeRoot!=null && pkg!=null && driverAppName(pkg)!=null && pkg !in frames) {
+                        val bounds=Rect().also{activeRoot.getBoundsInScreen(it)}
+                        if(!bounds.isEmpty) {
+                            val text=StringBuilder();if(readingEnabled())collectText(activeRoot,text)
+                            frames[pkg]=DriverFrame(activeRoot.windowId,bounds,text.toString(),null,0)
+                        }
+                    }
+                } finally {activeRoot?.recycle()}
+                driverFrames=frames.toMap()
+                applicationSnapshots=applications.toSet()
+                foregroundSnapshot=activePkg
+                snapshotAt=android.os.SystemClock.elapsedRealtime()
+                getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_window_status","${frames.size} apps • consulta em ${snapshotAt-started} ms").apply()
+                readerHandler.post {
+                    if(!stopped) {
+                        updateForeground(foregroundSnapshot)
+                        if(readingEnabled())visibleDriverPackages().forEach{readOffer(it)}
+                    }
+                }
+            } catch (_:Exception) {readerStatus("Janela atualizando; repetindo consulta automaticamente")}
+            finally {windowRefreshPending.set(false)}
+        }
+    }
 
-        // Só existe oferta enquanto o próprio app do motorista exibe a ação de aceitar.
-        // Na tela de navegação/viagem, distância e ETA mudam conforme o carro se aproxima;
-        // esses dados NUNCA devem atualizar a análise da oferta já aceita.
-        if (!isIncomingOfferScreen(root, screenText)) {
-            val navigation = normalizeActionText(screenText)
-            if (listOf("encerrar viagem", "finalizar viagem", "em viagem", "cheguei").any { navigation.contains(it) }) {
-                hideOverlay(pkg)
-                lastOfferSeen.remove(pkg)
-                acceptedSignatures.remove(pkg)
-                return
+    private fun readOffer(pkg: String) {
+        if(!readingEnabled())return
+        val frame=driverFrames[pkg] ?: return
+        val screenText=frame.text
+        if(!IncomingOfferPolicy.isIncoming(pkg,screenText)) {
+            val n=normalizeActionText(screenText)
+            if(listOf("encerrar viagem","finalizar viagem","em viagem","cheguei").any{n.contains(it)}) {
+                hideOverlay(pkg);lastOfferSeen.remove(pkg);acceptedSignatures.remove(pkg);return
             }
-            readerStatus("${driverAppName(pkg)} aberto; conferindo oferta por imagem")
             requestOfferScreenshot(pkg)
             return
         }
-
-        val offer = OfferTextParser.parse(screenText)
-        if (offer == null) {
-            readerStatus("Texto incompleto; conferindo oferta por imagem")
-            requestOfferScreenshot(pkg)
-            return
-        }
-        lastOfferSeen[pkg] = android.os.SystemClock.elapsedRealtime()
-        val clickedAccept = event?.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && isAcceptActionNode(event.source)
-        // Oferta completa: a assinatura impede alterações causadas pela navegação.
-        val signature = listOf(
-            "%.2f".format(java.util.Locale.US, offer.fare),
-            "%.2f".format(java.util.Locale.US, offer.pickupKm),
-            "%.2f".format(java.util.Locale.US, offer.tripKm),
-            "%.1f".format(java.util.Locale.US, offer.minutes),
-            offer.passengerRating.orEmpty(),
-            offer.pickupMinutes?.toString().orEmpty(),
-            offer.pickupAddress.orEmpty(),
-            offer.destinationAddress.orEmpty()
-        ).joinToString("|")
-        if (clickedAccept) {
-            acceptedOfferSignatures[pkg] = signature
-            hideOverlay(pkg)
-            return
-        }
-        if (acceptedOfferSignatures[pkg] == signature) {
-            hideOverlay(pkg)
-            return
-        }
+        val offer=OfferTextParser.parse(screenText) ?: run {requestOfferScreenshot(pkg);return}
+        lastOfferSeen[pkg]=android.os.SystemClock.elapsedRealtime()
+        val signature=listOf(
+            "%.2f".format(java.util.Locale.US,offer.fare),"%.2f".format(java.util.Locale.US,offer.pickupKm),
+            "%.2f".format(java.util.Locale.US,offer.tripKm),"%.1f".format(java.util.Locale.US,offer.minutes),
+            offer.passengerRating.orEmpty(),offer.pickupMinutes?.toString().orEmpty(),offer.pickupAddress.orEmpty(),offer.destinationAddress.orEmpty()).joinToString("|")
+        if(acceptedOfferSignatures[pkg]==signature){hideOverlay(pkg);return}
         acceptedOfferSignatures.remove(pkg)
-        if (acceptedSignatures[pkg] != signature) {
-            acceptedSignatures[pkg] = signature
-            calculateAndShow(offer, findFareBounds(root), pkg)
+        if(acceptedSignatures[pkg]!=signature) {
+            acceptedSignatures[pkg]=signature
+            calculateAndShow(offer,frame.fareBounds,pkg)
         }
-        } finally { root.recycle() }
     }
 
     // Alguns cartões da Uber/99 são desenhados como imagem e não aparecem na árvore
@@ -339,13 +365,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (Build.VERSION.SDK_INT < 34 && (foregroundPackage != pkg ||
             bounds.width() < resources.displayMetrics.widthPixels * 0.9 ||
             bounds.height() < resources.displayMetrics.heightPixels * 0.85 ||
-            windows.any { window ->
-                if (window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) false
-                else window.root?.let { other ->
-                    try { other.isVisibleToUser && other.packageName?.toString() != pkg }
-                    finally { other.recycle() }
-                } ?: false
-            })) {
+            applicationSnapshots.any { it!=pkg })) {
             readerStatus("Abra o app de motorista em tela cheia para usar OCR neste Android")
             return
         }
@@ -547,59 +567,18 @@ class OfferAccessibilityService : AccessibilityService() {
         showOffer(result, offer, anchor, sourcePackage)
     }
 
-    private fun driverWindow(pkg: String): Pair<Int,Rect>? {
-        var best:Pair<Int,Rect>?=null
-        var bestScore=-1L
-        for(window in windows) {
-            if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
-            val bounds=Rect().also{window.getBoundsInScreen(it)}
-            if(bounds.isEmpty)continue
-            val root=window.root ?: rootInActiveWindow?.let { if(it.windowId==window.id) it else {it.recycle();null} }
-            if(root!=null)try {
-                if(root.packageName?.toString()?.equals(pkg,true)==true) {
-                    val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
-                    val score=if(offerOverlay)1_000_000_000L+bounds.width().toLong()*bounds.height() else bounds.width().toLong()*bounds.height()
-                    if(score>bestScore){bestScore=score;best=window.id to bounds}
-                }
-            } finally {root.recycle()}
-        }
-        if(best!=null)return best
-        val root=rootInActiveWindow ?: return null
-        return try {
-            val bounds=Rect().also{root.getBoundsInScreen(it)}
-            if(root.packageName?.toString()?.equals(pkg,true)==true && !bounds.isEmpty)root.windowId to bounds else null
-        } finally {root.recycle()}
+    private fun driverWindow(pkg:String):Pair<Int,Rect>? {
+        if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)return null
+        val frame=driverFrames[pkg] ?: return null
+        return frame.id to Rect(frame.bounds)
     }
-
-    private fun visibleDriverPackages(): List<String> {
-        val packages=linkedSetOf<String>()
-        for(window in windows) {
-            if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
-            val root=window.root ?: continue
-            try {
-                val pkg=root.packageName?.toString() ?: continue
-                val bounds=Rect().also{window.getBoundsInScreen(it)}
-                if(!bounds.isEmpty && driverAppName(pkg)!=null)packages.add(pkg)
-            } finally {root.recycle()}
-        }
-        // Some OEMs briefly return no interactive roots while the active root is available.
-        rootInActiveWindow?.let {root->try {root.packageName?.toString()?.takeIf{driverAppName(it)!=null}?.let{packages.add(it)}}finally{root.recycle()}}
-        return packages.sortedBy {lastCaptureByPackage[it]?:0L}
-    }
-
-    private val lastCaptureByPackage = mutableMapOf<String, Long>()
-    private fun captureStillValid(pkg: String, id: Int, bounds: Rect): Boolean {
+    private fun visibleDriverPackages():List<String> =
+        if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)emptyList()
+        else driverFrames.keys.sortedBy{lastCaptureByPackage[it]?:0L}
+    private val lastCaptureByPackage=mutableMapOf<String,Long>()
+    private fun captureStillValid(pkg:String,id:Int,bounds:Rect):Boolean {
         val current=driverWindow(pkg) ?: return false
         return readingEnabled() && current.first==id && current.second==bounds
-    }
-
-    private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
-        val target=driverWindow(pkg) ?: return null
-        windows.firstOrNull{it.id==target.first}?.root?.let {candidate->
-            if(candidate.packageName?.toString()?.equals(pkg,true)==true)return candidate
-            candidate.recycle()
-        }
-        return rootInActiveWindow?.let {if(it.windowId==target.first && it.packageName?.toString()?.equals(pkg,true)==true)it else {it.recycle();null}}
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth:Int=0) {
@@ -669,7 +648,7 @@ class OfferAccessibilityService : AccessibilityService() {
             val defaultX = if (useLandscapeRow) dp(12 + column * (overlayWidth + 8)) else dp(8)
             val defaultY = if (useLandscapeRow) dp(70 + row * 246) else dp(70 + slot * 246)
             val pane=Rect()
-            findDriverWindowRoot(sourcePackage)?.let { it.getBoundsInScreen(pane);it.recycle() }
+            driverWindow(sourcePackage)?.second?.let { pane.set(it) }
             val position=prefs.getInt("card_position_${driverAppName(sourcePackage)}",0)
             val chosenX=when(position){1->pane.left+(pane.width()-dp(overlayWidth))/2;2->pane.right-dp(overlayWidth)-dp(8);else->pane.left+dp(8)}
             params.x = prefs.getInt("offer_tag_x_$suffix", if(pane.isEmpty)defaultX else chosenX)
@@ -817,6 +796,7 @@ class OfferAccessibilityService : AccessibilityService() {
         bubble?.let { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) }
         bubble = null
         try { textRecognizer.close() } catch (_: Exception) {}
+        windowExecutor.shutdownNow()
         screenshotExecutor.shutdown()
         super.onDestroy()
     }

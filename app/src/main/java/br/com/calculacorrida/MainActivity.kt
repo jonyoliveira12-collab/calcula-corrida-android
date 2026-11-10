@@ -223,6 +223,7 @@ class MainActivity : Activity() {
                 "Copiloto: ${prefs.getBoolean("copilot_enabled",false)} • Semáforo: ${prefs.getBoolean("traffic_enabled",false)} • Pausa: ${prefs.getBoolean("reader_paused",false)}",
                 "Estado: ${prefs.getString("reader_status","Sem registro")}","Último app: ${prefs.getString("reader_last_app","—")}",
                 "Última captura: ${prefs.getLong("reader_last_capture",0)} • Última detecção: ${prefs.getLong("reader_last_detection",0)}",
+                "Janelas: ${prefs.getString("reader_window_status","Aguardando")}",
                 "Captura: ${prefs.getString("reader_capture_status","Aguardando")}",
                 "Reconhecimento: ${prefs.getString("reader_ocr_status","Aguardando")}",
                 "Modelo de leitura pronto: ${prefs.getBoolean("reader_model_ready",false)}",
