@@ -50,14 +50,21 @@ class OfferAccessibilityService : AccessibilityService() {
     private var foregroundPackage: String? = null
     @Volatile private var stopped = false
     private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key != null && (key.startsWith("card_") || key == "overlay_scale")) {
+        if (key != null && (key.startsWith("card_") || key == "overlay_scale" || key == "reader_paused")) {
             readerHandler.post { hideAllOverlays() }
         }
     }
+    private val lastWindowSeen=mutableMapOf<String,Long>()
     private val lastOfferSeen = mutableMapOf<String, Long>()
     private val poll = object : Runnable {
         override fun run() {
             if (stopped) return
+            try {
+            val prefs=getSharedPreferences("settings", MODE_PRIVATE)
+            if(android.os.SystemClock.elapsedRealtime()-lastHeartbeat>2000L) {
+                lastHeartbeat=android.os.SystemClock.elapsedRealtime()
+                prefs.edit().putLong("reader_heartbeat",System.currentTimeMillis()).apply()
+            }
             val pkg = rootInActiveWindow?.let { root ->
                 val name = root.packageName?.toString()
                 root.recycle()
@@ -67,14 +74,17 @@ class OfferAccessibilityService : AccessibilityService() {
             if (readingEnabled()) visibleDriverPackages().forEach { readOffer(it, null) }
             overlays.keys.toList().forEach { reflowOverlay(it) }
             val now = android.os.SystemClock.elapsedRealtime()
-            lastOfferSeen.filterValues { now - it > 5000L }.keys.toList().forEach { expired ->
+            lastOfferSeen.filterValues { now - it > getSharedPreferences("settings",MODE_PRIVATE).getInt("card_hold_seconds",20).coerceIn(10,120)*1000L }.keys.toList().forEach { expired ->
                 hideOverlay(expired);lastOfferSeen.remove(expired);acceptedSignatures.remove(expired)
             }
-            readerHandler.postDelayed(this, 350L)
+            } catch (_: Exception) { readerStatus("Falha temporária da janela; tentando novamente") }
+            finally { if(!stopped) readerHandler.postDelayed(this, 350L) }
         }
     }
 
-    private fun readingEnabled(): Boolean {
+    private var lastHeartbeat=0L
+    private fun readingEnabled(): Boolean = foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
+    private fun readerConfigured(): Boolean {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         return prefs.getBoolean("reader_disclosure_accepted", false) &&
             (prefs.getBoolean("copilot_enabled", false) || prefs.getBoolean("traffic_enabled", false))
@@ -94,8 +104,10 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun updateForeground(pkg: String?) {
         foregroundPackage = pkg
         val visible = visibleDriverPackages()
-        overlays.keys.filter { it !in visible }.forEach { hideOverlay(it); acceptedSignatures.remove(it) }
-        if (!readingEnabled() || (visible.isEmpty() && pkg != packageName)) {
+        val now=android.os.SystemClock.elapsedRealtime()
+        visible.forEach{lastWindowSeen[it]=now}
+        overlays.keys.filter { it !in visible && now-(lastWindowSeen[it]?:0)>2000L }.forEach { hideOverlay(it); acceptedSignatures.remove(it) }
+        if (!readerConfigured() || pkg == "com.nu.production") {
             hideAllOverlays()
             removeBubble()
             return
@@ -103,6 +115,10 @@ class OfferAccessibilityService : AccessibilityService() {
         if (!Settings.canDrawOverlays(this)) {
             readerStatus("Falta permitir sobreposição de tela")
             return
+        }
+        bubble?.apply {
+            text=if(readingEnabled())"CC" else "Ⅱ"
+            contentDescription=if(readingEnabled())"Copiloto CC ativo em segundo plano" else "Copiloto CC pausado"
         }
         if (bubbleOwner !in visible) bubbleOwner = visible.firstOrNull()
         if (bubble != null) {
@@ -148,15 +164,28 @@ class OfferAccessibilityService : AccessibilityService() {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (moved) prefs.edit().putInt("bubble_x",params.x).putInt("bubble_y",params.y).apply()
-                    else packageManager.getLaunchIntentForPackage(packageName)?.let { intent ->
-                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        startActivity(intent)
-                    }
+                    else showReaderControls()
                 }
             }
             true
         }
         try { wm.addView(view,params); bubble=view; bubbleParams=params } catch (_: Exception) { readerStatus("Não foi possível mostrar a bolinha CC") }
+    }
+
+    private fun showReaderControls() {
+        val prefs=getSharedPreferences("settings",MODE_PRIVATE)
+        val paused=prefs.getBoolean("reader_paused",false)
+        val dialog=android.app.AlertDialog.Builder(this)
+            .setTitle("Copiloto CC")
+            .setItems(arrayOf(if(paused)"Retomar leitura" else "Pausar leitura", "Abrir JHONDRIVER", "Desligar leitura")) { _, which ->
+                when(which) {
+                    0 -> { prefs.edit().putBoolean("reader_paused",!paused).apply();hideAllOverlays();readerStatus(if(!paused)"Leitura pausada pelo usuário" else "Leitura retomada") }
+                    1 -> packageManager.getLaunchIntentForPackage(packageName)?.let { it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(it) }
+                    2 -> {prefs.edit().putBoolean("copilot_enabled",false).putBoolean("traffic_enabled",false).apply();stopReading()}
+                }
+            }.setNegativeButton("Fechar",null).create()
+        dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+        dialog.show()
     }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -173,6 +202,9 @@ class OfferAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         active = this
+        serviceInfo=serviceInfo.apply {
+            flags=flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+        }
         getSharedPreferences("settings", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(appearanceListener)
         NetworkGate.register(this, networkCallback)
         stopped = false
@@ -196,13 +228,19 @@ class OfferAccessibilityService : AccessibilityService() {
         }
     }
 
+    private var lastEventScan=0L
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        val now=android.os.SystemClock.elapsedRealtime()
+        if(event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED && now-lastEventScan<100L)return
+        lastEventScan=now
+        try {
         val root = rootInActiveWindow
         val pkg = root?.packageName?.toString() ?: event.packageName?.toString()
         root?.recycle()
         updateForeground(pkg)
         if (readingEnabled()) visibleDriverPackages().forEach { readOffer(it, if (event.packageName?.toString() == it) event else null) }
+        } catch (_: Exception) { readerStatus("Janela atualizando; nova tentativa automática") }
     }
 
     private fun readOffer(pkg: String, event: AccessibilityEvent?) {
@@ -274,11 +312,9 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun requestOfferScreenshot(pkg: String) {
         if (Build.VERSION.SDK_INT < 30) { readerStatus("Neste Android a leitura depende do texto acessível da oferta"); return }
         if (screenshotInProgress || pkg !in visibleDriverPackages() || !readingEnabled()) return
-        val root = findDriverWindowRoot(pkg) ?: return
-        val windowId = root.windowId
-        val bounds = Rect()
-        root.getBoundsInScreen(bounds)
-        root.recycle()
+        val target=driverWindow(pkg) ?: run { readerStatus("${driverAppName(pkg)}: janela ainda indisponível para captura"); return }
+        val windowId = target.first
+        val bounds = target.second
         if (Build.VERSION.SDK_INT < 34 && (foregroundPackage != pkg ||
             bounds.width() < resources.displayMetrics.widthPixels * 0.9 ||
             bounds.height() < resources.displayMetrics.heightPixels * 0.85 ||
@@ -296,7 +332,15 @@ class OfferAccessibilityService : AccessibilityService() {
         if (now - lastScreenshotAt < 700L) return
         lastScreenshotAt = now
         lastCaptureByPackage[pkg] = now
+        getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_last_app",driverAppName(pkg)).putLong("reader_last_capture",System.currentTimeMillis()).apply()
         screenshotInProgress = true
+        val requestTime=now
+        readerHandler.postDelayed({
+            if(screenshotInProgress && lastScreenshotAt==requestTime) {
+                screenshotInProgress=false
+                readerStatus("Captura demorou; repetindo automaticamente")
+            }
+        },6000L)
         try {
             val callback = object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
@@ -309,18 +353,19 @@ class OfferAccessibilityService : AccessibilityService() {
                         }
                         try { result.hardwareBuffer.close() } catch (_: Exception) {}
                         val captured = bitmap
-                        if (stopped || !captureStillValid(pkg, windowId, bounds)) {
+                        if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) {
                             captured?.recycle()
-                            screenshotInProgress = false
+                            if(lastScreenshotAt==requestTime) screenshotInProgress = false
                             return
                         }
                         if (captured == null) {
-                            screenshotInProgress = false
+                            readerStatus("Falha ao converter a imagem da janela")
+                            if(lastScreenshotAt==requestTime) screenshotInProgress = false
                             return
                         }
                         textRecognizer.process(InputImage.fromBitmap(captured, 0))
                             .addOnSuccessListener { visionText ->
-                                if (stopped || !captureStillValid(pkg, windowId, bounds)) return@addOnSuccessListener
+                                if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) return@addOnSuccessListener
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = visionText.text
@@ -330,7 +375,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                     .lowercase(java.util.Locale.ROOT)
                                 val hasAccept = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
                                     .containsMatchIn(normalized)
-                                val offer = if (hasAccept && Regex("""r\s*\$\s*[0-9]""").containsMatchIn(normalized))
+                                val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized) else null
                                 if (offer == null) {
                                     readerStatus("Imagem lida; oferta sem valor, percurso ou tempo confiável")
@@ -358,19 +403,19 @@ class OfferAccessibilityService : AccessibilityService() {
                             .addOnFailureListener { readerStatus("Falha ao reconhecer a imagem da oferta") }
                             .addOnCompleteListener {
                                 captured.recycle()
-                                screenshotInProgress = false
+                                if(lastScreenshotAt==requestTime) screenshotInProgress = false
                             }
                     }
 
                     override fun onFailure(errorCode: Int) {
-                        screenshotInProgress = false
+                        if(lastScreenshotAt==requestTime) screenshotInProgress = false
                         readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
                     }
                 }
             if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotExecutor, callback)
             else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor, callback)
         } catch (_: Exception) {
-            screenshotInProgress = false
+            if(lastScreenshotAt==requestTime) screenshotInProgress = false
             readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
         }
     }
@@ -390,7 +435,7 @@ class OfferAccessibilityService : AccessibilityService() {
             "encerrar viagem", "finalizar viagem", "em viagem", "cheguei"
         ).any { normalized.contains(it) }
 
-        return hasAcceptAction && hasVisibleAcceptAction(root) && hasFare && hasOfferMetrics && !isNavigationOrTrip
+        return IncomingOfferPolicy.isIncoming(root.packageName?.toString().orEmpty(),rawText) && hasFare && hasOfferMetrics && !isNavigationOrTrip
     }
 
     private fun normalizeActionText(value: CharSequence?): String {
@@ -434,51 +479,72 @@ class OfferAccessibilityService : AccessibilityService() {
             prefs.getFloat("good_rating", 4.90f).toDouble()
         ) ?: return // Dados incompletos não apagam uma etiqueta válida já exibida.
         readerStatus("Oferta detectada em ${driverAppName(sourcePackage)}")
+        prefs.edit().putLong("reader_last_detection",System.currentTimeMillis()).apply()
         // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
         JourneyStore.record(this, offer, result, sourcePackage)
         showOffer(result, offer, anchor, sourcePackage)
     }
 
-    private fun visibleDriverPackages(): List<String> = try {
-        windows.filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION }
-            .mapNotNull { window ->
-                val root = window.root ?: return@mapNotNull null
-                try {
-                    val pkg = root.packageName?.toString() ?: return@mapNotNull null
-                    val bounds = Rect().also { root.getBoundsInScreen(it) }
-                    pkg.takeIf { root.isVisibleToUser && !bounds.isEmpty && driverAppName(pkg) != null }
-                } finally { root.recycle() }
-            }.distinct().sortedBy { lastCaptureByPackage[it] ?: 0L }
-    } catch (_: Exception) { emptyList() }
+    private fun driverWindow(pkg: String): Pair<Int,Rect>? {
+        for(window in windows) {
+            if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
+            val bounds=Rect().also{window.getBoundsInScreen(it)}
+            if(bounds.isEmpty)continue
+            val root=window.root ?: rootInActiveWindow?.let { if(it.windowId==window.id) it else {it.recycle();null} }
+            if(root!=null)try {
+                if(root.packageName?.toString()?.equals(pkg,true)==true &&
+                    (root.isVisibleToUser || window.isActive || window.isFocused))return window.id to bounds
+            } finally {root.recycle()}
+        }
+        val root=rootInActiveWindow ?: return null
+        return try {
+            val bounds=Rect().also{root.getBoundsInScreen(it)}
+            if(root.packageName?.toString()?.equals(pkg,true)==true && !bounds.isEmpty)root.windowId to bounds else null
+        } finally {root.recycle()}
+    }
+
+    private fun visibleDriverPackages(): List<String> {
+        val packages=linkedSetOf<String>()
+        for(window in windows) {
+            if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
+            val root=window.root ?: continue
+            try {
+                val pkg=root.packageName?.toString() ?: continue
+                val bounds=Rect().also{window.getBoundsInScreen(it)}
+                if(!bounds.isEmpty && (root.isVisibleToUser || window.isActive || window.isFocused) && driverAppName(pkg)!=null)packages.add(pkg)
+            } finally {root.recycle()}
+        }
+        // Some OEMs briefly return no interactive roots while the active root is available.
+        rootInActiveWindow?.let {root->try {root.packageName?.toString()?.takeIf{driverAppName(it)!=null}?.let{packages.add(it)}}finally{root.recycle()}}
+        return packages.sortedBy {lastCaptureByPackage[it]?:0L}
+    }
 
     private val lastCaptureByPackage = mutableMapOf<String, Long>()
     private fun captureStillValid(pkg: String, id: Int, bounds: Rect): Boolean {
-        val root = findDriverWindowRoot(pkg) ?: return false
-        return try { val current = Rect(); root.getBoundsInScreen(current); root.windowId == id && current == bounds }
-        finally { root.recycle() }
+        val current=driverWindow(pkg) ?: return false
+        return readingEnabled() && current.first==id && current.second==bounds
     }
 
     private fun findDriverWindowRoot(pkg: String): AccessibilityNodeInfo? {
-        return try {
-            windows.firstNotNullOfOrNull { window ->
-                if (window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) return@firstNotNullOfOrNull null
-                val candidate = window.root ?: return@firstNotNullOfOrNull null
-                val rootPackage = candidate.packageName?.toString()?.lowercase().orEmpty()
-                if (rootPackage == pkg.lowercase() && candidate.isVisibleToUser) candidate
-                else { candidate.recycle(); null }
-            }
-        } catch (_: Exception) { null }
+        for(window in windows) {
+            if(window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
+            val candidate=window.root ?: continue
+            if(candidate.packageName?.toString()?.equals(pkg,true)==true &&
+                (candidate.isVisibleToUser || window.isActive || window.isFocused))return candidate
+            candidate.recycle()
+        }
+        return rootInActiveWindow?.let {if(it.packageName?.toString()?.equals(pkg,true)==true)it else {it.recycle();null}}
     }
 
-    private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
-        if (!node.isVisibleToUser) return
+    private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth:Int=0) {
+        if (depth>60 || out.length>30000) return
         val text = node.text?.toString()?.trim().orEmpty()
         val description = node.contentDescription?.toString()?.trim().orEmpty()
         if (text.isNotEmpty()) out.append(text).append('\n')
         if (description.isNotEmpty() && description != text) out.append(description).append('\n')
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { child ->
-                collectText(child, out)
+                collectText(child, out, depth+1)
                 child.recycle()
             }
         }
@@ -612,8 +678,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun reflowOverlay(pkg: String) {
         val view = overlays[pkg] ?: return
         val params = overlayParams[pkg] ?: return
-        val root = findDriverWindowRoot(pkg) ?: return
-        val pane = Rect(); root.getBoundsInScreen(pane); root.recycle()
+        val pane = driverWindow(pkg)?.second ?: return
         if (pane.isEmpty) return
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val width = dp((310 * prefs.getInt("overlay_scale", 100).coerceIn(65, 130) / 100f).toInt()).coerceAtMost((pane.width()-dp(12)).coerceAtLeast(dp(100)))

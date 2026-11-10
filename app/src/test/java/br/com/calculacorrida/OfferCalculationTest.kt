@@ -86,4 +86,29 @@ Aceitar""")!!
         assertEquals(6.6,offer.pickupKm+offer.tripKm,0.000001)
         assertNull(OfferTextParser.parse("R$ 8,96 R$3,89 18 min • 6.6 km Aceitar"))
     }
+    @Test fun fullScreen99WithoutAcceptAndWithDynamicBaseFare() {
+        val text="""Não afeta a TA
+R$11,90 1,2x
+R$2,95 Tarifa base dinâmica inicial.
+4,79 · +999 corridas · Perfil Premium
+10min (4,4km)
+Rua Belém, 44
+12min (6km)
+Rua Getúlio Vargas, 73"""
+        assertTrue(IncomingOfferPolicy.isIncoming("com.taxis99",text))
+        assertFalse(IncomingOfferPolicy.isIncoming("com.ubercab.driver",text))
+        val o=OfferTextParser.parse(text)!!
+        assertEquals(11.90,o.fare,0.000001);assertEquals(22.0,o.minutes,0.000001)
+        assertEquals(10.4,o.pickupKm+o.tripKm,0.000001);assertEquals("4.79",o.passengerRating)
+        assertFalse(IncomingOfferPolicy.isIncoming("com.taxis99",text+" Em viagem"))
+    }
+    @Test fun floatingUberAndSmallWindowReferences() {
+        for((fare,summary,legs,note) in listOf(
+            listOf("17,37","26 min · 16.4 km","12 min (9.3 km) 14 minutos (7.1 km)","4,98 (303)"),
+            listOf("11,03","14 min · 10.8 km","4 min (2.9 km) 10 minutos (7.9 km)","4,92 (120)"))) {
+            val text="R$ $fare $summary Est. de R$1,02/km $note $legs Tenho interesse"
+            assertTrue(IncomingOfferPolicy.isIncoming("com.ubercab.driver",text))
+            assertNotNull(OfferTextParser.parse(text))
+        }
+    }
 }

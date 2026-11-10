@@ -29,7 +29,7 @@ class CardStyleActivity : Activity() {
         toggle("Comentário da IA","card_ai",false)
         title("APARÊNCIA",13)
         toggle("Aviso em destaque","card_banner",true)
-        toggle("Exibir o motivo","card_reason",true)
+        toggle("Exibir o motivo","card_compact_reason",false)
         title("Posição do aviso",16)
         choices(listOf("Acima do cartão","Abaixo do cartão"),if(prefs.getString("card_banner_position","above")=="above")0 else 1){prefs.edit().putString("card_banner_position",if(it==0)"above" else "below").apply();refresh()}
         title("Tema",16)
@@ -38,6 +38,9 @@ class CardStyleActivity : Activity() {
         title("Tamanho do cartão",16)
         val size=TextView(this).apply{setTextColor(Color.DKGRAY)};page.addView(size)
         page.addView(SeekBar(this).apply{max=65;progress=prefs.getInt("overlay_scale",100)-65;setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{override fun onProgressChanged(v:SeekBar?,n:Int,user:Boolean){size.text="${n+65}%";if(user){prefs.edit().putInt("overlay_scale",n+65).apply();refresh()}};override fun onStartTrackingTouch(v:SeekBar?){};override fun onStopTrackingTouch(v:SeekBar?) {}});size.text="${progress+65}%"})
+        title("Permanência da última leitura",16)
+        val holds=listOf(20,30,60)
+        choices(listOf("20 segundos","30 segundos","60 segundos"),holds.indexOf(prefs.getInt("card_hold_seconds",20)).coerceAtLeast(0)){prefs.edit().putInt("card_hold_seconds",holds[it]).apply()}
         title("Posição inicial por aplicativo",16)
         listOf("UBER","99","INDRIVE","IFOOD").forEach {app->title(app,13);choices(listOf("Esquerda","Centro","Direita"),prefs.getInt("card_position_$app",0)){prefs.edit().putInt("card_position_$app",it).apply()}}
         title("Arraste o cartão para ajustar a posição durante a leitura. Os cálculos aparecem antes da resposta da IA.",13)

@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <application android:label="Synthetic reader fixture" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false">
         <activity android:name="br.com.calculacorrida.fixture.OfferFixtureActivity" android:exported="true" android:resizeableActivity="true" />
     </application>

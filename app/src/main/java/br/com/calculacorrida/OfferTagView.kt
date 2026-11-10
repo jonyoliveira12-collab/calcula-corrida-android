@@ -34,13 +34,13 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         val fg=if(dark) Color.WHITE else Color.rgb(22,24,27)
         val muted=if(dark) Color.LTGRAY else Color.rgb(112,116,123)
         val fill=when(theme){"colored"->color;"dark"->Color.rgb(20,22,27);else->Color.WHITE}
-        banner.text=label+(if(prefs.getBoolean("card_reason",true)) "  • "+(reason?.trim()?.trimEnd('.') ?: when {
+        banner.text="● "+when(label){"ACEITAR","BOA CORRIDA"->"BOA";"ATENÇÃO"->"ANALISAR";else->label}+(if(prefs.getBoolean("card_compact_reason",false)) "  • "+(reason?.trim()?.trimEnd('.') ?: when {
             pickupMinutes!=null && pickupMinutes>=10 -> "Embarque (${duration(pickupMinutes)})"
             label=="RECUSAR" -> "Abaixo dos seus limites"
             label=="ACEITAR" -> "Dentro dos seus limites"
             else -> "Confira os indicadores"
         }) else "")
-        banner.background=rounded(color,color);banner.setPadding(dp(10),dp(6),dp(8),dp(6))
+        banner.setTextColor(color);banner.textSize=12f;banner.background=null;banner.setPadding(dp(4),dp(2),dp(4),dp(2))
         summary.text="$source  ${duration(minutes)} • ${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
         summary.setTextColor(fg)
         val header=LinearLayout(context).apply {gravity=Gravity.CENTER_VERTICAL}

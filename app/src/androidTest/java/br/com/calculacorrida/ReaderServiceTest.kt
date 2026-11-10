@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ReaderServiceTest {
-    @Test fun ccAppearsAndLeavesUnrelatedApps() {
+    @Test fun ccPersistsInBackgroundAndStopsWhenDisabled() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val ui = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
@@ -39,6 +39,8 @@ class ReaderServiceTest {
             instrumentation.waitForIdleSync()
             await(true)
             context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            await(true)
+            context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",false).putBoolean("traffic_enabled",false).commit()
             await(false)
         } finally {
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",false).commit()

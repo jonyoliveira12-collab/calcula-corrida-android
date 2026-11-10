@@ -211,13 +211,29 @@ class MainActivity : Activity() {
         val serviceOn = isAccessibilityEnabled()
         diagnostics.addView(label("LEITURA DE OFERTAS", 12f, gold, true))
         diagnostics.addView(label(if (!serviceOn) "Acessibilidade desligada: ative nos ajustes" else prefs.getString("reader_status", "Serviço ativado; aguardando conexão") ?: "Aguardando oferta", 13f, white, false, 6, 2))
+        val heartbeat=prefs.getLong("reader_heartbeat",0)
+        val alive=serviceOn && System.currentTimeMillis()-heartbeat in 0..10000
+        diagnostics.addView(label(if(alive) "Serviço respondendo em segundo plano" else "Serviço sem resposta recente; confira a acessibilidade",12f,if(alive)green else red))
+        diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
+            prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
+        })
+        diagnostics.addView(action("COPIAR DIAGNÓSTICO", false) {
+            val report=listOf("JHONDRIVER ${packageManager.getPackageInfo(packageName,0).versionName}","Android ${android.os.Build.VERSION.RELEASE} • ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+                "Acessibilidade: $serviceOn • Serviço respondendo: $alive • Sobreposição: ${Settings.canDrawOverlays(this)}",
+                "Copiloto: ${prefs.getBoolean("copilot_enabled",false)} • Semáforo: ${prefs.getBoolean("traffic_enabled",false)} • Pausa: ${prefs.getBoolean("reader_paused",false)}",
+                "Estado: ${prefs.getString("reader_status","Sem registro")}","Último app: ${prefs.getString("reader_last_app","—")}",
+                "Última captura: ${prefs.getLong("reader_last_capture",0)} • Última detecção: ${prefs.getLong("reader_last_detection",0)}",
+                "IA: ${prefs.getString("ai_status","Aguardando oferta")}").joinToString("\n")
+            (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico JHONDRIVER",report))
+            android.widget.Toast.makeText(this,"Diagnóstico copiado; não inclui imagem, endereço nem chave",android.widget.Toast.LENGTH_LONG).show()
+        })
         diagnostics.addView(action("ABRIR AJUSTES DE LEITURA  ›", false) { showTab("Perfil") })
         diagnostics.addView(label(prefs.getString("ai_status", "IA: aguardando oferta") ?: "IA: aguardando oferta", 12f, muted, false, 4, 0))
         content.addView(diagnostics, margin(0,10))
         val status = horizontal().apply { setPadding(dp(4), dp(12), dp(4), dp(4)) }
         status.addView(label("PAINEL DO MOTORISTA", 11f, gold, true), weight())
         val online = isOperationalOnline()
-        status.addView(pill(if (online) "● ONLINE" else "● LEITURA PAUSADA", if (online) green else muted))
+        status.addView(pill(if (online) "● LEITURA ATIVA" else "● LEITURA PAUSADA", if (online) green else muted))
         content.addView(status)
 
         val controls = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
@@ -240,7 +256,7 @@ class MainActivity : Activity() {
                             adjusting = false
                             prefs.edit().putBoolean(key, false).apply()
                         } else {
-                            prefs.edit().putBoolean(key, enabled).remove("reader_pending_feature").remove("reader_permission_step").apply()
+                            prefs.edit().putBoolean(key, enabled).putBoolean("reader_paused", false).remove("reader_pending_feature").remove("reader_permission_step").apply()
                         }
                     }
                 }
@@ -329,7 +345,7 @@ class MainActivity : Activity() {
 
     private fun isOperationalOnline(): Boolean {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        return NetworkGate.isOnline(this) &&
+        return !prefs.getBoolean("reader_paused",false) &&
             (prefs.getBoolean("copilot_enabled", false) || prefs.getBoolean("traffic_enabled", false)) &&
             Settings.canDrawOverlays(this) && isAccessibilityEnabled()
     }

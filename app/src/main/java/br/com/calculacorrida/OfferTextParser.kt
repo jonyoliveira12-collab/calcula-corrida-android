@@ -34,6 +34,7 @@ object OfferTextParser {
             val after = text.substring(match.range.last + 1).trimStart()
             val before = text.substring(0, match.range.first).trimEnd()
             // A rate or a separately labelled bonus is not the total fare.
+            !Regex("""^tarifa\s+base\s+din[aâ]mica""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
             !Regex("""^(?:/\s*|por\s+)(?:km|h(?:ora)?s?|min)\b""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
                 !Regex("""(?:\+|b[oô]nus\s*[:+]?|adicional\s*[:+]?)$""", RegexOption.IGNORE_CASE).containsMatchIn(before)
         }.mapNotNull { it.groupValues[1].let(::toNumber) }.distinct().toList()
@@ -130,7 +131,7 @@ object OfferTextParser {
         ).find(text)?.groupValues?.get(1)
         if (labeled != null) return normalizeRating(labeled)
         val besideTrips = Regex(
-            """([0-5][,.][0-9]{1,2})\s*(?:[·•|]\s*)?[0-9]+\s*corridas?""",
+            """([0-5][,.][0-9]{1,2})\s*(?:[·•|]\s*)?\+?[0-9]+\s*corridas?""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (besideTrips != null) return normalizeRating(besideTrips)
