@@ -126,9 +126,11 @@ class OfferAccessibilityService : AccessibilityService() {
                 bubbleOwner?.let { target ->
                     val root = findDriverWindowRoot(target)
                     if (root != null) { val pane=Rect();root.getBoundsInScreen(pane);root.recycle()
+                        if(pane.width()>=dp(160) && pane.height()>=dp(100)) {
                         params.x=params.x.coerceIn(pane.left,(pane.right-dp(48)).coerceAtLeast(pane.left))
                         params.y=params.y.coerceIn(pane.top,(pane.bottom-dp(48)).coerceAtLeast(pane.top))
                         try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(bubble,params) } catch (_: Exception) {}
+                        }
                     }
                 }
             }
@@ -315,6 +317,10 @@ class OfferAccessibilityService : AccessibilityService() {
         val target=driverWindow(pkg) ?: run { readerStatus("${driverAppName(pkg)}: janela ainda indisponível para captura"); return }
         val windowId = target.first
         val bounds = target.second
+        if(bounds.width()<dp(160) || bounds.height()<dp(100)) {
+            readerStatus("${driverAppName(pkg)}: aguardando cartão da oferta; apenas a bolinha está visível")
+            return
+        }
         if (Build.VERSION.SDK_INT < 34 && (foregroundPackage != pkg ||
             bounds.width() < resources.displayMetrics.widthPixels * 0.9 ||
             bounds.height() < resources.displayMetrics.heightPixels * 0.85 ||
@@ -696,7 +702,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val view = overlays[pkg] ?: return
         val params = overlayParams[pkg] ?: return
         val pane = driverWindow(pkg)?.second ?: return
-        if (pane.isEmpty) return
+        if (pane.isEmpty || pane.width()<dp(160) || pane.height()<dp(100)) return
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val width = dp((310 * prefs.getInt("overlay_scale", 100).coerceIn(65, 130) / 100f).toInt()).coerceAtMost((pane.width()-dp(12)).coerceAtLeast(dp(100)))
         params.width = width
