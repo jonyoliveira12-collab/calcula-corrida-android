@@ -31,9 +31,13 @@ public class OfferFixtureActivity extends Activity {
                 if(floating)lines=new String[]{"R$ 17,37","26 min • 16.4 km","4,98 (303)","12 min (9.3 km)","14 minutos (7.1 km)","Tenho interesse"};
                 if(getPackageName().equals("com.taxis99"))lines=new String[]{"Não afeta a TA","R$11,90","R$2,95 Tarifa base dinâmica inicial.","4,79 · +999 corridas · Perfil Premium","10min (4,4km)","12min (6km)"};
                 if(getPackageName().equals("sinet.startup.inDriver"))lines=new String[]{"R$ 30,00","30 min • 12.0 km","Nota 4,90","5 min (2.0 km)","25 min (10.0 km)","Aceitar"};
-                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,(35+i*32)*d,paint);
+                float first=floating?35*d:("small".equals(layout)?getHeight()*0.42f:Math.max(35*d,getHeight()-210*d));
+                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*32*d,paint);
             }
         };
+        offer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        offer.setContentDescription("Synthetic driver offer pixels");
+        offer.setClickable(true);
         if(floating) {
             setContentView(new View(this));
             float d=getResources().getDisplayMetrics().density;

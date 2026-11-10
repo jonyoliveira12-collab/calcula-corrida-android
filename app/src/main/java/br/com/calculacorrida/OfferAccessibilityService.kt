@@ -406,12 +406,30 @@ class OfferAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun prepareOfferRegion(pkg:String,bitmap:Bitmap):Bitmap {
+        // Offer panels are normally below the map. Isolated floating cards stay whole.
+        var image=bitmap
+        if(bitmap.height>=dp(320)) {
+            val fraction=if((driverAppName(pkg)=="99") && bitmap.height>bitmap.width)0.55f else 0.72f
+            val top=(bitmap.height*(1f-fraction)).toInt()
+            image=Bitmap.createBitmap(bitmap,0,top,bitmap.width,bitmap.height-top)
+        }
+        val factor=kotlin.math.sqrt(1_200_000.0/(image.width.toDouble()*image.height)).coerceAtMost(1.0)
+        if(factor<1.0) {
+            val scaled=Bitmap.createScaledBitmap(image,(image.width*factor).toInt().coerceAtLeast(1),(image.height*factor).toInt().coerceAtLeast(1),true)
+            if(image!==bitmap && scaled!==image)image.recycle()
+            image=scaled
+        }
+        return image
+    }
+
     private fun recognizeCaptured(pkg:String,windowId:Int,bounds:Rect,captured:Bitmap,requestTime:Long,index:Int=0) {
-        val angles=intArrayOf(0,90,270,180)
+        val angles=intArrayOf(0,0,90,270,180)
+        val image=if(index==0)prepareOfferRegion(pkg,captured) else captured
         val ocrStarted=android.os.SystemClock.elapsedRealtime()
         var retry=false
         try {
-                        textRecognizer.process(InputImage.fromBitmap(captured, angles[index]))
+                        textRecognizer.process(InputImage.fromBitmap(image, angles[index]))
                             .addOnSuccessListener { visionText ->
                                 if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) return@addOnSuccessListener
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -419,10 +437,10 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val recognized = visionText.text
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized) else null
-                                prefs.edit().putString("reader_ocr_status","Rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms").apply()
+                                prefs.edit().putString("reader_ocr_status","Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms").apply()
                                 if(offer==null && index<angles.lastIndex) {
                                     retry=true
-                                    recognizeCaptured(pkg,windowId,bounds,captured,requestTime,index+1)
+                                    recognizeCaptured(pkg,windowId,bounds,captured,requestTime,if(index==0 && image===captured)2 else index+1)
                                     return@addOnSuccessListener
                                 }
                                 if (offer == null) {
@@ -450,12 +468,14 @@ class OfferAccessibilityService : AccessibilityService() {
                             }
                             .addOnFailureListener { readerStatus("Falha ao reconhecer a imagem da oferta") }
                             .addOnCompleteListener {
+                                if(image!==captured)image.recycle()
                                 if(!retry) {
                                     captured.recycle()
                                     if(lastScreenshotAt==requestTime) screenshotInProgress = false
                                 }
                             }
         } catch (_: Exception) {
+            if(image!==captured)image.recycle()
             captured.recycle()
             if(lastScreenshotAt==requestTime)screenshotInProgress=false
             readerStatus("Reconhecimento indisponível; repetindo leitura")
