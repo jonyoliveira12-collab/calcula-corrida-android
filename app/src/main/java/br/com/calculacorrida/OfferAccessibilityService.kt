@@ -41,13 +41,14 @@ class OfferAccessibilityService : AccessibilityService() {
     private val acceptedOfferSignatures = mutableMapOf<String, String>()
     private var bubble: TextView? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+    private var bubbleOwner: String? = null
     private val screenshotExecutor = Executors.newSingleThreadExecutor()
     private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     @Volatile private var screenshotInProgress = false
     @Volatile private var lastScreenshotAt = 0L
     private val readerHandler = Handler(Looper.getMainLooper())
     private var foregroundPackage: String? = null
-    private var stopped = false
+    @Volatile private var stopped = false
     private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key.startsWith("card_") || key == "overlay_scale")) {
             readerHandler.post { hideAllOverlays() }
@@ -87,6 +88,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun removeBubble() {
         bubble?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
         bubble = null
+        bubbleOwner = null
     }
 
     private fun updateForeground(pkg: String?) {
@@ -102,9 +104,10 @@ class OfferAccessibilityService : AccessibilityService() {
             readerStatus("Falta permitir sobreposição de tela")
             return
         }
+        if (bubbleOwner !in visible) bubbleOwner = visible.firstOrNull()
         if (bubble != null) {
             bubbleParams?.let { params ->
-                visible.firstOrNull()?.let { target ->
+                bubbleOwner?.let { target ->
                     val root = findDriverWindowRoot(target)
                     if (root != null) { val pane=Rect();root.getBoundsInScreen(pane);root.recycle()
                         params.x=params.x.coerceIn(pane.left,(pane.right-dp(48)).coerceAtLeast(pane.left))
@@ -322,9 +325,8 @@ class OfferAccessibilityService : AccessibilityService() {
                                     OfferTextParser.parse(recognized) else null
                                 if (offer == null) {
                                     readerStatus("Imagem lida; oferta sem valor, percurso ou tempo confiável")
-                                    hideOverlay(pkg)
-                                    acceptedSignatures.remove(pkg)
-                                    acceptedOfferSignatures.remove(pkg)
+                                    // A partial OCR frame must not erase a complete recent offer.
+                                    // The per-window expiry removes stale cards if the offer disappears.
                                 } else {
                                     lastOfferSeen[pkg] = android.os.SystemClock.elapsedRealtime()
                                     val signature = listOf(
@@ -621,7 +623,7 @@ class OfferAccessibilityService : AccessibilityService() {
         }
         val view = ensureOverlay(sourcePackage, anchor) ?: return
         val appName = driverAppName(sourcePackage) ?: "APP"
-        view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, offer.passengerRating, color, appName, r.fare, offer.pickupMinutes, offer.pickupKm.takeIf { offer.pickupMinutes != null || it > 0 })
+        view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, offer.passengerRating, color, appName, r.fare, offer.pickupMinutes, offer.pickupKm.takeIf { offer.pickupMinutes != null || it > 0 }, r.reason)
         val generation = android.os.SystemClock.elapsedRealtimeNanos()
         view.tag = generation
         view.setAiInsight("Consultando IA; cálculos locais prontos")

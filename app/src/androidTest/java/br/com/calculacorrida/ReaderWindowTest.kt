@@ -19,6 +19,8 @@ class ReaderWindowTest {
         fun shell(cmd:String)=ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand(cmd)).bufferedReader().use{it.readText().trim()}
         val oldServices=shell("settings get secure enabled_accessibility_services")
         val oldEnabled=shell("settings get secure accessibility_enabled")
+        var focusWindow:android.widget.TextView?=null
+        val wm=context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
         try {
             shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",true).putBoolean("reader_disclosure_accepted",true).commit()
@@ -26,6 +28,18 @@ class ReaderWindowTest {
             shell("settings put secure accessibility_enabled 1")
             shell("wm user-rotation lock 1")
             shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity")
+            instrumentation.runOnMainSync {
+                focusWindow=android.widget.TextView(context).apply {text="Foreground controls";setBackgroundColor(android.graphics.Color.BLUE);isFocusableInTouchMode=true}
+                val params=android.view.WindowManager.LayoutParams(180,90,android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,android.graphics.PixelFormat.TRANSLUCENT)
+                params.gravity=android.view.Gravity.TOP or android.view.Gravity.RIGHT
+                wm.addView(focusWindow,params);focusWindow!!.requestFocus()
+            }
+            Thread.sleep(500)
+            val driverWindow=ui.windows.first {w->val root=w.root;try{root?.packageName?.toString()=="com.ubercab.driver"}finally{root?.recycle()}}
+            assertFalse("Visible driver window has lost input focus",driverWindow.isFocused)
+            // Reset the card after focus moves: an earlier focused-window read cannot satisfy the test.
+            context.getSharedPreferences("settings",0).edit().putBoolean("card_details",true).commit()
+            Thread.sleep(500)
             val start=android.os.SystemClock.elapsedRealtime()
             var found=false
             for(attempt in 0..59){
@@ -35,8 +49,12 @@ class ReaderWindowTest {
                 Thread.sleep(250)
             }
             assertTrue("OCR landscape: "+context.getSharedPreferences("settings",0).getString("reader_status",""),found)
-            assertTrue(android.os.SystemClock.elapsedRealtime()-start<15000)
+            val elapsed=android.os.SystemClock.elapsedRealtime()-start
+            println("LANDSCAPE_UNFOCUSED_OCR_MS=$elapsed")
+            assertTrue(elapsed<15000)
         } finally {
+            instrumentation.runOnMainSync { focusWindow?.let {wm.removeView(it)} }
+            context.getSharedPreferences("settings",0).edit().putBoolean("card_details",false).commit()
             shell("am force-stop com.ubercab.driver")
             shell("wm user-rotation free")
             OfferAccessibilityService.stopReading()

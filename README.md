@@ -52,3 +52,21 @@ A descrição pública do Rota Pro confirma uso de acessibilidade para ler ofert
 
 - [Descrição no Google Play](https://play.google.com/store/apps/details?id=app.rotapro&hl=pt-BR)
 - [Guia de permissões](https://rotapro.app/ajuda/primeiros-passos/)
+
+
+### Compact offer card (0.4.2)
+
+Semáforo → Estilo do cartão opens a light preview/settings screen. R$/km, R$/hour,
+passenger rating, pickup details and AI commentary can be individually shown or
+hidden. The warning can appear above or below, in light/dark/colored themes.
+The reader enumerates visible allowlisted driver windows, including unfocused
+windows, and on Android 14+ captures only the selected window for OCR. A capture
+is discarded if that window disappears or changes bounds during recognition.
+Overlay size and placement are clamped to the owning app window after rotation.
+
+`reader-fixture` is an emulator-only synthetic pixel fixture, installed under the
+allowlisted Uber package solely in the isolated CI emulator. It contains no Uber
+code, account or networking. It is never included in or distributed with the
+JHONDRIVER APK. The instrumentation test rotates the emulator and moves focus
+to another overlay before checking OCR. Synthetic fixtures cannot certify
+coverage of all real driver-app versions, multiwindow layouts or bank acceptance.

@@ -27,19 +27,19 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     private fun amount(n:Double)=String.format(Locale.forLanguageTag("pt-BR"),"%.2f",n)
     private fun duration(n:Double)=if(n%1.0==0.0) "${n.toInt()} min" else String.format(Locale.forLanguageTag("pt-BR"),"%.1f min",n)
     private fun rounded(fill:Int,stroke:Int)=GradientDrawable().apply {setColor(fill);cornerRadius=dp(10).toFloat();setStroke(dp(1),stroke)}
-    fun setOffer(label:String,minutes:Double,totalKm:Double,valuePerKm:Double,valuePerHour:Double,rating:String?,color:Int,source:String="APP",fareValue:Double?=null,pickupMinutes:Double?=null,pickupKm:Double?=null) {
+    fun setOffer(label:String,minutes:Double,totalKm:Double,valuePerKm:Double,valuePerHour:Double,rating:String?,color:Int,source:String="APP",fareValue:Double?=null,pickupMinutes:Double?=null,pickupKm:Double?=null,reason:String?=null) {
         removeAllViews();body.removeAllViews();metrics.removeAllViews()
         val theme=prefs.getString("card_theme","light")
         val dark=theme=="dark" || theme=="colored"
         val fg=if(dark) Color.WHITE else Color.rgb(22,24,27)
         val muted=if(dark) Color.LTGRAY else Color.rgb(112,116,123)
         val fill=when(theme){"colored"->color;"dark"->Color.rgb(20,22,27);else->Color.WHITE}
-        banner.text=label+(if(prefs.getBoolean("card_reason",true)) "  • "+when {
+        banner.text=label+(if(prefs.getBoolean("card_reason",true)) "  • "+(reason?.trim()?.trimEnd('.') ?: when {
             pickupMinutes!=null && pickupMinutes>=10 -> "Embarque (${duration(pickupMinutes)})"
             label=="RECUSAR" -> "Abaixo dos seus limites"
             label=="ACEITAR" -> "Dentro dos seus limites"
             else -> "Confira os indicadores"
-        } else "")
+        }) else "")
         banner.background=rounded(color,color);banner.setPadding(dp(10),dp(6),dp(8),dp(6))
         summary.text="$source  ${duration(minutes)} • ${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
         summary.setTextColor(fg)
@@ -47,17 +47,23 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         header.addView(summary,LayoutParams(0,-2,1f))
         header.addView(line(19f,muted,true).apply{text="×";gravity=Gravity.CENTER;contentDescription="Fechar análise da oferta"},LayoutParams(dp(25),dp(25)))
         body.addView(header)
-        fun metric(key:String,title:String,value:String) {
+        fun metric(key:String,title:String,value:String,indicator:Int) {
             if(!prefs.getBoolean(key,true)) return
             val col=LinearLayout(context).apply {orientation=VERTICAL;setPadding(dp(3),dp(3),dp(3),0)}
             col.addView(line(11f,muted).apply{text=title})
             col.addView(line(30f,fg,true).apply{text=value;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(16,30,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
-            col.addView(View(context).apply{setBackgroundColor(if(theme=="colored")Color.WHITE else color)},LayoutParams(-1,dp(2)))
+            col.addView(View(context).apply{setBackgroundColor(if(theme=="colored")Color.WHITE else indicator)},LayoutParams(-1,dp(2)))
             metrics.addView(col,LayoutParams(0,-2,1f))
         }
-        metric("card_km","R$/Km",amount(valuePerKm))
-        metric("card_hour","R$/Hora",amount(valuePerHour))
-        metric("card_rating","Nota",rating?.replace('.',',')?:"—")
+        fun indicator(value:Double?,low:String,high:String,lowDefault:Float,highDefault:Float):Int = when {
+            value==null -> Color.GRAY
+            value < prefs.getFloat(low,lowDefault) -> Color.rgb(209,48,57)
+            value >= prefs.getFloat(high,highDefault) -> Color.rgb(0,146,99)
+            else -> Color.rgb(217,152,22)
+        }
+        metric("card_km","R$/Km",amount(valuePerKm),indicator(valuePerKm,"bad_per_km","min_per_km",1.5f,1.8f))
+        metric("card_hour","R$/Hora",amount(valuePerHour),indicator(valuePerHour,"min_per_hour","good_per_hour",50f,60f))
+        metric("card_rating","Nota",rating?.replace('.',',')?:"—",indicator(rating?.replace(',','.')?.toDoubleOrNull(),"min_rating","good_rating",4.8f,4.9f))
         body.addView(metrics)
         details.setTextColor(muted)
         details.text="Embarque: "+(pickupMinutes?.let(::duration)?:"—")+(pickupKm?.let{" • ${amount(it)} km"}?:"")

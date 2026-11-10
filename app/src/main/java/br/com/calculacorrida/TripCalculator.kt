@@ -49,7 +49,9 @@ object TripCalculator {
         }
 
         val reason = when {
-            lowRating -> "Nota do passageiro abaixo de 4,80."
+            lowRating -> "Nota abaixo de " + String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", minPassengerRating) + "."
+            perKm < badPerKm -> "Ganho por km abaixo do seu limite."
+            perHour < badPerHour -> "Ganho por hora abaixo do seu limite."
             passengerRating != null && passengerRating < goodPassengerRating ->
                 "Nota do passageiro na faixa de atenção."
             passengerRating == null ->
