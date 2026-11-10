@@ -117,8 +117,10 @@ class OfferAccessibilityService : AccessibilityService() {
             return
         }
         bubble?.apply {
-            text=if(readingEnabled())"CC" else "Ⅱ"
-            contentDescription=if(readingEnabled())"Copiloto CC ativo em segundo plano" else "Copiloto CC pausado"
+            val label=if(readingEnabled())"CC" else "Ⅱ"
+            val description=if(readingEnabled())"Copiloto CC ativo em segundo plano" else "Copiloto CC pausado"
+            if(text.toString()!=label)text=label
+            if(contentDescription?.toString()!=description)contentDescription=description
         }
         if (bubbleOwner !in visible) bubbleOwner = visible.firstOrNull()
         if (bubble != null) {
@@ -127,9 +129,10 @@ class OfferAccessibilityService : AccessibilityService() {
                     val root = findDriverWindowRoot(target)
                     if (root != null) { val pane=Rect();root.getBoundsInScreen(pane);root.recycle()
                         if(pane.width()>=dp(160) && pane.height()>=dp(100)) {
+                        val oldX=params.x;val oldY=params.y
                         params.x=params.x.coerceIn(pane.left,(pane.right-dp(48)).coerceAtLeast(pane.left))
                         params.y=params.y.coerceIn(pane.top,(pane.bottom-dp(48)).coerceAtLeast(pane.top))
-                        try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(bubble,params) } catch (_: Exception) {}
+                        if(oldX!=params.x || oldY!=params.y)try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(bubble,params) } catch (_: Exception) {}
                         }
                     }
                 }
@@ -717,11 +720,13 @@ class OfferAccessibilityService : AccessibilityService() {
         if (pane.isEmpty || pane.width()<dp(160) || pane.height()<dp(100)) return
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val width = dp((310 * prefs.getInt("overlay_scale", 100).coerceIn(65, 130) / 100f).toInt()).coerceAtMost((pane.width()-dp(12)).coerceAtLeast(dp(100)))
+        val oldWidth=params.width;val oldX=params.x;val oldY=params.y
         params.width = width
         val maxX = (pane.right-width-dp(4)).coerceAtLeast(pane.left)
         params.x = params.x.coerceIn(pane.left, maxX)
         params.y = params.y.coerceIn(pane.top, (pane.bottom-view.height-dp(4)).coerceAtLeast(pane.top))
-        try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view, params) } catch (_: Exception) {}
+        if(oldWidth!=params.width || oldX!=params.x || oldY!=params.y)
+            try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view, params) } catch (_: Exception) {}
     }
 
     private fun showOffer(r: TripResult, offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
