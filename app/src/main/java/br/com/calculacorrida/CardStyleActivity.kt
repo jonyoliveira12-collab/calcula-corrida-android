@@ -16,7 +16,8 @@ class CardStyleActivity : Activity() {
     override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);window.statusBarColor=Color.WHITE;window.navigationBarColor=Color.WHITE;window.decorView.systemUiVisibility=android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         page=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(16),dp(18),dp(24));setBackgroundColor(Color.rgb(246,245,243))}
         setContentView(ScrollView(this).apply{addView(page)})
-        title("‹  Estilo do cartão",24)
+        page.addView(Button(this).apply{text="‹  Voltar";isAllCaps=false;setOnClickListener{finish()}})
+        title("Estilo do cartão",24)
         title("Prévia da oferta",15)
         choices(listOf("Recusar","Atenção","Aceitar"),0){state=it;refresh()}
         preview=OfferTagView(this);page.addView(preview,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10);bottomMargin=dp(20)})

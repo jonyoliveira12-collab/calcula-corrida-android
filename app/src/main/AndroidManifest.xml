@@ -7,7 +7,7 @@
         <activity android:name=".LoginActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
-        <activity android:name=".CardStyleActivity" android:exported="false" />
+        <activity android:name=".CardStyleActivity" android:theme="@style/CardSettingsTheme" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="false" />
         <service android:name=".OfferAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true" android:label="@string/reading_service_name">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>

@@ -11,4 +11,12 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
+    <style name="CardSettingsTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#008D70</item>
+        <item name="colorSecondary">#008D70</item>
+        <item name="android:colorBackground">#F6F5F3</item>
+        <item name="android:windowBackground">#F6F5F3</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
 </resources>

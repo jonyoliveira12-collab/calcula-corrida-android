@@ -20,4 +20,40 @@ class OfferCardTest {
             for(expected in listOf("R$ 18,40","3 min","4,95","R$ 1,46/km","R$ 39,43/h","28 min")) assertTrue(text,text.contains(expected))
         }
     }
+    @Test fun compactThemesAndOptionalFieldsRenderWithoutOverflow() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val prefs=context.getSharedPreferences("settings",0)
+        val original=prefs.all
+        try {
+            for(theme in listOf("light","dark","colored")) {
+                prefs.edit().putString("card_theme",theme).putBoolean("card_details",false).putBoolean("card_ai",false).commit()
+                instrumentation.runOnMainSync {
+                    val view=OfferTagView(context)
+                    view.setOffer("RECUSAR",31.0,19.1,1.51,55.76,"4.76",Color.rgb(209,48,57),"UBER",28.81,6.0,2.2)
+                    val width=(310*context.resources.displayMetrics.density).toInt()
+                    view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(0,android.view.View.MeasureSpec.UNSPECIFIED))
+                    view.layout(0,0,width,view.measuredHeight)
+                    assertTrue("Compact card height",view.height<200*context.resources.displayMetrics.density)
+                    val bitmap=android.graphics.Bitmap.createBitmap(width,view.height,android.graphics.Bitmap.Config.ARGB_8888)
+                    view.draw(android.graphics.Canvas(bitmap))
+                    val dir=java.io.File(context.filesDir,"screenshots").apply{mkdirs()}
+                    java.io.File(dir,"card-$theme.png").outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
+                    bitmap.recycle()
+                }
+            }
+            prefs.edit().putBoolean("card_km",false).putBoolean("card_hour",false).putBoolean("card_rating",false).commit()
+            instrumentation.runOnMainSync {
+                val view=OfferTagView(context)
+                view.setOffer("ATENÇÃO",31.0,19.1,1.51,55.76,"4.76",Color.YELLOW)
+                fun texts(v:android.view.View):List<String> = if(v is android.view.ViewGroup)(0 until v.childCount).flatMap{texts(v.getChildAt(it))} else if(v is android.widget.TextView)listOf(v.text.toString())else emptyList()
+                val rendered=texts(view)
+                assertFalse(rendered.contains("R$/Km"));assertFalse(rendered.contains("R$/Hora"));assertFalse(rendered.contains("Nota"))
+            }
+        } finally {
+            val edit=prefs.edit().clear()
+            original.forEach{(k,v)->when(v){is Boolean->edit.putBoolean(k,v);is String->edit.putString(k,v);is Int->edit.putInt(k,v);is Float->edit.putFloat(k,v);is Long->edit.putLong(k,v)}}
+            edit.commit()
+        }
+    }
 }

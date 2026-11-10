@@ -63,7 +63,18 @@ jobs:
           target: google_apis
           disable-animations: true
           script: |
-            gradle --no-daemon connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest
+            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb install -r reader-fixture/build/outputs/apk/debug/reader-fixture-debug.apk
+            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.ReaderWindowTest br.com.calculacorrida.teste.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
+            adb exec-out run-as br.com.calculacorrida.teste tar -cf - files/screenshots > card-previews.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: card-previews
+          path: card-previews.tar
+          if-no-files-found: error
 
   publish:
     needs: test

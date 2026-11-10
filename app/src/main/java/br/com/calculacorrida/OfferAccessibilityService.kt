@@ -48,6 +48,11 @@ class OfferAccessibilityService : AccessibilityService() {
     private val readerHandler = Handler(Looper.getMainLooper())
     private var foregroundPackage: String? = null
     private var stopped = false
+    private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key != null && (key.startsWith("card_") || key == "overlay_scale")) {
+            readerHandler.post { hideAllOverlays() }
+        }
+    }
     private val lastOfferSeen = mutableMapOf<String, Long>()
     private val poll = object : Runnable {
         override fun run() {
@@ -165,6 +170,7 @@ class OfferAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         active = this
+        getSharedPreferences("settings", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(appearanceListener)
         NetworkGate.register(this, networkCallback)
         stopped = false
         readerStatus("Serviço conectado; aguardando app de motorista")
@@ -655,6 +661,7 @@ class OfferAccessibilityService : AccessibilityService() {
         stopped = true
         readerHandler.removeCallbacksAndMessages(null)
         active = null
+        getSharedPreferences("settings", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(appearanceListener)
         readerStatus("Leitura desligada")
         NetworkGate.unregister(this, networkCallback)
         overlays.values.forEach { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
