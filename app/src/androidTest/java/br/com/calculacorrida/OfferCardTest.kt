@@ -56,4 +56,23 @@ class OfferCardTest {
             edit.commit()
         }
     }
+    @Test fun consecutiveOffersAndAppearanceChangesReuseTheCardWithoutCrashing() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val prefs=context.getSharedPreferences("settings",0)
+        val original=prefs.getString("card_theme","light")
+        try {
+            instrumentation.runOnMainSync {
+                val view=OfferTagView(context)
+                view.setOffer("RECUSAR",14.0,10.8,1.02,47.27,"4.92",Color.RED,"UBER",11.03)
+                assertTrue(view.contentDescription.toString().contains("11,03"))
+                view.setOffer("RECUSAR",26.0,16.4,1.06,40.08,"4.98",Color.RED,"UBER",17.37)
+                assertTrue(view.contentDescription.toString().contains("17,37"))
+                assertFalse(view.contentDescription.toString().contains("11,03"))
+                prefs.edit().putString("card_theme","dark").commit()
+                view.setOffer("ATENÇÃO",22.0,10.4,1.14,32.45,"4.79",Color.YELLOW,"99",11.90)
+                assertTrue(view.contentDescription.toString().contains("32,45"))
+            }
+        } finally {prefs.edit().putString("card_theme",original).commit()}
+    }
 }

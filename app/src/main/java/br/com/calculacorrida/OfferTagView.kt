@@ -15,6 +15,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     private val prefs=context.getSharedPreferences("settings",Context.MODE_PRIVATE)
     private val banner=line(13f,Color.WHITE,true)
     private val body=LinearLayout(context)
+    private val header=LinearLayout(context)
     private val summary=line(12f,Color.BLACK,true)
     private val metrics=LinearLayout(context)
     private val details=line(11f,Color.DKGRAY)
@@ -28,7 +29,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     private fun duration(n:Double)=if(n%1.0==0.0) "${n.toInt()} min" else String.format(Locale.forLanguageTag("pt-BR"),"%.1f min",n)
     private fun rounded(fill:Int,stroke:Int)=GradientDrawable().apply {setColor(fill);cornerRadius=dp(10).toFloat();setStroke(dp(1),stroke)}
     fun setOffer(label:String,minutes:Double,totalKm:Double,valuePerKm:Double,valuePerHour:Double,rating:String?,color:Int,source:String="APP",fareValue:Double?=null,pickupMinutes:Double?=null,pickupKm:Double?=null,reason:String?=null) {
-        removeAllViews();body.removeAllViews();metrics.removeAllViews()
+        removeAllViews();body.removeAllViews();header.removeAllViews();metrics.removeAllViews()
         val theme=prefs.getString("card_theme","light")
         val dark=theme=="dark" || theme=="colored"
         val fg=if(dark) Color.WHITE else Color.rgb(22,24,27)
@@ -43,7 +44,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         banner.setTextColor(color);banner.textSize=12f;banner.background=null;banner.setPadding(dp(4),dp(2),dp(4),dp(2))
         summary.text="$source  ${duration(minutes)} • ${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
         summary.setTextColor(fg)
-        val header=LinearLayout(context).apply {gravity=Gravity.CENTER_VERTICAL}
+        header.gravity=Gravity.CENTER_VERTICAL
         header.addView(summary,LayoutParams(0,-2,1f))
         header.addView(line(19f,muted,true).apply{text="×";gravity=Gravity.CENTER;contentDescription="Fechar análise da oferta"},LayoutParams(dp(25),dp(25)))
         body.addView(header)
