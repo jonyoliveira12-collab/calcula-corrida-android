@@ -20,6 +20,8 @@ A auditoria do pipeline confere essa configuração e permissões não relaciona
 
 Na versão 0.4.5, quando o Android identifica uma janela do Nubank entre as janelas interativas, a leitura de ofertas é pausada e a bolinha e os cartões são removidos, inclusive se outro app estiver com foco. A leitura volta após o banco sair das janelas identificadas. A proteção depende das informações de janela disponibilizadas pelo Android; não garante liberação pelo banco. O teste usa um aplicativo sintético no emulador, não o Nubank real.
 
+O usuário também pode escolher “DESLIGAR PARA USAR BANCO” no início, no perfil ou no menu CC. Isso desativa o serviço de acessibilidade, preservando as opções de Copiloto e Semáforo; a reativação exige ação explícita do usuário nos ajustes do Android. “Pausar leitura” sozinho não desativa o serviço de acessibilidade. O usuário relatou que o Nubank abriu quando a acessibilidade foi desativada, mas a causa específica da avaliação de risco continua sem confirmação do banco.
+
 O nome exibido é JHONDRIVER. O pacote de avaliação permanece `br.com.calculacorrida.teste`; o aplicativo oficial mantém `br.com.calculacorrida`.
 
 ## Login

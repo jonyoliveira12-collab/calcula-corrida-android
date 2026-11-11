@@ -187,11 +187,13 @@ class OfferAccessibilityService : AccessibilityService() {
         val paused=prefs.getBoolean("reader_paused",false)
         val dialog=android.app.AlertDialog.Builder(this)
             .setTitle("Copiloto CC")
-            .setItems(arrayOf(if(paused)"Retomar leitura" else "Pausar leitura", "Abrir JHONDRIVER", "Desligar leitura")) { _, which ->
+            .setItems(arrayOf(if(paused)"Retomar leitura" else "Pausar leitura", "Abrir JHONDRIVER", "Desligar para usar banco")) { _, which ->
                 when(which) {
                     0 -> { prefs.edit().putBoolean("reader_paused",!paused).apply();hideAllOverlays();readerStatus(if(!paused)"Leitura pausada pelo usuário" else "Leitura retomada") }
                     1 -> packageManager.getLaunchIntentForPackage(packageName)?.let { it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(it) }
-                    2 -> {prefs.edit().putBoolean("copilot_enabled",false).putBoolean("traffic_enabled",false).apply();stopReading()}
+                    // This explicit user action turns off the Android service, not
+                    // only the in-app pause. Keep the driver's feature choices.
+                    2 -> { stopReading() }
                 }
             }.setNegativeButton("Fechar",null).create()
         dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
@@ -241,7 +243,15 @@ class OfferAccessibilityService : AccessibilityService() {
 
     companion object {
         private var active: OfferAccessibilityService? = null
-        fun stopReading() { active?.apply { stopped = true; readerHandler.removeCallbacks(poll); hideAllOverlays(); removeBubble(); disableSelf() } }
+        fun stopReading(): Boolean {
+            val service = active ?: return false
+            service.stopped = true
+            service.readerHandler.removeCallbacks(service.poll)
+            service.hideAllOverlays()
+            service.removeBubble()
+            service.disableSelf()
+            return true
+        }
     }
 
     private fun driverAppName(pkg: String): String? {

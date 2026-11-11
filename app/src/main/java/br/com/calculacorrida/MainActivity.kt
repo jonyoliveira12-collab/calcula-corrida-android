@@ -244,6 +244,10 @@ class MainActivity : Activity() {
         diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
             prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
         })
+        diagnostics.addView(label("Pausar mantém a acessibilidade ligada. Para usar um banco, desligue o serviço abaixo.", 12f, muted, false, 0, 2))
+        diagnostics.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", false) {
+            if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()
+        })
         diagnostics.addView(action("COPIAR DIAGNÓSTICO", false) {
             val report=listOf("JHONDRIVER ${packageManager.getPackageInfo(packageName,0).versionName}","Android ${android.os.Build.VERSION.RELEASE} • ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
                 "Acessibilidade: $serviceOn • Serviço respondendo: $alive • Sobreposição: ${Settings.canDrawOverlays(this)}",
@@ -421,6 +425,27 @@ class MainActivity : Activity() {
 
     private fun requestAccessibilityIfNeeded() {
         if (!isAccessibilityEnabled()) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
+    private fun openReaderAccessibilitySettings() {
+        Toast.makeText(this, "Nos ajustes do Android, selecione JHONDRIVER e ative a acessibilidade.", Toast.LENGTH_LONG).show()
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
+    private fun stopReaderForBank() {
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, "A acessibilidade do JHONDRIVER já está desligada.", Toast.LENGTH_LONG).show()
+            showTab(selectedTab)
+            return
+        }
+        if (OfferAccessibilityService.stopReading()) {
+            Toast.makeText(this, "Leitura desligada. Reative a acessibilidade quando voltar a trabalhar.", Toast.LENGTH_LONG).show()
+            val tab = selectedTab
+            content.postDelayed({ if (!isFinishing && selectedTab == tab) showTab(tab) }, 1000)
+        } else {
+            Toast.makeText(this, "Nos ajustes do Android, desligue a acessibilidade do JHONDRIVER.", Toast.LENGTH_LONG).show()
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
     }
@@ -643,12 +668,11 @@ class MainActivity : Activity() {
         content.addView(label("Perfil e ajustes", 24f, white, true, 5, 12))
 
         val privacy = card()
-        privacy.addView(label("Pausar para usar bancos", 18f, gold, true))
-        privacy.addView(label("Desliga a leitura de ofertas. Para voltar a trabalhar, reative a acessibilidade nas configurações do Android.", 13f, muted, false))
-        privacy.addView(action("DESLIGAR LEITURA", true) {
-            prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).apply()
-            OfferAccessibilityService.stopReading()
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
+        privacy.addView(label("Desliga a acessibilidade e oculta o CC. Para voltar a ler corridas, você precisa reativá-la nos ajustes do Android. Suas opções serão mantidas.", 13f, muted, false))
+        val serviceOn = isAccessibilityEnabled()
+        privacy.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", true) {
+            if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()
         })
         content.addView(privacy, margin(0, 10))
         val updates = card()
