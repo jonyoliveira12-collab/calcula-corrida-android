@@ -244,10 +244,6 @@ class MainActivity : Activity() {
         diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
             prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
         })
-        diagnostics.addView(label("Pausar mantém a acessibilidade ligada. Se o banco bloquear, você pode desligar o serviço abaixo.", 12f, muted, false, 0, 2))
-        diagnostics.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", false) {
-            if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()
-        })
         diagnostics.addView(action("COPIAR DIAGNÓSTICO", false) {
             val report=listOf("JHONDRIVER ${packageManager.getPackageInfo(packageName,0).versionName}","Android ${android.os.Build.VERSION.RELEASE} • ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
                 "Acessibilidade: $serviceOn • Serviço respondendo: $alive • Sobreposição: ${Settings.canDrawOverlays(this)}",

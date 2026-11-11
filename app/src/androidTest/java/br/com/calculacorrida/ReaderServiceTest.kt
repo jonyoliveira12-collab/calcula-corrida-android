@@ -95,8 +95,8 @@ class ReaderServiceTest {
             activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
             await("CC starts") { hasCc() }
             instrumentation.runOnMainSync {
-                // Refresh the dashboard after Android connects the service.
-                (findText(activity!!.window.decorView, "Início")!!.parent as View).performClick()
+                // Open the bank control after Android connects the service.
+                (findText(activity!!.window.decorView, "Perfil")!!.parent as View).performClick()
                 val button = findText(activity!!.window.decorView, "DESLIGAR PARA USAR BANCO")
                 assertNotNull("Bank control is available", button)
                 button!!.performClick()
