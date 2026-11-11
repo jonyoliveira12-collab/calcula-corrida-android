@@ -85,7 +85,12 @@ class OfferOverlayAnimationTest {
             instrumentation.runOnMainSync {visibility="attached=${overlay!!.isAttachedToWindow}, shown=${overlay!!.isShown}, window=${overlay!!.windowVisibility}"}
             val interactive=(context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isInteractive
             val movingPairs=frames.zipWithNext().count{(a,b)->different(a,b)>50}
-            assertTrue("The captured band contains the red card (red pixels: $redPixels, bounds=$bounds)",redPixels>50)
+            val appops=shell("appops get ${context.packageName} SYSTEM_ALERT_WINDOW")
+            val windowDump=shell("dumpsys window windows").lines()
+            val matching=windowDump.indices.filter{windowDump[it].contains(context.packageName)}.take(3)
+                .flatMap{index->windowDump.subList(index,(index+15).coerceAtMost(windowDump.size))}.joinToString(" | ")
+            instrumentation.sendStatus(0,android.os.Bundle().apply {putString("stream","OVERLAY_TEST phases=$phases $visibility interactive=$interactive appops=$appops windows=$matching\n")})
+            assertTrue("The captured band contains the red card (red pixels: $redPixels, bounds=$bounds, phases=$phases, $visibility, interactive=$interactive, appops=$appops)",redPixels>50)
             assertTrue("Visible floating flames keep moving over another app (changed pairs: $movingPairs, phases=$phases, $visibility, interactive=$interactive)",movingPairs>=3)
 
             prefs.edit().putBoolean("card_neon_animated",false).commit()
