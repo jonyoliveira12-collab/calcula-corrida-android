@@ -22,7 +22,7 @@ Na versão 0.4.5, quando o Android identifica uma janela do Nubank entre as jane
 
 O usuário também pode escolher “DESLIGAR PARA USAR BANCO” no perfil ou no menu CC. Isso desativa o serviço de acessibilidade, preservando as opções de Copiloto e Semáforo; a reativação exige ação explícita do usuário nos ajustes do Android. “Pausar leitura” sozinho não desativa o serviço de acessibilidade. O usuário relatou que o Nubank abriu quando a leitura foi desativada, mas a causa específica da avaliação de risco continua sem confirmação do banco.
 
-O nome exibido é JHONDRIVER. O pacote de avaliação permanece `br.com.calculacorrida.teste`; o aplicativo oficial mantém `br.com.calculacorrida`.
+O nome exibido é JHONDRIVER. A avaliação 0.4.6 usa o pacote `br.com.calculacorrida.avaliacao`, diferente das versões de avaliação antigas e do pacote oficial `br.com.calculacorrida`. Ela pode ser instalada ao lado da versão anterior sem apagar os dados locais, mas terá login, permissões e configurações próprios. Antes de testar, desative a leitura da instalação antiga para não executar dois leitores ao mesmo tempo.
 
 ## Login
 

@@ -17,7 +17,8 @@ android {
     }
 
     buildTypes.getByName("debug") {
-        applicationIdSuffix = ".teste"
+        // Evaluation installs alongside older builds signed with a different key.
+        applicationIdSuffix = ".avaliacao"
     }
 
     // Signing material is injected from private Actions secrets, never from source control.
