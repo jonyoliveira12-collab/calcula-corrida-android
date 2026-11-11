@@ -7,6 +7,8 @@ android {
     flavorDimensions += "driver"
     productFlavors {
         create("backdrop") { dimension = "driver"; applicationId = "br.com.calculacorrida.fixture.backdrop" }
+        // This synthetic package is installed only on a disposable CI emulator.
+        create("bank") { dimension = "driver"; applicationId = "com.nu.production" }
         create("uber") { dimension = "driver"; applicationId = "com.ubercab.driver" }
         create("ninetynine") { dimension = "driver"; applicationId = "com.taxis99" }
         create("indrive") { dimension = "driver"; applicationId = "sinet.startup.inDriver" }

@@ -67,10 +67,11 @@ jobs:
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb install -r reader-fixture/build/outputs/apk/backdrop/debug/reader-fixture-backdrop-debug.apk
+            adb install -r reader-fixture/build/outputs/apk/bank/debug/reader-fixture-bank-debug.apk
             adb install -r reader-fixture/build/outputs/apk/uber/debug/reader-fixture-uber-debug.apk
             adb install -r reader-fixture/build/outputs/apk/ninetynine/debug/reader-fixture-ninetynine-debug.apk
             adb install -r reader-fixture/build/outputs/apk/indrive/debug/reader-fixture-indrive-debug.apk
-            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest br.com.calculacorrida.teste.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest br.com.calculacorrida.teste.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
             adb exec-out run-as br.com.calculacorrida.teste tar -cf - files/screenshots > card-previews.tar
       - uses: actions/upload-artifact@v4

@@ -18,6 +18,8 @@ O serviço declara uma lista explícita de pacotes de motorista e do próprio JH
 
 A auditoria do pipeline confere essa configuração e permissões não relacionadas. Ela NÃO significa aprovação do Play Protect ou garantia de compatibilidade com Nubank. A causa exata do bloqueio do banco ainda não foi confirmada. Não desative proteções para usar o app. Não foi tentado disfarçar a identidade nem contornar a proteção do banco.
 
+Na versão 0.4.5, quando o Android identifica uma janela do Nubank entre as janelas interativas, a leitura de ofertas é pausada e a bolinha e os cartões são removidos, inclusive se outro app estiver com foco. A leitura volta após o banco sair das janelas identificadas. A proteção depende das informações de janela disponibilizadas pelo Android; não garante liberação pelo banco. O teste usa um aplicativo sintético no emulador, não o Nubank real.
+
 O nome exibido é JHONDRIVER. O pacote de avaliação permanece `br.com.calculacorrida.teste`; o aplicativo oficial mantém `br.com.calculacorrida`.
 
 ## Login

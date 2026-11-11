@@ -55,6 +55,8 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var applicationSnapshots:Set<String> = emptySet()
     @Volatile private var snapshotAt=0L
     @Volatile private var foregroundPackage: String? = null
+    // Treat a visible Nubank window as private even when a driver overlay has focus.
+    @Volatile private var sensitiveWindowVisible = false
     @Volatile private var stopped = false
     private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key.startsWith("card_") || key == "overlay_scale" || key == "reader_paused")) {
@@ -86,7 +88,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private var lastHeartbeat=0L
-    private fun readingEnabled(): Boolean = foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
+    private fun readingEnabled(): Boolean = !sensitiveWindowVisible && foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
     private fun readerConfigured(): Boolean {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         return prefs.getBoolean("reader_disclosure_accepted", false) &&
@@ -110,7 +112,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val now=android.os.SystemClock.elapsedRealtime()
         visible.forEach{lastWindowSeen[it]=now}
         overlays.keys.filter { it !in visible && now-(lastWindowSeen[it]?:0)>2000L }.forEach { hideOverlay(it); acceptedSignatures.remove(it) }
-        if (!readerConfigured() || pkg == "com.nu.production") {
+        if (!readerConfigured() || sensitiveWindowVisible || pkg == "com.nu.production") {
             hideAllOverlays()
             removeBubble()
             return
@@ -217,7 +219,7 @@ class OfferAccessibilityService : AccessibilityService() {
         NetworkGate.register(this, networkCallback)
         stopped = false
         val prefs=getSharedPreferences("settings",MODE_PRIVATE)
-        prefs.edit().putBoolean("reader_model_ready",false).apply()
+        prefs.edit().putBoolean("reader_model_ready",false).putBoolean("reader_privacy_protected",false).apply()
         screenshotExecutor.execute {
             val warm=Bitmap.createBitmap(640,480,Bitmap.Config.ARGB_8888)
             android.graphics.Canvas(warm).apply {
@@ -286,13 +288,32 @@ class OfferAccessibilityService : AccessibilityService() {
                 val activeRoot=rootInActiveWindow
                 try {
                     activePkg=activeRoot?.packageName?.toString()
-                    for(window in windows) {
-                        if(window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)continue
+                    // Inspect only package identities first; never inspect the bank's
+                    // node text. A driver window can coexist with the bank in split
+                    // screen or as a floating card, even when it has input focus.
+                    val windowPackages = windows.mapNotNull { window ->
+                        if(window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)return@mapNotNull null
+                        val root=window.root ?: return@mapNotNull null
+                        try {
+                            val pkg=root.packageName?.toString() ?: return@mapNotNull null
+                            if(window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION)applications.add(pkg)
+                            window to pkg
+                        } finally {root.recycle()}
+                    }
+                    val bankVisible = activePkg == "com.nu.production" || windowPackages.any { it.second == "com.nu.production" }
+                    val wasBankVisible = sensitiveWindowVisible
+                    sensitiveWindowVisible = bankVisible
+                    if (bankVisible != wasBankVisible) {
+                        getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("reader_privacy_protected", bankVisible).apply()
+                        readerStatus(if (bankVisible) "Leitura pausada: Nubank visível" else "Leitura retomada após sair do Nubank")
+                    }
+                    if (!bankVisible) for ((window, originalPackage) in windowPackages) {
+                        if(driverAppName(originalPackage)==null)continue
                         val root=window.root ?: continue
                         try {
+                            // The window can change between the two passes.
                             val pkg=root.packageName?.toString() ?: continue
-                            if(window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION)applications.add(pkg)
-                            if(driverAppName(pkg)==null)continue
+                            if(pkg!=originalPackage)continue
                             val bounds=Rect().also{window.getBoundsInScreen(it)}
                             if(bounds.isEmpty)continue
                             val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
@@ -304,7 +325,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         } finally {root.recycle()}
                     }
                     val pkg=activeRoot?.packageName?.toString()
-                    if(activeRoot!=null && pkg!=null && driverAppName(pkg)!=null && pkg !in frames) {
+                    if(!bankVisible && activeRoot!=null && pkg!=null && driverAppName(pkg)!=null && pkg !in frames) {
                         val bounds=Rect().also{activeRoot.getBoundsInScreen(it)}
                         if(!bounds.isEmpty) {
                             val text=StringBuilder();if(readingEnabled())collectText(activeRoot,text)

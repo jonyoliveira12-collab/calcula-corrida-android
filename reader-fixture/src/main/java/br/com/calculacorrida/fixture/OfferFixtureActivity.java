@@ -13,6 +13,13 @@ import android.graphics.PixelFormat;
 public class OfferFixtureActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if(getPackageName().equals("com.nu.production")) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            android.widget.TextView bank = new android.widget.TextView(this);
+            bank.setText("TEST FIXTURE - SECURE WINDOW");
+            setContentView(bank);
+            return;
+        }
         if(getPackageName().endsWith(".backdrop")) {
             android.widget.TextView background=new android.widget.TextView(this);
             background.setText("Aplicativo de fundo");
