@@ -1,0 +1,46 @@
+name: Share verified JHONDRIVER 0.4.8
+on:
+  push:
+    branches: [share/apk-0.4.8-browser]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify the tested source run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source_status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43104922141" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")')
+          test "$source_status" = "39f1989817ec86761b99daf799de9388934cc85b completed success"
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 43104922141
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify the exact evaluation APK
+        run: |
+          set -euo pipefail
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.4.8.apk
+          echo '95730638ba85d410a3a4b24ac4f490d9445c0781a9a96eb78b77131e3843e7be  verified-apk/JHONDRIVER-0.4.8.apk' | sha256sum --check
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose verified-apk/JHONDRIVER-0.4.8.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging verified-apk/JHONDRIVER-0.4.8.apk | grep -F "package: name='br.com.calculacorrida.avaliacao048' versionCode='14' versionName='0.4.8'"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-0.4.8
+          target_commitish: ${{ github.sha }}
+          name: JHONDRIVER 0.4.8
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: verified-apk/JHONDRIVER-0.4.8.apk
+          body: |
+            APK de avaliação com chamas neon mais visíveis e animação opcional.
+            A leitura da Uber aguarda o percurso completo quando o texto acessível é parcial.
+            Instala ao lado das versões anteriores, com login, permissões e configurações próprios. Desligue a leitura antiga antes de testar.
+            A leitura de ofertas reais e a compatibilidade com aplicativos bancários devem ser verificadas no dispositivo.
