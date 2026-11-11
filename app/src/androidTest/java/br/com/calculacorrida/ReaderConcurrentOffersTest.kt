@@ -54,14 +54,20 @@ class ReaderConcurrentOffersTest {
                 fail("$label: $diagnostic / records=$records / windows=${describeWindows()}")
             }
         }
-        fun findTag(source: String, summary: String, metrics: List<String>): Rect? {
+        fun findTag(source: String, summary: List<String>, metrics: List<String>): Rect? {
             for (window in ui.windows) {
                 val root = window.root ?: continue
                 try {
                     if (root.packageName?.toString() != context.packageName) continue
-                    val titleFound = root.findAccessibilityNodeInfosByText(source).any { it.text?.toString()?.contains(summary) == true }
+                    // The card exposes an accessibility description for screen readers;
+                    // Android may collapse its child text nodes into that description.
+                    val texts = nodeText(root)
+                    val titleFound = texts.any { line ->
+                        line.startsWith("$source ") && summary.all { line.contains(it) }
+                    }
                     val metricsFound = metrics.all { value ->
-                        root.findAccessibilityNodeInfosByText(value).any { it.text?.toString() == value }
+                        texts.any { line -> line == value ||
+                            (line.startsWith("$source •") && line.contains(value)) }
                     }
                     if (titleFound && metricsFound) return Rect().also { window.getBoundsInScreen(it) }
                 } finally { root.recycle() }
@@ -102,8 +108,8 @@ class ReaderConcurrentOffersTest {
             await("Both driver windows are simultaneously visible") {
                 driverWindow("com.ubercab.driver") != null && driverWindow("com.app99.driver") != null
             }
-            val uberSummary = "UBER  18 min • 6,60 km • R$ 9,09"
-            val ninetyNineSummary = "99  31 min • 11,20 km • R$ 11,59"
+            val uberSummary = listOf("18 min", "6,60 km", "R$ 9,09")
+            val ninetyNineSummary = listOf("31 min", "11,20 km", "R$ 11,59")
             fun uberTag() = findTag("UBER", uberSummary, listOf("1,38", "30,30", "4,87"))
             fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("1,03", "22,43", "4,96"))
             await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
