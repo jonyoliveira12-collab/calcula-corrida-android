@@ -40,6 +40,35 @@ class ReaderConcurrentOffersTest {
                 "$pkg ${window.type} $bounds [$texts]"
             } finally { root.recycle() }
         }
+        fun describeSyntheticNinetyNineOcr(): String {
+            // Only this CI fixture is captured; it contains invented offers and no user data.
+            return try {
+                context.getSharedPreferences("settings", 0).edit().putBoolean("reader_paused", true).commit()
+                Thread.sleep(750)
+                val bounds = ui.windows.mapNotNull { window ->
+                    val root = window.root ?: return@mapNotNull null
+                    try {
+                        if (root.packageName?.toString() != "com.app99.driver" ||
+                            window.type != AccessibilityWindowInfo.TYPE_SYSTEM) return@mapNotNull null
+                        Rect().also { window.getBoundsInScreen(it) }.takeIf { it.width() >= 160 && it.height() >= 100 }
+                    } finally { root.recycle() }
+                }.maxByOrNull { it.width().toLong() * it.height() } ?: return "fixture window unavailable"
+                val screenshot = ui.takeScreenshot() ?: return "fixture screenshot unavailable"
+                val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
+                    com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
+                )
+                try {
+                    if (!bounds.intersect(0, 0, screenshot.width, screenshot.height)) return "fixture bounds unavailable"
+                    val crop = android.graphics.Bitmap.createBitmap(screenshot, bounds.left, bounds.top, bounds.width(), bounds.height())
+                    try {
+                        com.google.android.gms.tasks.Tasks.await(
+                            recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(crop, 0)),
+                            10, java.util.concurrent.TimeUnit.SECONDS
+                        ).text.replace('\n', ' | ')
+                    } finally { crop.recycle() }
+                } finally { recognizer.close(); screenshot.recycle() }
+            } catch (e: Exception) { "fixture OCR unavailable: ${e.javaClass.simpleName}" }
+        }
         fun await(label: String, timeoutMs: Long = 45000, check: () -> Boolean) {
             val deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs
             while (!check() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
@@ -51,7 +80,9 @@ class ReaderConcurrentOffersTest {
                 val records = JourneyStore.getRecords(context).take(5).joinToString(" | ") {
                     listOf(it.optString("app"), it.optDouble("fare"), it.optDouble("totalKm"), it.optDouble("minutes"), it.optDouble("perKm"), it.optDouble("perHour"), it.optString("passengerRating")).joinToString(";")
                 }
-                fail("$label: $diagnostic / records=$records / windows=${describeWindows()}")
+                val windows = describeWindows()
+                val fixtureOcr = if (label.startsWith("Distinct")) describeSyntheticNinetyNineOcr() else ""
+                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr")
             }
         }
         fun findTag(source: String, summary: List<String>, metrics: List<String>): Rect? {

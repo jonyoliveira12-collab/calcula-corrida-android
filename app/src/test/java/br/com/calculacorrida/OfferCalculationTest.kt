@@ -31,6 +31,10 @@ R$12,17   R$12,75   R$13,33"""
         assertEquals(11.59, OfferTextParser.parse(text, "com.didiglobal.driver")!!.fare, 0.000001)
         val ocrMissingComma = text.replace("4,96 · 152 corridas", "496. 152 corridas")
         assertEquals("4.96", OfferTextParser.parse(ocrMissingComma, "com.app99.driver")!!.passengerRating)
+        for (separator in listOf(".", "-", "–", ":", "•")) {
+            val ocrPunctuation = text.replace("4,96 · 152 corridas", "4,96 $separator 152 corridas")
+            assertEquals("4.96", OfferTextParser.parse(ocrPunctuation, "com.app99.driver")!!.passengerRating)
+        }
         assertNull("Do not apply the 99-only rule to another app", OfferTextParser.parse(text, "com.ubercab.driver"))
     }
     @Test fun ninetyNineAmbiguousNegotiationNeverInventsFare() {

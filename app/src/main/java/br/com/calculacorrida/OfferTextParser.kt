@@ -164,7 +164,7 @@ object OfferTextParser {
         ).find(text)?.groupValues?.get(1)
         if (labeled != null) return normalizeRating(labeled)
         val besideTrips = Regex(
-            """([0-5][,.][0-9]{1,2})\s*(?:[·•|]\s*)?\+?[0-9]+\s*corridas?""",
+            """(?<![0-9.,])([0-5][,.][0-9]{1,2})\s*(?:[·•|.:\-–—]\s*)?\+?[0-9]+\s*corridas?""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (besideTrips != null) return normalizeRating(besideTrips)
