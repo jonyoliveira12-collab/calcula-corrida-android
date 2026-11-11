@@ -1,7 +1,6 @@
 package br.com.calculacorrida
 
 import android.content.Context
-import android.animation.ValueAnimator
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -36,12 +35,12 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     private var flameFrame=0
     private val flameTick=object:Runnable {
         override fun run() {
-            if(!neonEnabled || !prefs.getBoolean("card_neon_animated",true) || !isAttachedToWindow || !isShown || windowVisibility!=View.VISIBLE || !ValueAnimator.areAnimatorsEnabled())return
+            if(!neonEnabled || !prefs.getBoolean("card_neon_animated",true) || !isAttachedToWindow || !isShown || windowVisibility!=View.VISIBLE)return
             val power=context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
             if(power?.isInteractive != false) {
-                flameFrame=(flameFrame+1)%20
-                invalidate()
-                postDelayed(this,120L)
+                flameFrame=(flameFrame+1)%24
+                postInvalidateOnAnimation()
+                postDelayed(this,80L)
             } else postDelayed(this,2000L)
         }
     }
@@ -137,7 +136,9 @@ class OfferTagView(context: Context) : LinearLayout(context) {
 
     private fun updateFlameAnimation() {
         removeCallbacks(flameTick)
-        if(neonEnabled && prefs.getBoolean("card_neon_animated",true) && isAttachedToWindow && isShown && windowVisibility==View.VISIBLE && ValueAnimator.areAnimatorsEnabled())post(flameTick)
+        // The explicit in-app switch controls this custom effect independently of
+        // Android's transition/animator scale. Keep it off for a hidden card.
+        if(neonEnabled && prefs.getBoolean("card_neon_animated",true) && isAttachedToWindow && isShown && windowVisibility==View.VISIBLE)post(flameTick)
     }
 
     /** The effect stays around the reserved edge and never covers the metrics. */
@@ -157,14 +158,15 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             canvas.drawRoundRect(box,dp(10).toFloat(),dp(10).toFloat(),neonPaint)
         }
         val x=box.right-dp(8);val y=box.top
-        val motion=kotlin.math.sin(flameFrame*Math.PI/10.0).toFloat()*dp(2)
+        val motion=kotlin.math.sin(flameFrame*Math.PI/12.0).toFloat()*dp(6)
+        val sway=kotlin.math.sin((flameFrame+6)*Math.PI/12.0).toFloat()*dp(4)
         val flame=Path().apply {
             moveTo(x-dp(81),y+dp(3))
-            cubicTo(x-dp(66),y+dp(2),x-dp(59),y-dp(2),x-dp(56),y-dp(18)-motion)
+            cubicTo(x-dp(66),y+dp(2),x-dp(59),y-dp(2),x-dp(56)+sway,y-dp(18)-motion)
             cubicTo(x-dp(51),y-dp(11),x-dp(48),y-dp(6),x-dp(51),y-dp(1))
-            cubicTo(x-dp(43),y-dp(3),x-dp(39),y-dp(10),x-dp(34),y-dp(23)+motion)
+            cubicTo(x-dp(43),y-dp(3),x-dp(39),y-dp(10),x-dp(34)-sway,y-dp(23)+motion)
             cubicTo(x-dp(28),y-dp(16),x-dp(27),y-dp(8),x-dp(31),y-dp(1))
-            cubicTo(x-dp(20),y-dp(3),x-dp(15),y-dp(8),x-dp(11),y-dp(16)-motion)
+            cubicTo(x-dp(20),y-dp(3),x-dp(15),y-dp(8),x-dp(11)+sway,y-dp(16)-motion)
             cubicTo(x-dp(4),y-dp(10),x,y-dp(3),x,y+dp(5))
             lineTo(x-dp(81),y+dp(5));close()
         }
@@ -179,9 +181,10 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             var x=left;var index=0
             while(x<right) {
                 val end=(x+step).coerceAtMost(right);val s=end-x
-                val motion=kotlin.math.sin((flameFrame+index*3)*Math.PI/10.0).toFloat()*dp(2)
-                val peak=base-dp(16)-motion
-                cubicTo(x+s*.18f,base,x+s*.23f,base-dp(4),x+s*.43f,peak)
+                val motion=kotlin.math.sin((flameFrame+index*3)*Math.PI/12.0).toFloat()*dp(6)
+                val sway=kotlin.math.sin((flameFrame+index*3+6)*Math.PI/12.0).toFloat()*dp(4)
+                val peak=base-dp(12)-motion
+                cubicTo(x+s*.18f,base,x+s*.23f,base-dp(4),x+s*.43f+sway,peak)
                 cubicTo(x+s*.33f,base-dp(5),x+s*.46f,base-dp(3),x+s*.60f,base-dp(7))
                 cubicTo(x+s*.72f,base-dp(10),x+s*.83f,base-dp(2),end,base)
                 x=end;index++
