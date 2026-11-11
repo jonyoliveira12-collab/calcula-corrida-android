@@ -1,0 +1,51 @@
+name: Share checked JHONDRIVER 0.4.9
+on:
+  push:
+    branches: [share/apk-0.4.9-browser]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify APK build and flame-frame test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          build_sha=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43116887716" --jq '.head_sha')
+          test "$build_sha" = "32f761f1245a0007fe196a87d292f4942fa36858"
+          build_result=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43116887716/jobs" --jq '.jobs[] | select(.name == "test") | .conclusion')
+          test "$build_result" = "success"
+          flame_result=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43116864995" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")')
+          test "$flame_result" = "bac2257834e633b358027ca6ab1cae8d0dcea7f6 completed success"
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 43116887716
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify the exact evaluation APK
+        run: |
+          set -euo pipefail
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.4.9.apk
+          echo 'e131a7c0650455c7b67952f5cb380af421bf47e3f450fea66c24f94aafd2c15b  verified-apk/JHONDRIVER-0.4.9.apk' | sha256sum --check
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose verified-apk/JHONDRIVER-0.4.9.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging verified-apk/JHONDRIVER-0.4.9.apk | grep -F "package: name='br.com.calculacorrida.avaliacao049' versionCode='15' versionName='0.4.9'"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-0.4.9
+          target_commitish: ${{ github.sha }}
+          name: JHONDRIVER 0.4.9
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: verified-apk/JHONDRIVER-0.4.9.apk
+          body: |
+            APK de avaliação com movimento de chamas mais visível no cartão flutuante.
+            A opção Animar chamas controla o efeito no aplicativo.
+            Instala ao lado das versões anteriores, com login, permissões e configurações próprios. Desligue a leitura antiga antes de testar.
+            A leitura de ofertas reais e a compatibilidade com aplicativos bancários devem ser verificadas no dispositivo.
