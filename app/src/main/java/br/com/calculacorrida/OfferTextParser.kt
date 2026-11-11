@@ -71,6 +71,10 @@ object OfferTextParser {
         """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*([0-9]+(?:[,.][0-9]+)?)\s*km(?=\s*(?:[·•]\s*)?Est\.?\s*(?:de\s*)?R\s*\$)""",
         RegexOption.IGNORE_CASE
     )
+    private val explicitTotalPrefixRegex=Regex(
+        """(?:total(?:\s+d[ao]\s+(?:trajeto|viagem|percurso))?|percurso\s+total)\s*[:\-]?\s*$""",
+        RegexOption.IGNORE_CASE
+    )
 
     fun parse(rawText: String, sourcePackage:String?=null): ParsedOffer? {
         if (rawText.isBlank()) return null
@@ -82,7 +86,12 @@ object OfferTextParser {
             return if (unit.equals("m", true)) n / 1000.0 else n
         }
 
-        val summary = (summaryRegex.find(text) ?: estimatedSummaryRegex.find(text))?.let {
+        // Prefer the Uber total next to its per-km estimate. Accessibility or
+        // OCR can expose the pickup as "minutes • km", which looks like a
+        // total but is only one leg of the trip.
+        val estimatedSummary = estimatedSummaryRegex.find(text)
+        val summaryMatch = estimatedSummary ?: summaryRegex.find(text)
+        val summary = summaryMatch?.let {
             val mins = toNumber(it.groupValues[1])
             val dist = toNumber(it.groupValues[2])
             if (mins != null && dist != null) mins to dist else null
@@ -92,6 +101,11 @@ object OfferTextParser {
             val dist = km(it.groupValues[3], it.groupValues[4]) ?: return@mapNotNull null
             if (mins > 0 && dist > 0) mins to dist else null
         }.toList()
+
+        if (DriverPackages.name(sourcePackage.orEmpty()) == "UBER" && summaryMatch != null && estimatedSummary == null && parenthesizedLegs.size < 2) {
+            val prefix=text.substring(0,summaryMatch.range.first).takeLast(64)
+            if(!explicitTotalPrefixRegex.containsMatchIn(prefix)) return null
+        }
 
         val pickupKm: Double
         val tripKm: Double

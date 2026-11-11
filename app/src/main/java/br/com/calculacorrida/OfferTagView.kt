@@ -1,6 +1,7 @@
 package br.com.calculacorrida
 
 import android.content.Context
+import android.animation.ValueAnimator
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -29,8 +30,21 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         strokeCap=Paint.Cap.ROUND
         strokeJoin=Paint.Join.ROUND
     }
+    private val flameFill=Paint(Paint.ANTI_ALIAS_FLAG).apply { style=Paint.Style.FILL }
     private var neonEnabled=true
     private var neonColor=Color.RED
+    private var flameFrame=0
+    private val flameTick=object:Runnable {
+        override fun run() {
+            if(!neonEnabled || !prefs.getBoolean("card_neon_animated",true) || !isAttachedToWindow || !isShown || windowVisibility!=View.VISIBLE || !ValueAnimator.areAnimatorsEnabled())return
+            val power=context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            if(power?.isInteractive != false) {
+                flameFrame=(flameFrame+1)%20
+                invalidate()
+                postDelayed(this,120L)
+            } else postDelayed(this,2000L)
+        }
+    }
     init { orientation=VERTICAL;clipToPadding=false;clipChildren=false;setChildrenDrawingOrderEnabled(true);body.orientation=VERTICAL;metrics.orientation=HORIZONTAL }
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
     private fun line(size:Float,color:Int,bold:Boolean=false)=TextView(context).apply {
@@ -48,10 +62,10 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             else -> Color.rgb(245,38,55)
         }
         // Reserve real space for the glow so it is not clipped by the overlay window.
-        if(neonEnabled) setPadding(dp(8),dp(13),dp(8),dp(10)) else setPadding(0,0,0,0)
+        if(neonEnabled) setPadding(dp(9),dp(25),dp(9),dp(12)) else setPadding(0,0,0,0)
         val above=prefs.getString("card_banner_position","above")=="above"
         val hasBanner=prefs.getBoolean("card_banner",true)
-        body.setPadding(dp(9),dp(if(neonEnabled && above && hasBanner)12 else 6),dp(9),dp(if(neonEnabled)15 else 6))
+        body.setPadding(dp(9),dp(if(neonEnabled && above && hasBanner)12 else 6),dp(9),dp(if(neonEnabled)24 else 6))
         val theme=prefs.getString("card_theme","light")
         val dark=theme=="dark" || theme=="colored"
         val fg=if(dark) Color.WHITE else Color.rgb(22,24,27)
@@ -112,9 +126,21 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         fun addBanner(){if(hasBanner)addView(banner,LayoutParams(-2,-2).apply{gravity=Gravity.START;bottomMargin=if(neonEnabled && above)-dp(7) else dp(4);topMargin=dp(4)})}
         if(above)addBanner();addView(body,LayoutParams(-1,-2));if(!above)addBanner()
         contentDescription="$source • $shownLabel. R$ ${fareValue?.let(::amount)}. Até passageiro: ${pickupMinutes?.let(::duration)}. Total: ${duration(minutes)} • ${amount(totalKm)} km. Nota ${rating?.replace('.',',')?:"não identificada"}. R$ ${amount(valuePerKm)}/km. R$ ${amount(valuePerHour)}/h"
+        updateFlameAnimation()
         invalidate()
     }
-    /** Static, low-cost outlines; the white information area remains unobstructed. */
+
+    override fun onAttachedToWindow(){super.onAttachedToWindow();updateFlameAnimation()}
+    override fun onDetachedFromWindow(){removeCallbacks(flameTick);super.onDetachedFromWindow()}
+    override fun onVisibilityChanged(changedView:View,visibility:Int){super.onVisibilityChanged(changedView,visibility);updateFlameAnimation()}
+    override fun onWindowVisibilityChanged(visibility:Int){super.onWindowVisibilityChanged(visibility);updateFlameAnimation()}
+
+    private fun updateFlameAnimation() {
+        removeCallbacks(flameTick)
+        if(neonEnabled && prefs.getBoolean("card_neon_animated",true) && isAttachedToWindow && isShown && windowVisibility==View.VISIBLE && ValueAnimator.areAnimatorsEnabled())post(flameTick)
+    }
+
+    /** The effect stays around the reserved edge and never covers the metrics. */
     override fun getChildDrawingOrder(childCount:Int,drawingPosition:Int):Int =
         if(childCount==2 && getChildAt(0)===banner) 1-drawingPosition else drawingPosition
 
@@ -126,47 +152,58 @@ class OfferTagView(context: Context) : LinearLayout(context) {
 
     private fun drawNeonBehind(canvas:Canvas) {
         val box=RectF(body.left.toFloat(),body.top.toFloat(),body.right.toFloat(),body.bottom.toFloat())
-        for((width,alpha) in listOf(8 to 32,5 to 58,3 to 115)) {
+        for((width,alpha) in listOf(14 to 45,9 to 90,5 to 155,2 to 235)) {
             neonPaint.color=withAlpha(neonColor,alpha);neonPaint.strokeWidth=dp(width).toFloat()
             canvas.drawRoundRect(box,dp(10).toFloat(),dp(10).toFloat(),neonPaint)
         }
         val x=box.right-dp(8);val y=box.top
+        val motion=kotlin.math.sin(flameFrame*Math.PI/10.0).toFloat()*dp(2)
         val flame=Path().apply {
-            moveTo(x-dp(57),y+dp(1))
-            cubicTo(x-dp(44),y+dp(1),x-dp(36),y-dp(2),x-dp(33),y-dp(11))
-            cubicTo(x-dp(29),y-dp(4),x-dp(26),y-dp(4),x-dp(22),y-dp(13))
-            cubicTo(x-dp(18),y-dp(6),x-dp(13),y-dp(3),x-dp(15),y+dp(1))
-            cubicTo(x-dp(10),y-dp(1),x-dp(6),y-dp(4),x-dp(5),y-dp(8))
-            cubicTo(x-dp(1),y-dp(4),x,y-dp(1),x,y+dp(5))
+            moveTo(x-dp(81),y+dp(3))
+            cubicTo(x-dp(66),y+dp(2),x-dp(59),y-dp(2),x-dp(56),y-dp(18)-motion)
+            cubicTo(x-dp(51),y-dp(11),x-dp(48),y-dp(6),x-dp(51),y-dp(1))
+            cubicTo(x-dp(43),y-dp(3),x-dp(39),y-dp(10),x-dp(34),y-dp(23)+motion)
+            cubicTo(x-dp(28),y-dp(16),x-dp(27),y-dp(8),x-dp(31),y-dp(1))
+            cubicTo(x-dp(20),y-dp(3),x-dp(15),y-dp(8),x-dp(11),y-dp(16)-motion)
+            cubicTo(x-dp(4),y-dp(10),x,y-dp(3),x,y+dp(5))
+            lineTo(x-dp(81),y+dp(5));close()
         }
-        drawFlameLine(canvas,flame)
+        drawFlameShape(canvas,flame)
     }
 
     private fun drawBottomFlames(canvas:Canvas) {
         val left=body.left+dp(8).toFloat();val right=body.right-dp(8).toFloat()
-        val base=body.bottom-dp(3).toFloat();val step=dp(30).toFloat().coerceAtLeast(1f)
+        val base=body.bottom-dp(4).toFloat();val step=dp(52).toFloat().coerceAtLeast(1f)
         val flame=Path().apply {
             moveTo(left,base)
-            var x=left
+            var x=left;var index=0
             while(x<right) {
                 val end=(x+step).coerceAtMost(right);val s=end-x
-                cubicTo(x+s*.16f,base,x+s*.27f,base-dp(2),x+s*.43f,base-dp(8))
-                cubicTo(x+s*.36f,base-dp(2),x+s*.49f,base-dp(1),x+s*.62f,base-dp(2))
-                cubicTo(x+s*.79f,base-dp(3),x+s*.88f,base,end,base)
-                x=end
+                val motion=kotlin.math.sin((flameFrame+index*3)*Math.PI/10.0).toFloat()*dp(2)
+                val peak=base-dp(16)-motion
+                cubicTo(x+s*.18f,base,x+s*.23f,base-dp(4),x+s*.43f,peak)
+                cubicTo(x+s*.33f,base-dp(5),x+s*.46f,base-dp(3),x+s*.60f,base-dp(7))
+                cubicTo(x+s*.72f,base-dp(10),x+s*.83f,base-dp(2),end,base)
+                x=end;index++
             }
+            lineTo(right,body.bottom.toFloat());lineTo(left,body.bottom.toFloat());close()
         }
         val saved=canvas.save()
-        canvas.clipRect(body.left,body.bottom-dp(15),body.right,body.bottom+dp(8))
-        drawFlameLine(canvas,flame)
+        canvas.clipRect(body.left,body.bottom-dp(23),body.right,body.bottom+dp(6))
+        drawFlameShape(canvas,flame)
         canvas.restoreToCount(saved)
     }
 
-    private fun drawFlameLine(canvas:Canvas,path:Path) {
-        for((width,alpha) in listOf(6 to 50,3 to 115,1 to 255)) {
+    private fun drawFlameShape(canvas:Canvas,path:Path) {
+        for((width,alpha) in listOf(10 to 55,6 to 110,3 to 200)) {
             neonPaint.color=withAlpha(neonColor,alpha);neonPaint.strokeWidth=dp(width).toFloat().coerceAtLeast(1f)
             canvas.drawPath(path,neonPaint)
         }
+        flameFill.color=withAlpha(neonColor,230)
+        canvas.drawPath(path,flameFill)
+        neonPaint.color=Color.WHITE
+        neonPaint.strokeWidth=(resources.displayMetrics.density*1.3f).coerceAtLeast(1f)
+        canvas.drawPath(path,neonPaint)
     }
 
     private fun withAlpha(color:Int,alpha:Int)=Color.argb(alpha,Color.red(color),Color.green(color),Color.blue(color))

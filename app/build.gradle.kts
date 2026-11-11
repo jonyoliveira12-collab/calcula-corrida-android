@@ -11,14 +11,14 @@ android {
         applicationId = "br.com.calculacorrida"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.4.7"
+        versionCode = 14
+        versionName = "0.4.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes.getByName("debug") {
         // Evaluation installs alongside older builds signed with a different key.
-        applicationIdSuffix = ".avaliacao047"
+        applicationIdSuffix = ".avaliacao048"
     }
 
     // Signing material is injected from private Actions secrets, never from source control.

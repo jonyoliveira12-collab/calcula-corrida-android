@@ -56,6 +56,7 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         setContentView(R.layout.activity_login)
+        findViewById<android.widget.TextView>(R.id.appVersionLabel).text="Versão ${packageManager.getPackageInfo(packageName,0).versionName}"
         AppUpdates.check(this)
         val auth = findViewById<android.widget.LinearLayout>(R.id.authContent)
         fun fitLogin() {

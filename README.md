@@ -22,7 +22,7 @@ Na versão 0.4.5, quando o Android identifica uma janela do Nubank entre as jane
 
 O usuário também pode escolher “DESLIGAR PARA USAR BANCO” no perfil ou no menu CC. Isso desativa o serviço de acessibilidade, preservando as opções de Copiloto e Semáforo; a reativação exige ação explícita do usuário nos ajustes do Android. “Pausar leitura” sozinho não desativa o serviço de acessibilidade. O usuário relatou que o Nubank abriu quando a leitura foi desativada, mas a causa específica da avaliação de risco continua sem confirmação do banco.
 
-O nome exibido é JHONDRIVER. A avaliação 0.4.7 usa o pacote `br.com.calculacorrida.avaliacao047`, diferente das versões anteriores e do pacote oficial `br.com.calculacorrida`. Ela pode ser instalada ao lado da versão anterior sem apagar os dados locais, mas terá login, permissões e configurações próprios. Antes de testar, desative a leitura da instalação antiga para não executar dois leitores ao mesmo tempo.
+O nome exibido é JHONDRIVER. A avaliação 0.4.8 usa o pacote `br.com.calculacorrida.avaliacao048`, diferente das versões anteriores e do pacote oficial `br.com.calculacorrida`. Ela pode ser instalada ao lado da versão anterior sem apagar os dados locais, mas terá login, permissões e configurações próprios. Antes de testar, desative a leitura da instalação antiga para não executar dois leitores ao mesmo tempo.
 
 ## Login
 
@@ -40,7 +40,11 @@ As janelas dos aplicativos de motorista são analisadas e exibidas por origem, c
 
 ### Chamas neon no cartão (0.4.7)
 
-O cartão flutuante usa contorno neon e chamas estáticas em vermelho, amarelo ou verde, de acordo com a classificação, mantendo os valores legíveis e o botão de fechar acessível. A opção “Chamas neon” pode ser desligada nas configurações; os temas e campos existentes continuam configuráveis. A prévia apresenta exemplos calculados para cada classificação. O estilo é puramente visual e não altera o cálculo nem a leitura automática.
+O cartão flutuante usa contorno neon e chamas em vermelho, amarelo ou verde, de acordo com a classificação. Na 0.4.8 as chamas ficam maiores e podem se mover; o efeito respeita a opção de animação do sistema e pode ser desligado nas configurações. Os valores ficam fora da área do fogo e o botão de fechar permanece acessível. A prévia apresenta exemplos calculados para cada classificação.
+
+### Percurso e versão ativa (0.4.8)
+
+Para a Uber, uma linha isolada com tempo e distância não é considerada total sem indicação de estimativa, rótulo de total ou dois trechos que o confirmem; nesse caso o leitor tenta a imagem completa antes de calcular. A tela inicial avisa quando outra instalação do JHONDRIVER tem acessibilidade ativa. A versão é exibida no login e na tela inicial para ajudar a identificar qual leitor está em uso.
 
 O aviso de atualização procura releases com pacote/certificado compatíveis e versão maior. A pessoa confirma o download/instalação. Versões antigas sem verificador precisam de uma instalação manual inicial. O APK debug de avaliação não substitui o app oficial.
 

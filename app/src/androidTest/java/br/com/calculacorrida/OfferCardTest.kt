@@ -140,12 +140,32 @@ class OfferCardTest {
                     assertTrue("Compact neon card height",view.height<200*context.resources.displayMetrics.density)
                     val badge=view.getChildAt(0) as android.widget.TextView
                     assertNotNull("Flames are on by default",badge.compoundDrawables[0])
-                    val bitmap=android.graphics.Bitmap.createBitmap(width,view.height,android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas=android.graphics.Canvas(bitmap)
-                    canvas.drawColor(Color.rgb(28,29,32))
-                    view.draw(canvas)
-                    java.io.File(dir,"card-neon-$name.png").outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
-                    bitmap.recycle()
+                    for((backgroundName,background) in listOf("dark" to Color.rgb(28,29,32),"light" to Color.rgb(235,241,249))) {
+                        val bitmap=android.graphics.Bitmap.createBitmap(width,view.height,android.graphics.Bitmap.Config.ARGB_8888)
+                        val canvas=android.graphics.Canvas(bitmap)
+                        canvas.drawColor(background)
+                        view.draw(canvas)
+                        java.io.File(dir,"card-fire-$name-$backgroundName.png").outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
+                        if(backgroundName=="light") {
+                            val body=view.getChildAt(1)
+                            val density=context.resources.displayMetrics.density
+                            var visibleFirePixels=0
+                            for(y in (body.bottom-(22*density).toInt()).coerceAtLeast(0) until (body.bottom-(3*density).toInt()).coerceAtMost(bitmap.height)) {
+                                for(x in (body.left+(8*density).toInt()).coerceAtLeast(0) until (body.right-(8*density).toInt()).coerceAtMost(bitmap.width)) {
+                                    val p=bitmap.getPixel(x,y)
+                                    val red=Color.red(p);val green=Color.green(p);val blue=Color.blue(p)
+                                    val isFire=when(name) {
+                                        "red" -> red>160 && red>green*1.35 && red>blue*1.35
+                                        "amber" -> red>170 && green>75 && blue<120
+                                        else -> green>110 && green>red*1.3 && green>blue*1.1
+                                    }
+                                    if(isFire)visibleFirePixels++
+                                }
+                            }
+                            assertTrue("Visible $name flames against a light map",visibleFirePixels>50)
+                        }
+                        bitmap.recycle()
+                    }
                 }
                 prefs.edit().putBoolean("card_neon_flames",false).commit()
                 val plain=OfferTagView(context)
@@ -191,6 +211,66 @@ class OfferCardTest {
             }
         } finally {
             activity?.let{instrumentation.runOnMainSync{it.finish()}}
+            val edit=prefs.edit().clear()
+            original.forEach{(k,v)->when(v){is Boolean->edit.putBoolean(k,v);is String->edit.putString(k,v);is Int->edit.putInt(k,v);is Float->edit.putFloat(k,v);is Long->edit.putLong(k,v)}}
+            edit.commit()
+        }
+    }
+
+    @Test fun flamesAnimateWhileVisibleAndStopWhenDisabled() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val ui=instrumentation.uiAutomation
+        fun shell(command:String)=android.os.ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand(command)).bufferedReader().use{it.readText().trim()}
+        val oldScale=shell("settings get global animator_duration_scale")
+        val prefs=context.getSharedPreferences("settings",0)
+        val original=prefs.all
+        var activity:android.app.Activity?=null
+        try {
+            shell("settings put global animator_duration_scale 1")
+            prefs.edit().putBoolean("card_neon_flames",true).putBoolean("card_neon_animated",true)
+                .putBoolean("card_banner",true).putString("card_banner_position","above").commit()
+            activity=instrumentation.startActivitySync(android.content.Intent(context,CardStyleActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            instrumentation.waitForIdleSync()
+            repeat(30){if(!android.animation.ValueAnimator.areAnimatorsEnabled())Thread.sleep(100)}
+            assertTrue("System animations enabled for this test",android.animation.ValueAnimator.areAnimatorsEnabled())
+            var preview:OfferTagView?=null
+            var toggle:android.widget.Switch?=null
+            instrumentation.runOnMainSync {
+                fun views(v:android.view.View):List<android.view.View> = listOf(v)+
+                    if(v is android.view.ViewGroup)(0 until v.childCount).flatMap{views(v.getChildAt(it))} else emptyList()
+                val all=views(activity!!.window.decorView)
+                preview=all.filterIsInstance<OfferTagView>().single()
+                toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Animar chamas"}
+                assertTrue(preview!!.isAttachedToWindow)
+                assertTrue(toggle!!.isChecked)
+            }
+            fun snapshot():IntArray {
+                var pixels=IntArray(0)
+                instrumentation.runOnMainSync {
+                    val v=preview!!
+                    assertTrue(v.width>0 && v.height>0)
+                    val bitmap=android.graphics.Bitmap.createBitmap(v.width,v.height,android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas=android.graphics.Canvas(bitmap);canvas.drawColor(Color.rgb(235,241,249));v.draw(canvas)
+                    pixels=IntArray(bitmap.width*bitmap.height)
+                    bitmap.getPixels(pixels,0,bitmap.width,0,0,bitmap.width,bitmap.height)
+                    bitmap.recycle()
+                }
+                return pixels
+            }
+            val first=snapshot()
+            Thread.sleep(720)
+            assertFalse("Visible flames change over time",first.contentEquals(snapshot()))
+            instrumentation.runOnMainSync {toggle!!.performClick()}
+            Thread.sleep(200)
+            val stopped=snapshot()
+            Thread.sleep(450)
+            assertTrue("Disabled flames stay still",stopped.contentEquals(snapshot()))
+        } finally {
+            activity?.let{instrumentation.runOnMainSync{it.finish()}}
+            if(oldScale.matches(Regex("[0-9]+(?:\\.[0-9]+)?")))shell("settings put global animator_duration_scale $oldScale")
+            else shell("settings delete global animator_duration_scale")
             val edit=prefs.edit().clear()
             original.forEach{(k,v)->when(v){is Boolean->edit.putBoolean(k,v);is String->edit.putString(k,v);is Int->edit.putInt(k,v);is Float->edit.putFloat(k,v);is Long->edit.putLong(k,v)}}
             edit.commit()

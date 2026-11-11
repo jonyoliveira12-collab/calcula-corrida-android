@@ -112,6 +112,7 @@ class MainActivity : Activity() {
             setPadding(dp(10), 0, 0, 0)
             addView(label("JHONDRIVER", 21f, Color.WHITE, true))
             addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, gold, true))
+            addView(label("Versão ${packageManager.getPackageInfo(packageName,0).versionName}", 9f, gold, false))
         }
         brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         val avatar = ImageView(this).apply {
@@ -234,6 +235,14 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val records = JourneyStore.getRecords(this)
         val wide = resources.configuration.screenWidthDp >= 600
+        val enabledServices=Settings.Secure.getString(contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        if(ReaderVersions.hasOtherEnabledService(enabledServices,packageName)) {
+            val conflict=card()
+            conflict.addView(label("Outra versão está lendo corridas",16f,gold,true))
+            conflict.addView(label("Desligue a acessibilidade das versões antigas do JHONDRIVER e deixe ativa somente a desta versão. Seus dados antigos continuam guardados.",13f,white,false,4,8))
+            conflict.addView(action("ABRIR AJUSTES DE ACESSIBILIDADE  ›",false) { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
+            content.addView(conflict,margin(0,10))
+        }
         val diagnostics = card()
         val serviceOn = isAccessibilityEnabled()
         diagnostics.addView(label("LEITURA DE OFERTAS", 12f, gold, true))

@@ -20,6 +20,8 @@ class LoginControlsTest {
         SessionManager(context).logout()
         val activity=instrumentation.startActivitySync(Intent(context,LoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         instrumentation.runOnMainSync {
+            val version=activity.findViewById<android.widget.TextView>(R.id.appVersionLabel)
+            assertEquals("Versão ${context.packageManager.getPackageInfo(context.packageName,0).versionName}",version.text.toString())
             val password=activity.findViewById<EditText>(R.id.passwordInput)
             val eye=activity.findViewById<ImageButton>(R.id.togglePasswordButton)
             password.setText("senha-de-teste")

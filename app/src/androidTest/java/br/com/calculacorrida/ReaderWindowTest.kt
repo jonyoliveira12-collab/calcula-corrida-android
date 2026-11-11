@@ -31,6 +31,7 @@ class ReaderWindowTest {
             assertTrue("Local OCR initialized",context.getSharedPreferences("settings",0).getBoolean("reader_model_ready",false))
             val scenarios=listOf(
                 listOf("com.ubercab.driver","40,33","0","partial"),
+                listOf("com.ubercab.driver","48,00","0","partial_dot"),
                 listOf("com.ubercab.driver","47,27","0","small"),
                 listOf("com.ubercab.driver","55,76","1","normal"),
                 listOf("com.app99.driver","32,45","0","normal"),
@@ -72,6 +73,11 @@ class ReaderWindowTest {
             }
             val diagnostic=listOf("reader_status","reader_capture_status","reader_ocr_status").joinToString(" / "){settings.getString(it,"").orEmpty()}
             assertTrue("OCR $driver $layout rotation=$rotation: $diagnostic",found)
+            if(layout=="partial_dot") {
+                val rows=JourneyStore.getRecords(context).filter{it.optLong("timestamp")>=drawnAt && kotlin.math.abs(it.optDouble("fare")-24.0)<0.001}
+                assertTrue("Full synthetic route is recorded",rows.any{kotlin.math.abs(it.optDouble("minutes")-30.0)<0.001 && kotlin.math.abs(it.optDouble("totalKm")-12.0)<0.001})
+                assertFalse("Pickup alone is never recorded as the complete offer",rows.any{kotlin.math.abs(it.optDouble("minutes")-10.0)<0.001 || kotlin.math.abs(it.optDouble("totalKm")-4.0)<0.001})
+            }
             val elapsed=detectedAt-drawnAt
             instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream","$driver/$layout DETECTION_MS=$elapsed $diagnostic\n")})
             assertTrue("Fresh detection for $driver/$layout: $elapsed ms",elapsed>=0)

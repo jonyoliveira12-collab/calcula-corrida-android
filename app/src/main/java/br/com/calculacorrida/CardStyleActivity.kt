@@ -30,6 +30,7 @@ class CardStyleActivity : Activity() {
         toggle("Comentário da IA","card_ai",false)
         title("APARÊNCIA",13)
         toggle("Chamas neon","card_neon_flames",true)
+        toggle("Animar chamas","card_neon_animated",true)
         toggle("Aviso em destaque","card_banner",true)
         toggle("Exibir o motivo","card_compact_reason",false)
         title("Posição do aviso",16)
