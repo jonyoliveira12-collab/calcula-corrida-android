@@ -244,7 +244,7 @@ class MainActivity : Activity() {
         diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
             prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
         })
-        diagnostics.addView(label("Pausar mantém a acessibilidade ligada. Para usar um banco, desligue o serviço abaixo.", 12f, muted, false, 0, 2))
+        diagnostics.addView(label("Pausar mantém a acessibilidade ligada. Se o banco bloquear, você pode desligar o serviço abaixo.", 12f, muted, false, 0, 2))
         diagnostics.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", false) {
             if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()
         })
