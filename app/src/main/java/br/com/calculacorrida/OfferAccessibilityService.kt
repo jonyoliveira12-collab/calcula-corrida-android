@@ -248,14 +248,20 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private var active: OfferAccessibilityService? = null
+        @Volatile private var active: OfferAccessibilityService? = null
         fun stopReading(): Boolean {
             val service = active ?: return false
             service.stopped = true
             service.readerHandler.removeCallbacks(service.poll)
-            service.hideAllOverlays()
-            service.removeBubble()
-            service.disableSelf()
+            // The windows and their maps belong to the main thread. Calls from
+            // instrumentation or another worker must not race the polling loop.
+            val cleanup = {
+                service.hideAllOverlays()
+                service.removeBubble()
+                service.disableSelf()
+            }
+            if (Looper.myLooper() == Looper.getMainLooper()) cleanup()
+            else service.readerHandler.post { cleanup() }
             return true
         }
     }

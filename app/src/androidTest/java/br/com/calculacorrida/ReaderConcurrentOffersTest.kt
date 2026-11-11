@@ -134,7 +134,7 @@ class ReaderConcurrentOffersTest {
             context.getSharedPreferences("journey", 0).edit().apply {
                 if (originalJourney == null) remove("offers") else putString("offers", originalJourney)
             }.commit()
-            OfferAccessibilityService.stopReading()
+            instrumentation.runOnMainSync { OfferAccessibilityService.stopReading() }
             if (oldServices == "null" || oldServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
             else shell("settings put secure enabled_accessibility_services '$oldServices'")
             if (oldEnabled == "null" || oldEnabled.isBlank()) shell("settings delete secure accessibility_enabled")
