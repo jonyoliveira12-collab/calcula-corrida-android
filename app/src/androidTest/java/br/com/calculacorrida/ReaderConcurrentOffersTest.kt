@@ -139,10 +139,10 @@ class ReaderConcurrentOffersTest {
             await("Both driver windows are simultaneously visible") {
                 driverWindow("com.ubercab.driver") != null && driverWindow("com.app99.driver") != null
             }
-            val uberSummary = listOf("18 min", "6,60 km", "R$ 9,09")
-            val ninetyNineSummary = listOf("31 min", "11,20 km", "R$ 11,59")
-            fun uberTag() = findTag("UBER", uberSummary, listOf("1,38", "30,30", "4,87"))
-            fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("1,03", "22,43", "4,96"))
+            val uberSummary = listOf("20 min", "8,00 km", "R$ 12,00")
+            val ninetyNineSummary = listOf("30 min", "15,00 km", "R$ 30,00")
+            fun uberTag() = findTag("UBER", uberSummary, listOf("1,50", "36,00", "4,80"))
+            fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("2,00", "60,00", "4,90"))
             await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
 
             val uber = uberTag()!!
@@ -153,8 +153,8 @@ class ReaderConcurrentOffersTest {
             assertTrue("99 tag is inside the 99 window", ninetyNinePane.contains(ninetyNine.centerX(), ninetyNine.centerY()))
             assertFalse("The tags do not overlap", Rect.intersects(uber, ninetyNine))
             val records = JourneyStore.getRecords(context).filter { it.optLong("timestamp") >= startedAt }
-            assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-9.09)<0.001 })
-            assertTrue("99 offer recorded", records.any { it.optString("app") == "99" && kotlin.math.abs(it.optDouble("fare")-11.59)<0.001 })
+            assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-12.0)<0.001 })
+            assertTrue("99 offer recorded", records.any { it.optString("app") == "99" && kotlin.math.abs(it.optDouble("fare")-30.0)<0.001 })
 
             shell("am force-stop com.app99.driver")
             await("Closing 99 removes only its tag", 10000) { ninetyNineTag() == null && uberTag() != null }

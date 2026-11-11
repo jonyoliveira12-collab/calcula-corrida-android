@@ -46,8 +46,8 @@ public class OfferFixtureActivity extends Activity {
                 if(floating)lines=new String[]{"R$ 17,37","26 min • 16.4 km","4,98 (303)","12 min (9.3 km)","14 minutos (7.1 km)","Tenho interesse"};
                 if(getPackageName().equals("com.app99.driver"))lines=new String[]{"Não afeta a TA","R$11,90","R$2,95 Tarifa base dinâmica inicial.","4,79 · +999 corridas · Perfil Premium","10min (4,4km)","12min (6km)"};
                 if(getPackageName().equals("sinet.startup.inDriver"))lines=new String[]{"R$ 30,00","30 min • 12.0 km","Nota 4,90","5 min (2.0 km)","25 min (10.0 km)","Aceitar"};
-                if(dual && getPackageName().equals("com.ubercab.driver"))lines=new String[]{"UberX Exclusivo","R$ 9,09","18 min • 6.6 km • Est. de R$1,38/km","4,87 (566)","3 min (0.6 km)","15 minutos (6.0 km)","Aceitar"};
-                if(dual && getPackageName().equals("com.app99.driver"))lines=new String[]{"Negocia · Pgto. no app","R$11,59","4,96 · 152 corridas · Perfil Essencial","9min (3km)","22min (8,2km)","Aceitar por R$11,59","R$12,17   R$12,75   R$13,33"};
+                if(dual && getPackageName().equals("com.ubercab.driver"))lines=new String[]{"UberX Exclusivo","R$ 12,00","20 min • 8.0 km • Est. de R$1,50/km","4,80 (100)","4 min (1.0 km)","16 minutos (7.0 km)","Aceitar"};
+                if(dual && getPackageName().equals("com.app99.driver"))lines=new String[]{"Negocia · Pgto. no app","R$30,00","4,90 · 110 corridas · Perfil Essencial","5min (3km)","25min (12km)","Aceitar por R$30,00","R$31,00   R$32,00   R$33,00"};
                 float first=floating?35*d:("small".equals(layout)?getHeight()*0.42f:Math.max(35*d,getHeight()-210*d));
                 for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*32*d,paint);
             }

@@ -7,42 +7,42 @@ class OfferCalculationTest {
     @Test fun onlyTheOfficialNinetyNineDriverPackageIsRecognized() {
         assertEquals("99", DriverPackages.name("com.app99.driver"))
         assertNull(DriverPackages.name("com.taxis99"))
-        assertFalse(IncomingOfferPolicy.isIncoming("com.taxis99", "R$11,59 9min (3km) 22min (8,2km) Aceitar"))
+        assertFalse(IncomingOfferPolicy.isIncoming("com.taxis99", "R$30,00 5min (3km) 25min (12km) Aceitar"))
     }
     @Test fun ninetyNineNegotiationUsesAcceptPriceNotSuggestedCounteroffers() {
         val text="""Negocia · Pgto. no app
-R$11,59
-4,96 · 152 corridas · Perfil Essencial
-9min (3km)
-22min (8,2km)
-Aceitar por R$11,59
-R$12,17   R$12,75   R$13,33"""
+R$30,00
+4,90 · 110 corridas · Perfil Essencial
+5min (3km)
+25min (12km)
+Aceitar por R$30,00
+R$31,00   R$32,00   R$33,00"""
         assertTrue(IncomingOfferPolicy.isIncoming("com.app99.driver", text))
         val offer = OfferTextParser.parse(text, "com.app99.driver")!!
-        assertEquals(11.59, offer.fare, 0.000001)
-        assertEquals(9.0, offer.pickupMinutes!!, 0.000001)
-        assertEquals(31.0, offer.minutes, 0.000001)
-        assertEquals(11.2, offer.pickupKm + offer.tripKm, 0.000001)
-        assertEquals("4.96", offer.passengerRating)
+        assertEquals(30.0, offer.fare, 0.000001)
+        assertEquals(5.0, offer.pickupMinutes!!, 0.000001)
+        assertEquals(30.0, offer.minutes, 0.000001)
+        assertEquals(15.0, offer.pickupKm + offer.tripKm, 0.000001)
+        assertEquals("4.90", offer.passengerRating)
         val result = TripCalculator.calculate(offer.fare, offer.pickupKm, offer.tripKm, offer.minutes)!!
-        assertEquals(11.59 / 11.2, result.perKm, 0.000001)
-        assertEquals(11.59 * 60 / 31, result.perHour, 0.000001)
-        assertEquals(11.59, OfferTextParser.fareOrNull(text, "com.app99.driver")!!, 0.000001)
-        assertEquals(11.59, OfferTextParser.parse(text, "com.didiglobal.driver")!!.fare, 0.000001)
-        val ocrMissingComma = text.replace("4,96 · 152 corridas", "496. 152 corridas")
-        assertEquals("4.96", OfferTextParser.parse(ocrMissingComma, "com.app99.driver")!!.passengerRating)
+        assertEquals(2.0, result.perKm, 0.000001)
+        assertEquals(60.0, result.perHour, 0.000001)
+        assertEquals(30.0, OfferTextParser.fareOrNull(text, "com.app99.driver")!!, 0.000001)
+        assertEquals(30.0, OfferTextParser.parse(text, "com.didiglobal.driver")!!.fare, 0.000001)
+        val ocrMissingComma = text.replace("4,90 · 110 corridas", "490. 110 corridas")
+        assertEquals("4.90", OfferTextParser.parse(ocrMissingComma, "com.app99.driver")!!.passengerRating)
         for (separator in listOf(".", "-", "–", ":", "•")) {
-            val ocrPunctuation = text.replace("4,96 · 152 corridas", "4,96 $separator 152 corridas")
-            assertEquals("4.96", OfferTextParser.parse(ocrPunctuation, "com.app99.driver")!!.passengerRating)
+            val ocrPunctuation = text.replace("4,90 · 110 corridas", "4,90 $separator 110 corridas")
+            assertEquals("4.90", OfferTextParser.parse(ocrPunctuation, "com.app99.driver")!!.passengerRating)
         }
         assertNull("Do not apply the 99-only rule to another app", OfferTextParser.parse(text, "com.ubercab.driver"))
     }
     @Test fun ninetyNineAmbiguousNegotiationNeverInventsFare() {
-        val route="9min (3km) 22min (8,2km)"
-        assertNull(OfferTextParser.parse("R$11,59 $route Aceitar R$12,17 R$12,75", "com.app99.driver"))
-        assertNull(OfferTextParser.parse("R$10,59 $route Aceitar por R$11,59 R$12,17", "com.app99.driver"))
-        assertNull(OfferTextParser.parse("R$11,59 $route Aceitar por R$11,59 Aceitar por R$12,17", "com.app99.driver"))
-        assertNull(OfferTextParser.fareOrNull("R$11,59 R$12,17", "com.app99.driver"))
+        val route="5min (3km) 25min (12km)"
+        assertNull(OfferTextParser.parse("R$30,00 $route Aceitar R$31,00 R$32,00", "com.app99.driver"))
+        assertNull(OfferTextParser.parse("R$29,00 $route Aceitar por R$30,00 R$31,00", "com.app99.driver"))
+        assertNull(OfferTextParser.parse("R$30,00 $route Aceitar por R$30,00 Aceitar por R$31,00", "com.app99.driver"))
+        assertNull(OfferTextParser.fareOrNull("R$30,00 R$31,00", "com.app99.driver"))
     }
     @Test fun referenceOffer() {
         val result = TripCalculator.calculate(18.40, 1.4, 11.2, 28.0)!!
@@ -101,9 +101,9 @@ R$ 28,81
 +R$ 6,00 incluído
 + R$ 3,57 incluída para retirada prioritária
 6 min (2.2 km)
-Rua Angela Ganz
+Rua Exemplo A
 25 minutos (16.9 km)
-Rua Vicente Alves Padilha
+Rua Exemplo B
 Tenho interesse""")!!
         assertEquals("4.76",offer.passengerRating)
         assertEquals(28.81,offer.fare,0.000001)
