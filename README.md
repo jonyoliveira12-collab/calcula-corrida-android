@@ -36,7 +36,7 @@ O app está configurado para Android 16 (API 36), exigido em novos envios à Pla
 
 ### Ofertas simultâneas (0.4.6)
 
-As janelas dos aplicativos de motorista são analisadas e exibidas por origem, com uma etiqueta independente para cada aplicativo. Na oferta de negociação da 99, o valor de “Aceitar por” identifica o preço atual e não os valores sugeridos para contraproposta; valores contraditórios ou incompletos continuam sem cálculo. Há um teste em emulador com duas janelas e ofertas sintéticas simultâneas; o comportamento com as versões reais da Uber/99 no tablet ainda precisa de validação no aparelho.
+As janelas dos aplicativos de motorista são analisadas e exibidas por origem, com uma etiqueta independente para cada aplicativo. O escopo foi corrigido para o pacote oficial da 99 Motorista (`com.app99.driver`); o aplicativo de passageiro (`com.taxis99`) foi removido. Na oferta de negociação da 99, o valor de “Aceitar por” identifica o preço atual e não os valores sugeridos para contraproposta; valores contraditórios ou incompletos continuam sem cálculo. Há um teste em emulador com duas janelas e ofertas sintéticas simultâneas; o comportamento com as versões reais da Uber/99 no tablet ainda precisa de validação no aparelho.
 
 O aviso de atualização procura releases com pacote/certificado compatíveis e versão maior. A pessoa confirma o download/instalação. Versões antigas sem verificador precisam de uma instalação manual inicial. O APK debug de avaliação não substitui o app oficial.
 

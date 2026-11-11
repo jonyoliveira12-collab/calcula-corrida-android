@@ -48,8 +48,7 @@ object OfferTextParser {
         // "Aceitar por R$..." action and several suggested counteroffers.
         // Only the explicit accept action identifies the current offer;
         // arbitrary monetary amounts must never be selected as the fare.
-        val pkg = sourcePackage?.lowercase(java.util.Locale.ROOT)
-        if (pkg == "com.taxis99" || pkg == "com.didiglobal.driver") {
+        if (DriverPackages.name(sourcePackage.orEmpty()) == "99") {
             val acceptPrefix = Regex("""\baceitar\s+(?:a\s+corrida\s+)?por\s*[:\-]?\s*$""", RegexOption.IGNORE_CASE)
             val buttons = matches.filter { (match, _) ->
                 acceptPrefix.containsMatchIn(text.substring(0, match.range.first).takeLast(80))

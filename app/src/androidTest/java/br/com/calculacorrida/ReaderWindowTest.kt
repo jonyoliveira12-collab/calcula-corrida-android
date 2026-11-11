@@ -33,11 +33,11 @@ class ReaderWindowTest {
                 listOf("com.ubercab.driver","40,33","0","partial"),
                 listOf("com.ubercab.driver","47,27","0","small"),
                 listOf("com.ubercab.driver","55,76","1","normal"),
-                listOf("com.taxis99","32,45","0","normal"),
+                listOf("com.app99.driver","32,45","0","normal"),
                 listOf("com.ubercab.driver","40,08","0","floating"),
                 listOf("sinet.startup.inDriver","60,00","1","normal"))
             for((driver,expected,rotation,layout) in scenarios) {
-            listOf("com.ubercab.driver","com.taxis99","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
+            listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
             shell("appops set $driver SYSTEM_ALERT_WINDOW allow")
             shell("wm user-rotation lock $rotation")
             instrumentation.runOnMainSync {focusWindow?.let {wm.removeView(it)};focusWindow=null}
@@ -81,7 +81,7 @@ class ReaderWindowTest {
         } finally {
             instrumentation.runOnMainSync { focusWindow?.let {wm.removeView(it)} }
             context.getSharedPreferences("settings",0).edit().putBoolean("card_details",false).commit()
-            listOf("com.ubercab.driver","com.taxis99","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
+            listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
             shell("wm user-rotation free")
             OfferAccessibilityService.stopReading()
             if(oldServices=="null"||oldServices.isBlank())shell("settings delete secure enabled_accessibility_services")else shell("settings put secure enabled_accessibility_services '$oldServices'")

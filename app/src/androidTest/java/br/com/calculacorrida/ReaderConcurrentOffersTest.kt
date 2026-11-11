@@ -58,9 +58,9 @@ class ReaderConcurrentOffersTest {
         try {
             shell("settings delete secure enabled_accessibility_services")
             shell("settings put secure accessibility_enabled 0")
-            listOf("com.ubercab.driver", "com.taxis99", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
+            listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation lock 1")
-            listOf(context.packageName, "com.ubercab.driver", "com.taxis99").forEach { shell("appops set $it SYSTEM_ALERT_WINDOW allow") }
+            listOf(context.packageName, "com.ubercab.driver", "com.app99.driver").forEach { shell("appops set $it SYSTEM_ALERT_WINDOW allow") }
             prefs.edit().putBoolean("copilot_enabled", true).putBoolean("traffic_enabled", false)
                 .putBoolean("reader_paused", false).putBoolean("reader_disclosure_accepted", true)
                 .putBoolean("reader_model_ready", false).putBoolean("card_km", true)
@@ -72,9 +72,9 @@ class ReaderConcurrentOffersTest {
 
             val startedAt = System.currentTimeMillis()
             shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual")
-            shell("am start -W -n com.taxis99/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual")
+            shell("am start -W -n com.app99.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual")
             await("Both driver windows are simultaneously visible") {
-                driverWindow("com.ubercab.driver") != null && driverWindow("com.taxis99") != null
+                driverWindow("com.ubercab.driver") != null && driverWindow("com.app99.driver") != null
             }
             val uberSummary = "UBER  18 min • 6,60 km • R$ 9,09"
             val ninetyNineSummary = "99  31 min • 11,20 km • R$ 11,59"
@@ -85,7 +85,7 @@ class ReaderConcurrentOffersTest {
             val uber = uberTag()!!
             val ninetyNine = ninetyNineTag()!!
             val uberPane = driverWindow("com.ubercab.driver")!!
-            val ninetyNinePane = driverWindow("com.taxis99")!!
+            val ninetyNinePane = driverWindow("com.app99.driver")!!
             assertTrue("Uber tag is inside the Uber window", uberPane.contains(uber.centerX(), uber.centerY()))
             assertTrue("99 tag is inside the 99 window", ninetyNinePane.contains(ninetyNine.centerX(), ninetyNine.centerY()))
             assertFalse("The tags do not overlap", Rect.intersects(uber, ninetyNine))
@@ -93,10 +93,10 @@ class ReaderConcurrentOffersTest {
             assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-9.09)<0.001 })
             assertTrue("99 offer recorded", records.any { it.optString("app") == "99" && kotlin.math.abs(it.optDouble("fare")-11.59)<0.001 })
 
-            shell("am force-stop com.taxis99")
+            shell("am force-stop com.app99.driver")
             await("Closing 99 removes only its tag", 10000) { ninetyNineTag() == null && uberTag() != null }
         } finally {
-            listOf("com.ubercab.driver", "com.taxis99", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
+            listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")
             prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).remove("card_hold_seconds").commit()
             context.getSharedPreferences("journey", 0).edit().apply {

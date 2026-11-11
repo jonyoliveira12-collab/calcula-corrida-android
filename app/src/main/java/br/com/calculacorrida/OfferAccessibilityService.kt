@@ -261,13 +261,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun driverAppName(pkg: String): String? {
-        return when (pkg.lowercase(java.util.Locale.ROOT)) {
-            "com.ubercab.driver" -> "UBER"
-            "com.taxis99", "com.didiglobal.driver" -> "99"
-            "sinet.startup.indriver" -> "INDRIVE"
-            "br.com.ifood.driver.app" -> "IFOOD"
-            else -> null
-        }
+        return DriverPackages.name(pkg)
     }
 
     private var lastEventScan=0L
