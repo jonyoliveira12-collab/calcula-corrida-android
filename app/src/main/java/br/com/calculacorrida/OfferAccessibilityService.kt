@@ -43,6 +43,12 @@ class OfferAccessibilityService : AccessibilityService() {
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var bubbleOwner: String? = null
     private val screenshotExecutor = Executors.newSingleThreadExecutor()
+    // Android can deliver a pending screenshot callback after the service has
+    // been destroyed. Still run that callback so it can release the buffer.
+    private val screenshotCallbackExecutor = java.util.concurrent.Executor { task ->
+        try { screenshotExecutor.execute(task) }
+        catch (_: java.util.concurrent.RejectedExecutionException) { task.run() }
+    }
     private val textRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     @Volatile private var screenshotInProgress = false
     @Volatile private var lastScreenshotAt = 0L
@@ -467,8 +473,8 @@ class OfferAccessibilityService : AccessibilityService() {
                         readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
                     }
                 }
-            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotExecutor, callback)
-            else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotExecutor, callback)
+            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotCallbackExecutor, callback)
+            else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotCallbackExecutor, callback)
         } catch (_: Exception) {
             if(lastScreenshotAt==requestTime) screenshotInProgress = false
             readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
