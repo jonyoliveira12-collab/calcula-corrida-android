@@ -1,0 +1,51 @@
+name: Share verified JHONDRIVER 0.4.7
+on:
+  push:
+    branches: [share/apk-0.4.7-browser]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Wait for complete source verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..60}; do
+            source_status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43098628305" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")' 2>/dev/null || true)
+            if [[ "$source_status" == "e21bda0234e9ebdb222135915681fc3c230d2f47 completed success" ]]; then exit 0; fi
+            if [[ "$source_status" == *" completed "* ]]; then echo "Source verification did not pass: $source_status"; exit 1; fi
+            sleep 20
+          done
+          echo "Timed out waiting for source verification"; exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 43098628305
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify the evaluation APK
+        run: |
+          set -euo pipefail
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.4.7.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose verified-apk/JHONDRIVER-0.4.7.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging verified-apk/JHONDRIVER-0.4.7.apk | grep -F "package: name='br.com.calculacorrida.avaliacao047' versionCode='13' versionName='0.4.7'"
+          sha256sum verified-apk/JHONDRIVER-0.4.7.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-0.4.7
+          target_commitish: ${{ github.sha }}
+          name: JHONDRIVER 0.4.7
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: verified-apk/JHONDRIVER-0.4.7.apk
+          body: |
+            APK de avaliação com etiquetas e chamas neon em vermelho, amarelo e verde.
+            Gerado após testes automáticos em Android. A leitura das ofertas reais deve ser verificada no aparelho.
+            Esta avaliação instala ao lado das versões anteriores, com login, permissões e configurações próprios. Desligue a leitura da versão antiga antes de testar.
+            A assinatura é de avaliação. Não há garantia de aprovação pelo Play Protect ou compatibilidade com aplicativos de bancos.
