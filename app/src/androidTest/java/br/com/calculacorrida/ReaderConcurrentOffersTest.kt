@@ -20,13 +20,39 @@ class ReaderConcurrentOffersTest {
         val ui = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
         ui.serviceInfo = ui.serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS }
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand(command)).bufferedReader().use { it.readText().trim() }
+        fun nodeText(node: android.view.accessibility.AccessibilityNodeInfo, depth: Int = 0): List<String> {
+            if (depth > 12) return emptyList()
+            val result = mutableListOf<String>()
+            node.text?.toString()?.takeIf { it.isNotBlank() }?.let { result.add(it) }
+            node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { result.add(it) }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                try { result.addAll(nodeText(child, depth + 1)) } finally { child.recycle() }
+            }
+            return result
+        }
+        fun describeWindows(): String = ui.windows.joinToString(" / ") { window ->
+            val root = window.root ?: return@joinToString "no-root"
+            try {
+                val pkg = root.packageName?.toString().orEmpty()
+                val bounds = Rect().also { window.getBoundsInScreen(it) }
+                val texts = if (pkg == context.packageName) nodeText(root).distinct().joinToString(" | ").take(1000) else ""
+                "$pkg ${window.type} $bounds [$texts]"
+            } finally { root.recycle() }
+        }
         fun await(label: String, timeoutMs: Long = 45000, check: () -> Boolean) {
             val deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs
             while (!check() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
             val prefs = context.getSharedPreferences("settings", 0)
             val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
                 .joinToString(" / ") { prefs.getString(it, "").orEmpty() }
-            assertTrue("$label: $diagnostic", check())
+            if (!check()) {
+                // The emulator fixtures contain synthetic offers only.
+                val records = JourneyStore.getRecords(context).take(5).joinToString(" | ") {
+                    listOf(it.optString("app"), it.optDouble("fare"), it.optDouble("totalKm"), it.optDouble("minutes"), it.optDouble("perKm"), it.optDouble("perHour"), it.optString("passengerRating")).joinToString(";")
+                }
+                fail("$label: $diagnostic / records=$records / windows=${describeWindows()}")
+            }
         }
         fun findTag(source: String, summary: String, metrics: List<String>): Rect? {
             for (window in ui.windows) {
