@@ -1,0 +1,43 @@
+name: Share compact JHONDRIVER download
+on:
+  push:
+    branches: [share/apk-0.4.9-compact]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  share:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify tested source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43116887716" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")')
+          test "$status" = "32f761f1245a0007fe196a87d292f4942fa36858 completed success"
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 43116887716
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Package and verify the identical APK
+        run: |
+          set -euo pipefail
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.4.9.apk
+          echo 'e131a7c0650455c7b67952f5cb380af421bf47e3f450fea66c24f94aafd2c15b  verified-apk/JHONDRIVER-0.4.9.apk' | sha256sum --check
+          python3 - <<'PY'
+          import hashlib, zipfile
+          expected = 'e131a7c0650455c7b67952f5cb380af421bf47e3f450fea66c24f94aafd2c15b'
+          path = 'verified-apk/JHONDRIVER-0.4.9.apk'
+          with zipfile.ZipFile('JHONDRIVER-0.4.9.zip', 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              archive.write(path, 'JHONDRIVER-0.4.9.apk')
+          with zipfile.ZipFile('JHONDRIVER-0.4.9.zip') as archive:
+              assert archive.testzip() is None
+              assert hashlib.sha256(archive.read('JHONDRIVER-0.4.9.apk')).hexdigest() == expected
+          PY
+      - name: Add compact download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload preview-0.4.9 JHONDRIVER-0.4.9.zip --repo "$GITHUB_REPOSITORY"
