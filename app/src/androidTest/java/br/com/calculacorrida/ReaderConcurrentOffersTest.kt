@@ -64,7 +64,7 @@ class ReaderConcurrentOffersTest {
                         com.google.android.gms.tasks.Tasks.await(
                             recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(crop, 0)),
                             10, java.util.concurrent.TimeUnit.SECONDS
-                        ).text.replace('\n', ' | ')
+                        ).text.replace("\n", " | ")
                     } finally { crop.recycle() }
                 } finally { recognizer.close(); screenshot.recycle() }
             } catch (e: Exception) { "fixture OCR unavailable: ${e.javaClass.simpleName}" }
