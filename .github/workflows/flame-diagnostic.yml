@@ -34,12 +34,13 @@ jobs:
           target: google_apis
           disable-animations: true
           script: |
-            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleBackdropDebug
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb install -r reader-fixture/build/outputs/apk/backdrop/debug/reader-fixture-backdrop-debug.apk
             adb shell am instrument -w -r -e class br.com.calculacorrida.OfferOverlayAnimationTest br.com.calculacorrida.avaliacao049.test/androidx.test.runner.AndroidJUnitRunner | tee instrument.txt
             adb exec-out run-as br.com.calculacorrida.avaliacao049 tar -cf - files/screenshots > flame-debug.tar
-            grep -E '^OK \\([0-9]+ tests?\\)' instrument.txt
+            grep -F 'OK (' instrument.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

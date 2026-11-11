@@ -2,11 +2,9 @@ package br.com.calculacorrida
 
 import android.app.UiAutomation
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.ParcelFileDescriptor
-import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -36,7 +34,7 @@ class OfferOverlayAnimationTest {
                 .putBoolean("card_banner",true).putString("card_banner_position","above")
                 .putString("card_theme","light").putBoolean("card_details",false)
                 .putBoolean("card_ai",false).putBoolean("card_compact_reason",false).commit()
-            context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            shell("am start -W -n br.com.calculacorrida.fixture.backdrop/br.com.calculacorrida.fixture.OfferFixtureActivity")
             instrumentation.waitForIdleSync()
             instrumentation.runOnMainSync {
                 overlay=OfferTagView(context).apply {
@@ -97,6 +95,7 @@ class OfferOverlayAnimationTest {
             assertTrue("The in-app option stops floating flames",still.contentEquals(pixels()))
         } finally {
             overlay?.let{view->instrumentation.runOnMainSync{wm.removeView(view)}}
+            shell("am force-stop br.com.calculacorrida.fixture.backdrop")
             if(oldScale.matches(Regex("[0-9]+(?:\\.[0-9]+)?")))shell("settings put global animator_duration_scale $oldScale")
             else shell("settings delete global animator_duration_scale")
             val edit=prefs.edit().clear()
