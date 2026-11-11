@@ -366,7 +366,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun discardPreviousOfferIfFareChanged(pkg:String,text:String) {
-        val fare=OfferTextParser.fareOrNull(text) ?: return
+        val fare=OfferTextParser.fareOrNull(text,pkg) ?: return
         val previous=acceptedSignatures[pkg]?.substringBefore('|')?.toDoubleOrNull() ?: return
         if(kotlin.math.abs(fare-previous)>0.005) {
             hideOverlay(pkg)
@@ -387,7 +387,7 @@ class OfferAccessibilityService : AccessibilityService() {
             requestOfferScreenshot(pkg)
             return
         }
-        val offer=OfferTextParser.parse(screenText) ?: run {
+        val offer=OfferTextParser.parse(screenText,pkg) ?: run {
             discardPreviousOfferIfFareChanged(pkg,screenText)
             readerStatus("Conferindo os trechos da oferta antes de calcular")
             requestOfferScreenshot(pkg);return
@@ -511,7 +511,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = visionText.text
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
-                                    OfferTextParser.parse(recognized) else null
+                                    OfferTextParser.parse(recognized,pkg) else null
                                 prefs.edit().putString("reader_ocr_status","Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms").apply()
                                 if(offer==null)discardPreviousOfferIfFareChanged(pkg,recognized)
                                 if(offer==null && index<angles.lastIndex) {

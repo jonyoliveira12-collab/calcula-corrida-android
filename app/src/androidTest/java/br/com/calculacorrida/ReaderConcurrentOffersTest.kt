@@ -1,0 +1,112 @@
+package br.com.calculacorrida
+
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.UiAutomation
+import android.graphics.Rect
+import android.os.ParcelFileDescriptor
+import android.view.accessibility.AccessibilityWindowInfo
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/** Two CI-only driver apps draw different offers simultaneously in separate windows. */
+@RunWith(AndroidJUnit4::class)
+class ReaderConcurrentOffersTest {
+    @Test fun uberAndNinetyNineKeepTheirOwnConcurrentTags() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val ui = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+        ui.serviceInfo = ui.serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS }
+        fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand(command)).bufferedReader().use { it.readText().trim() }
+        fun await(label: String, timeoutMs: Long = 45000, check: () -> Boolean) {
+            val deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs
+            while (!check() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
+            val prefs = context.getSharedPreferences("settings", 0)
+            val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
+                .joinToString(" / ") { prefs.getString(it, "").orEmpty() }
+            assertTrue("$label: $diagnostic", check())
+        }
+        fun findTag(source: String, summary: String, metrics: List<String>): Rect? {
+            for (window in ui.windows) {
+                val root = window.root ?: continue
+                try {
+                    if (root.packageName?.toString() != context.packageName) continue
+                    val titleFound = root.findAccessibilityNodeInfosByText(source).any { it.text?.toString()?.contains(summary) == true }
+                    val metricsFound = metrics.all { value ->
+                        root.findAccessibilityNodeInfosByText(value).any { it.text?.toString() == value }
+                    }
+                    if (titleFound && metricsFound) return Rect().also { window.getBoundsInScreen(it) }
+                } finally { root.recycle() }
+            }
+            return null
+        }
+        fun driverWindow(pkg: String): Rect? = ui.windows.mapNotNull { window ->
+            if (window.type != AccessibilityWindowInfo.TYPE_SYSTEM) return@mapNotNull null
+            val root = window.root ?: return@mapNotNull null
+            try {
+                if (root.packageName?.toString() != pkg) return@mapNotNull null
+                Rect().also { window.getBoundsInScreen(it) }.takeIf { it.width() >= 160 && it.height() >= 100 }
+            } finally { root.recycle() }
+        }.maxByOrNull { it.width().toLong() * it.height() }
+
+        val oldServices = shell("settings get secure enabled_accessibility_services")
+        val oldEnabled = shell("settings get secure accessibility_enabled")
+        val prefs = context.getSharedPreferences("settings", 0)
+        val originalJourney = context.getSharedPreferences("journey", 0).getString("offers", null)
+        try {
+            shell("settings delete secure enabled_accessibility_services")
+            shell("settings put secure accessibility_enabled 0")
+            listOf("com.ubercab.driver", "com.taxis99", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
+            shell("wm user-rotation lock 1")
+            listOf(context.packageName, "com.ubercab.driver", "com.taxis99").forEach { shell("appops set $it SYSTEM_ALERT_WINDOW allow") }
+            prefs.edit().putBoolean("copilot_enabled", true).putBoolean("traffic_enabled", false)
+                .putBoolean("reader_paused", false).putBoolean("reader_disclosure_accepted", true)
+                .putBoolean("reader_model_ready", false).putBoolean("card_km", true)
+                .putBoolean("card_hour", true).putBoolean("card_rating", true)
+                .putInt("card_hold_seconds", 120).commit()
+            shell("settings put secure enabled_accessibility_services ${context.packageName}/br.com.calculacorrida.OfferAccessibilityService")
+            shell("settings put secure accessibility_enabled 1")
+            await("OCR initialized", 30000) { prefs.getBoolean("reader_model_ready", false) }
+
+            val startedAt = System.currentTimeMillis()
+            shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual")
+            shell("am start -W -n com.taxis99/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual")
+            await("Both driver windows are simultaneously visible") {
+                driverWindow("com.ubercab.driver") != null && driverWindow("com.taxis99") != null
+            }
+            val uberSummary = "UBER  18 min • 6,60 km • R$ 9,09"
+            val ninetyNineSummary = "99  31 min • 11,20 km • R$ 11,59"
+            fun uberTag() = findTag("UBER", uberSummary, listOf("1,38", "30,30", "4,87"))
+            fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("1,03", "22,43", "4,96"))
+            await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
+
+            val uber = uberTag()!!
+            val ninetyNine = ninetyNineTag()!!
+            val uberPane = driverWindow("com.ubercab.driver")!!
+            val ninetyNinePane = driverWindow("com.taxis99")!!
+            assertTrue("Uber tag is inside the Uber window", uberPane.contains(uber.centerX(), uber.centerY()))
+            assertTrue("99 tag is inside the 99 window", ninetyNinePane.contains(ninetyNine.centerX(), ninetyNine.centerY()))
+            assertFalse("The tags do not overlap", Rect.intersects(uber, ninetyNine))
+            val records = JourneyStore.getRecords(context).filter { it.optLong("timestamp") >= startedAt }
+            assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-9.09)<0.001 })
+            assertTrue("99 offer recorded", records.any { it.optString("app") == "99" && kotlin.math.abs(it.optDouble("fare")-11.59)<0.001 })
+
+            shell("am force-stop com.taxis99")
+            await("Closing 99 removes only its tag", 10000) { ninetyNineTag() == null && uberTag() != null }
+        } finally {
+            listOf("com.ubercab.driver", "com.taxis99", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
+            shell("wm user-rotation free")
+            prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).remove("card_hold_seconds").commit()
+            context.getSharedPreferences("journey", 0).edit().apply {
+                if (originalJourney == null) remove("offers") else putString("offers", originalJourney)
+            }.commit()
+            OfferAccessibilityService.stopReading()
+            if (oldServices == "null" || oldServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
+            else shell("settings put secure enabled_accessibility_services '$oldServices'")
+            if (oldEnabled == "null" || oldEnabled.isBlank()) shell("settings delete secure accessibility_enabled")
+            else shell("settings put secure accessibility_enabled $oldEnabled")
+        }
+    }
+}

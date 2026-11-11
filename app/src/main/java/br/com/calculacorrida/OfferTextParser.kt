@@ -28,18 +28,44 @@ object OfferTextParser {
     )
 
     /** A fare alone does not certify that all route legs have been read. */
-    fun fareOrNull(rawText:String):Double? = parseFare(Normalizer.normalize(rawText.replace('\u00A0',' '),Normalizer.Form.NFKC))
-    private fun parseFare(text:String):Double? {
-        val fares = moneyRegex.findAll(text).filter { match ->
+    fun fareOrNull(rawText:String, sourcePackage:String?=null):Double? =
+        parseFare(Normalizer.normalize(rawText.replace('\u00A0',' '),Normalizer.Form.NFKC), sourcePackage)
+
+    private fun parseFare(text:String, sourcePackage:String?):Double? {
+        val matches = moneyRegex.findAll(text).filter { match ->
             val after = text.substring(match.range.last + 1).trimStart()
             val before = text.substring(0, match.range.first).trimEnd()
             // A rate or a separately labelled bonus is not the total fare.
             !Regex("""^tarifa\s+base\s+din[aâ]mica""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
             !Regex("""^(?:/\s*|por\s+)(?:km|h(?:ora)?s?|min)\b""", RegexOption.IGNORE_CASE).containsMatchIn(after) &&
                 !Regex("""(?:\+|b[oô]nus\s*[:+]?|adicional\s*[:+]?)$""", RegexOption.IGNORE_CASE).containsMatchIn(before)
-        }.mapNotNull { it.groupValues[1].let(::toNumber) }.distinct().toList()
-        return fares.singleOrNull()?.takeIf { it.isFinite() && it > 0 }
+        }.mapNotNull { match ->
+            val value = toNumber(match.groupValues[1])
+            if (value != null && value.isFinite() && value > 0) match to value else null
+        }.toList()
 
+        // 99's negotiation card may show the current fare, a matching
+        // "Aceitar por R$..." action and several suggested counteroffers.
+        // Only the explicit accept action identifies the current offer;
+        // arbitrary monetary amounts must never be selected as the fare.
+        val pkg = sourcePackage?.lowercase(java.util.Locale.ROOT)
+        if (pkg == "com.taxis99" || pkg == "com.didiglobal.driver") {
+            val acceptPrefix = Regex("""\baceitar\s+(?:a\s+corrida\s+)?por\s*[:\-]?\s*$""", RegexOption.IGNORE_CASE)
+            val buttons = matches.filter { (match, _) ->
+                acceptPrefix.containsMatchIn(text.substring(0, match.range.first).takeLast(80))
+            }
+            val buttonValues = buttons.map { it.second }.distinct()
+            if (buttonValues.size > 1) return null
+            if (buttonValues.size == 1) {
+                val value = buttonValues.single()
+                val buttonStart = buttons.first().first.range.first
+                val precedingFares = matches.filter { it.first.range.first < buttonStart }.map { it.second }.distinct()
+                // A conflicting headline may be a partially recognized fare.
+                if (precedingFares.any { kotlin.math.abs(it-value)>0.005 }) return null
+                return value
+            }
+        }
+        return matches.map { it.second }.distinct().singleOrNull()
     }
 
     private val estimatedSummaryRegex=Regex(
@@ -47,10 +73,10 @@ object OfferTextParser {
         RegexOption.IGNORE_CASE
     )
 
-    fun parse(rawText: String): ParsedOffer? {
+    fun parse(rawText: String, sourcePackage:String?=null): ParsedOffer? {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
-        val fare = parseFare(text) ?: return null
+        val fare = parseFare(text, sourcePackage) ?: return null
 
         fun km(value: String, unit: String): Double? {
             val n = toNumber(value) ?: return null
@@ -143,6 +169,16 @@ object OfferTextParser {
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (besideTrips != null) return normalizeRating(besideTrips)
+        // Some OCR engines omit the decimal separator in the compact 99 rating.
+        // Only recover it when the digits are immediately tied to a trip count.
+        val compactBesideTrips = Regex(
+            """(?<![0-9.,])([45])([0-9]{2})\s*[·•|.,]?\s*\+?[0-9]+\s*corridas?\b""",
+            RegexOption.IGNORE_CASE
+        ).find(text)
+        if (compactBesideTrips != null) {
+            val rating = compactBesideTrips.groupValues[1] + "." + compactBesideTrips.groupValues[2]
+            return normalizeRating(rating)
+        }
         val withCount = Regex("""(?<![0-9.,])([0-5][,.][0-9]{2})\s*\(\s*[0-9]+\s*\)""").find(text)?.groupValues?.get(1)
         return withCount?.let(::normalizeRating)
     }

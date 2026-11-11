@@ -4,6 +4,37 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OfferCalculationTest {
+    @Test fun ninetyNineNegotiationUsesAcceptPriceNotSuggestedCounteroffers() {
+        val text="""Negocia · Pgto. no app
+R$11,59
+4,96 · 152 corridas · Perfil Essencial
+9min (3km)
+22min (8,2km)
+Aceitar por R$11,59
+R$12,17   R$12,75   R$13,33"""
+        assertTrue(IncomingOfferPolicy.isIncoming("com.taxis99", text))
+        val offer = OfferTextParser.parse(text, "com.taxis99")!!
+        assertEquals(11.59, offer.fare, 0.000001)
+        assertEquals(9.0, offer.pickupMinutes!!, 0.000001)
+        assertEquals(31.0, offer.minutes, 0.000001)
+        assertEquals(11.2, offer.pickupKm + offer.tripKm, 0.000001)
+        assertEquals("4.96", offer.passengerRating)
+        val result = TripCalculator.calculate(offer.fare, offer.pickupKm, offer.tripKm, offer.minutes)!!
+        assertEquals(11.59 / 11.2, result.perKm, 0.000001)
+        assertEquals(11.59 * 60 / 31, result.perHour, 0.000001)
+        assertEquals(11.59, OfferTextParser.fareOrNull(text, "com.taxis99")!!, 0.000001)
+        assertEquals(11.59, OfferTextParser.parse(text, "com.didiglobal.driver")!!.fare, 0.000001)
+        val ocrMissingComma = text.replace("4,96 · 152 corridas", "496. 152 corridas")
+        assertEquals("4.96", OfferTextParser.parse(ocrMissingComma, "com.taxis99")!!.passengerRating)
+        assertNull("Do not apply the 99-only rule to another app", OfferTextParser.parse(text, "com.ubercab.driver"))
+    }
+    @Test fun ninetyNineAmbiguousNegotiationNeverInventsFare() {
+        val route="9min (3km) 22min (8,2km)"
+        assertNull(OfferTextParser.parse("R$11,59 $route Aceitar R$12,17 R$12,75", "com.taxis99"))
+        assertNull(OfferTextParser.parse("R$10,59 $route Aceitar por R$11,59 R$12,17", "com.taxis99"))
+        assertNull(OfferTextParser.parse("R$11,59 $route Aceitar por R$11,59 Aceitar por R$12,17", "com.taxis99"))
+        assertNull(OfferTextParser.fareOrNull("R$11,59 R$12,17", "com.taxis99"))
+    }
     @Test fun referenceOffer() {
         val result = TripCalculator.calculate(18.40, 1.4, 11.2, 28.0)!!
         assertEquals(12.6, result.totalKm, 0.000001)

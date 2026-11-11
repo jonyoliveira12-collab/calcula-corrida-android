@@ -93,7 +93,7 @@ jobs:
             adb exec-out run-as br.com.calculacorrida.teste tar -cf - files/screenshots > card-previews.tar
             adb shell wm size 960x1536
             adb shell wm density 160
-            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest br.com.calculacorrida.teste.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
+            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.teste.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
             adb shell wm size reset
             adb shell wm density reset
