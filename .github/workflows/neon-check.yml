@@ -46,3 +46,5 @@ jobs:
           name: neon-card-previews
           path: card-previews.tar
           if-no-files-found: warn
+
+# Retry the visual check when a runner is available.
