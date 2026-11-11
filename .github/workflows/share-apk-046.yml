@@ -1,0 +1,49 @@
+name: Share verified JHONDRIVER 0.4.6
+on:
+  push:
+    branches: [share/apk-0.4.6-browser]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify the tested source run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..36}; do
+            source_status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43080135067" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")')
+            if [[ "$source_status" == "a82c12df3f6126c240af49116803d41db5bdb07b completed success" ]]; then exit 0; fi
+            if [[ "$source_status" == *" completed "* ]]; then echo "Source verification did not pass: $source_status"; exit 1; fi
+            sleep 15
+          done
+          echo "Timed out waiting for source verification"; exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 43080135067
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify the exact tested APK
+        run: |
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.4.6.apk
+          echo 'f11d9538bb7eb4ba76f9cf0ceaac7ef56ddfe14d7715e7a511c55bf62fe4764e  verified-apk/JHONDRIVER-0.4.6.apk' | sha256sum --check
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-0.4.6
+          target_commitish: ${{ github.sha }}
+          name: JHONDRIVER 0.4.6
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: verified-apk/JHONDRIVER-0.4.6.apk
+          body: |
+            APK de avaliação: reconhece 99 Motorista e calcula ofertas de Uber e 99 em cartões separados.
+            Testado em emulador com ofertas sintéticas; a leitura das versões reais deve ser verificada no aparelho.
+            Esta avaliação instala ao lado da versão antiga, com login, permissões e configurações próprios. Desligue a leitura da versão antiga antes de testar.
+            A assinatura é de avaliação. Não há garantia de aprovação pelo Play Protect ou compatibilidade com aplicativos de bancos.
+            SHA-256: f11d9538bb7eb4ba76f9cf0ceaac7ef56ddfe14d7715e7a511c55bf62fe4764e
