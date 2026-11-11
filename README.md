@@ -22,7 +22,7 @@ Na versão 0.4.5, quando o Android identifica uma janela do Nubank entre as jane
 
 O usuário também pode escolher “DESLIGAR PARA USAR BANCO” no perfil ou no menu CC. Isso desativa o serviço de acessibilidade, preservando as opções de Copiloto e Semáforo; a reativação exige ação explícita do usuário nos ajustes do Android. “Pausar leitura” sozinho não desativa o serviço de acessibilidade. O usuário relatou que o Nubank abriu quando a leitura foi desativada, mas a causa específica da avaliação de risco continua sem confirmação do banco.
 
-O nome exibido é JHONDRIVER. A avaliação 0.4.6 usa o pacote `br.com.calculacorrida.avaliacao`, diferente das versões de avaliação antigas e do pacote oficial `br.com.calculacorrida`. Ela pode ser instalada ao lado da versão anterior sem apagar os dados locais, mas terá login, permissões e configurações próprios. Antes de testar, desative a leitura da instalação antiga para não executar dois leitores ao mesmo tempo.
+O nome exibido é JHONDRIVER. A avaliação 0.4.7 usa o pacote `br.com.calculacorrida.avaliacao047`, diferente das versões anteriores e do pacote oficial `br.com.calculacorrida`. Ela pode ser instalada ao lado da versão anterior sem apagar os dados locais, mas terá login, permissões e configurações próprios. Antes de testar, desative a leitura da instalação antiga para não executar dois leitores ao mesmo tempo.
 
 ## Login
 
@@ -37,6 +37,10 @@ O app está configurado para Android 16 (API 36), exigido em novos envios à Pla
 ### Ofertas simultâneas (0.4.6)
 
 As janelas dos aplicativos de motorista são analisadas e exibidas por origem, com uma etiqueta independente para cada aplicativo. O escopo foi corrigido para o pacote oficial da 99 Motorista (`com.app99.driver`); o aplicativo de passageiro (`com.taxis99`) foi removido. Na oferta de negociação da 99, o valor de “Aceitar por” identifica o preço atual e não os valores sugeridos para contraproposta; valores contraditórios ou incompletos continuam sem cálculo. Há um teste em emulador com duas janelas e ofertas sintéticas simultâneas; o comportamento com as versões reais da Uber/99 no tablet ainda precisa de validação no aparelho.
+
+### Chamas neon no cartão (0.4.7)
+
+O cartão flutuante usa contorno neon e chamas estáticas em vermelho, amarelo ou verde, de acordo com a classificação, mantendo os valores legíveis e o botão de fechar acessível. A opção “Chamas neon” pode ser desligada nas configurações; os temas e campos existentes continuam configuráveis. A prévia apresenta exemplos calculados para cada classificação. O estilo é puramente visual e não altera o cálculo nem a leitura automática.
 
 O aviso de atualização procura releases com pacote/certificado compatíveis e versão maior. A pessoa confirma o download/instalação. Versões antigas sem verificador precisam de uma instalação manual inicial. O APK debug de avaliação não substitui o app oficial.
 
