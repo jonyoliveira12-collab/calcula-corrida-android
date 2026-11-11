@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "br.com.calculacorrida"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "br.com.calculacorrida"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 11
         versionName = "0.4.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

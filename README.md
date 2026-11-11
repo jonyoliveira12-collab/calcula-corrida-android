@@ -32,6 +32,8 @@ O botão de olho mostra/esconde a senha e volta a escondê-la quando a tela perd
 
 A publicação oficial exige os secrets privados `JHONDRIVER_KEYSTORE_BASE64`, `JHONDRIVER_KEYSTORE_PASSWORD`, `JHONDRIVER_KEY_ALIAS` e `JHONDRIVER_KEY_PASSWORD` no GitHub Actions, mantendo o certificado original conferido pelo pipeline. A exposição anterior da chave no histórico não foi desfeita e ainda exige planejamento de rotação. A configuração privada e publicação oficial continuam pendentes.
 
+O app está configurado para Android 16 (API 36), exigido em novos envios à Play. O pipeline gera um AAB **sem assinatura** para verificar a compilação; esse arquivo não é uma versão pronta para publicar. A assinatura oficial, os dados da loja, as declarações de acessibilidade/privacidade e os testes no dispositivo real ainda são necessários.
+
 O aviso de atualização procura releases com pacote/certificado compatíveis e versão maior. A pessoa confirma o download/instalação. Versões antigas sem verificador precisam de uma instalação manual inicial. O APK debug de avaliação não substitui o app oficial.
 
 ## Verificação
