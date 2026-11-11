@@ -26,7 +26,9 @@ class ReaderPrivacyTest {
         fun await(label: String, timeout: Long = 15000, predicate: () -> Boolean) {
             val deadline = android.os.SystemClock.elapsedRealtime() + timeout
             while (!predicate() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
-            assertTrue(label, predicate())
+            val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
+                .joinToString(" / ") { context.getSharedPreferences("settings", 0).getString(it, "").orEmpty() }
+            assertTrue("$label: $diagnostic", predicate())
         }
         val settings = context.getSharedPreferences("settings", 0)
         val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
@@ -34,11 +36,15 @@ class ReaderPrivacyTest {
         val oldServices = shell("settings get secure enabled_accessibility_services")
         val oldEnabled = shell("settings get secure accessibility_enabled")
         try {
+            shell("settings delete secure enabled_accessibility_services")
+            shell("settings put secure accessibility_enabled 0")
+            shell("am force-stop com.ubercab.driver")
+            shell("am force-stop br.com.calculacorrida.fixture.backdrop")
             shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
             shell("appops set com.ubercab.driver SYSTEM_ALERT_WINDOW allow")
             settings.edit().putBoolean("copilot_enabled", true).putBoolean("traffic_enabled", false)
                 .putBoolean("reader_paused", false).putBoolean("reader_disclosure_accepted", true)
-                .putBoolean("reader_privacy_protected", false).commit()
+                .putBoolean("reader_privacy_protected", false).putBoolean("reader_model_ready", false).commit()
             shell("settings put secure enabled_accessibility_services ${context.packageName}/br.com.calculacorrida.OfferAccessibilityService")
             shell("settings put secure accessibility_enabled 1")
             await("OCR model initialized", 30000) { settings.getBoolean("reader_model_ready", false) }
