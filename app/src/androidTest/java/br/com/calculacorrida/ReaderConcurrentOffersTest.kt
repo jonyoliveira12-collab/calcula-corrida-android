@@ -131,7 +131,7 @@ class ReaderConcurrentOffersTest {
                 .putBoolean("reader_paused", false).putBoolean("reader_disclosure_accepted", true)
                 .putBoolean("reader_model_ready", false).putBoolean("card_km", true)
                 .putBoolean("card_hour", true).putBoolean("card_rating", true)
-                .putInt("card_hold_seconds", 120).commit()
+                .putInt("card_hold_seconds", 10).commit()
             shell("settings put secure enabled_accessibility_services ${context.packageName}/br.com.calculacorrida.OfferAccessibilityService")
             shell("settings put secure accessibility_enabled 1")
             await("OCR initialized", 30000) { prefs.getBoolean("reader_model_ready", false) }
@@ -172,10 +172,11 @@ class ReaderConcurrentOffersTest {
 
             // The expiry setting used by older builds must no longer remove a
             // valid offer. Both fixture windows remain visible during this time.
-            prefs.edit().putInt("card_hold_seconds",10).commit()
-            Thread.sleep(11500)
-            assertNotNull("Uber tag remains while its offer is visible",uberTag())
-            assertNotNull("99 tag remains while its offer is visible",ninetyNineTag())
+            repeat(5) {
+                Thread.sleep(2300)
+                assertNotNull("Uber tag remains while its offer is visible",uberTag())
+                assertNotNull("99 tag remains while its offer is visible",ninetyNineTag())
+            }
 
             // Remove only the offer pixels, leaving the Uber window open.
             shell("am broadcast -a br.com.calculacorrida.fixture.HIDE_OFFER -p com.ubercab.driver")

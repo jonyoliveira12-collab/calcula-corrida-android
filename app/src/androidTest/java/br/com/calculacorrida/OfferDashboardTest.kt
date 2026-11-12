@@ -12,6 +12,44 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class OfferDashboardTest {
+    @Test fun nameEditedInSettingsIsSavedAndRenderedOnTheCard() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val prefs=context.getSharedPreferences("settings",0)
+        val previous=prefs.getString("label_bad",null)
+        prefs.edit().remove("label_bad").commit()
+        SessionManager(context).saveUser("labels-test@example.invalid")
+        val activity=instrumentation.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        fun views(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{views(v.getChildAt(it))} else emptyList()
+        try {
+            instrumentation.runOnMainSync {
+                views(activity.window.decorView).filterIsInstance<TextView>().first{it.text.toString().startsWith("AJUSTAR LIMITES")}.performClick()
+                views(activity.window.decorView).filterIsInstance<TextView>().first{it.text.toString()=="Vixe não dá" && it.isClickable}.performClick()
+            }
+            instrumentation.waitForIdleSync()
+            val ui=instrumentation.uiAutomation
+            fun nodes(node:android.view.accessibility.AccessibilityNodeInfo):List<android.view.accessibility.AccessibilityNodeInfo> =
+                listOf(node)+(0 until node.childCount).mapNotNull{node.getChild(it)}.flatMap{nodes(it)}
+            val dialog=ui.rootInActiveWindow ?: throw AssertionError("Dialog is not visible")
+            val input=nodes(dialog).first{it.className?.toString()=="android.widget.EditText"}
+            val args=android.os.Bundle().apply{putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"Vixe, sai fora")}
+            assertTrue(input.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT,args))
+            val save=nodes(ui.rootInActiveWindow).first{it.text?.toString()?.equals("Salvar",ignoreCase=true)==true}
+            assertTrue(save.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+            instrumentation.waitForIdleSync()
+            assertEquals("Vixe, sai fora",prefs.getString("label_bad",null))
+            instrumentation.runOnMainSync {
+                val card=OfferTagView(context)
+                card.setOffer("RECUSAR",20.0,10.0,1.0,30.0,"4.70",android.graphics.Color.RED)
+                assertTrue(card.contentDescription.toString().contains("Vixe, sai fora"))
+            }
+        } finally {
+            instrumentation.runOnMainSync {activity.finish()}
+            prefs.edit().apply {if(previous==null)remove("label_bad") else putString("label_bad",previous)}.commit()
+            SessionManager(context).logout()
+        }
+    }
+
     @Test fun dashboardRefreshesWhenTheBackgroundReaderRecordsANewOffer() {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val context=instrumentation.targetContext
