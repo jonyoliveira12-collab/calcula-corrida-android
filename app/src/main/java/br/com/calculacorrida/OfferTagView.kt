@@ -76,7 +76,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         // is editable. Colors, thresholds and calculations must never depend on it.
         val (nameKey,defaultName)=when(label) {
             "ACEITAR","BOA CORRIDA","BOA" -> "label_good" to "Bora carai"
-            "ATENÇÃO","ANALISAR" -> "label_review" to "Hum, talvez"
+            "ATENÇÃO","ANALISAR" -> "label_review" to "Será?"
             else -> "label_bad" to "Vixe não dá"
         }
         val shownLabel=prefs.getString(nameKey,defaultName)?.trim().takeUnless{it.isNullOrEmpty()} ?: defaultName

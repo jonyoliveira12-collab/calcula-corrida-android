@@ -493,7 +493,7 @@ class MainActivity : Activity() {
             names.addView(row)
         }
         editLabel("Faixa vermelha", "label_bad", "Vixe não dá")
-        editLabel("Faixa amarela", "label_review", "Hum, talvez")
+        editLabel("Faixa amarela", "label_review", "Será?")
         editLabel("Faixa verde", "label_good", "Bora carai")
         content.addView(names, margin(0, 8))
 

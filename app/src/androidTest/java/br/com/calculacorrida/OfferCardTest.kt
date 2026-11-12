@@ -86,7 +86,7 @@ class OfferCardTest {
                 .remove("label_bad").remove("label_review").remove("label_good").commit()
             instrumentation.runOnMainSync {
                 val view=OfferTagView(context)
-                for((label,shown) in listOf("RECUSAR" to "Vixe não dá","ATENÇÃO" to "Hum, talvez","ACEITAR" to "Bora carai")) {
+                for((label,shown) in listOf("RECUSAR" to "Vixe não dá","ATENÇÃO" to "Será?","ACEITAR" to "Bora carai")) {
                     view.setOffer(label,19.0,12.0,1.0641666667,40.3263157895,"4.99",Color.RED,"UBER",12.77)
                     val badge=view.getChildAt(0) as android.widget.TextView
                     assertEquals(shown,badge.text.toString())
@@ -229,7 +229,7 @@ class OfferCardTest {
                 fun containsAll(vararg values:String){for(value in values)assertTrue(preview.contentDescription.toString(),preview.contentDescription.toString().contains(value))}
                 containsAll("Vixe não dá","R$ 1,00/km","R$ 30,00/h","4,70")
                 select("Analisar")
-                containsAll("Hum, talvez","R$ 1,67/km","R$ 50,00/h","4,85")
+                containsAll("Será?","R$ 1,67/km","R$ 50,00/h","4,85")
                 select("Boa")
                 containsAll("Bora carai","R$ 2,00/km","R$ 72,00/h","4,96")
                 val toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Chamas neon"}
