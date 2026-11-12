@@ -61,14 +61,14 @@ class OfferAccessibilityService : AccessibilityService() {
         val featurePrefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         if (Settings.canDrawOverlays(this) && bubble == null && featurePrefs.getBoolean("copilot_enabled", false)) {
             val v = TextView(this).apply {
-                text = "CC"
+                text = "JD"
                 textSize = 12f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(218, 166, 67)); setStroke(dp(2), Color.WHITE) }
                 isClickable = true
-                contentDescription = "Botão CC. Arraste para mover ou toque para abrir o aplicativo."
+                contentDescription = "Botão JD. Arraste para mover ou toque para abrir o aplicativo."
             }
             val t = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE
             val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
