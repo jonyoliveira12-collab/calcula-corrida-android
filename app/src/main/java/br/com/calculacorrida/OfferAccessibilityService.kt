@@ -720,7 +720,14 @@ class OfferAccessibilityService : AccessibilityService() {
     }
     private fun visibleDriverPackages():List<String> =
         if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)emptyList()
-        else driverFrames.keys.sortedBy{lastCaptureByPackage[it]?:0L}
+        else driverFrames.keys.sortedWith(compareBy<String> {
+            // Confirm a readable missing-offer frame before starting another
+            // app's OCR. Only the first confirmation gets priority, so an
+            // unreadable/partial frame cannot starve the other visible apps.
+            val missing = missingOffers[it]
+            if (missing != null && missing.samples == 1 &&
+                android.os.SystemClock.elapsedRealtime() - missing.since < 15_000L) 0 else 1
+        }.thenBy { lastCaptureByPackage[it] ?: 0L })
     private val lastCaptureByPackage=mutableMapOf<String,Long>()
     private val lastCaptureByWindow=mutableMapOf<Pair<String,Int>,Long>()
     private fun captureStillValid(pkg:String,id:Int,bounds:Rect):Boolean {
