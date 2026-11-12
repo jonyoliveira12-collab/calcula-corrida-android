@@ -36,10 +36,9 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs distribution/JHONDRIVER-0.5.1.apk | tee certificate.txt
           grep -Fx 'Signer #1 certificate SHA-256 digest: d83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7' certificate.txt
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging distribution/JHONDRIVER-0.5.1.apk | grep -F "package: name='br.com.calculacorrida' versionCode='17'"
-      - name: Upload and publish the tested installation
+      - name: Upload the tested installation to the draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh release upload preview-0.5.1 distribution/JHONDRIVER-0.5.1.apk distribution/update.json --clobber
-          gh release edit preview-0.5.1 --draft=false
