@@ -1,0 +1,61 @@
+name: Share tested JHONDRIVER 0.5.0
+on:
+  push:
+    branches: [share/apk-0.5.0-browser]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-tested-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify both completed test runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43128437659" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")')
+          test "$source_status" = "e980cb557e5aaf6a2e1f1841b12955c99bdd112d completed success"
+          qa_status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/43128443217" --jq '.head_sha + " " + .status + " " + (.conclusion // "pending")')
+          test "$qa_status" = "fe13660cb333b49a9c7f6d207acb1cd26821231e completed success"
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER
+          run-id: 43128437659
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify APK and create smaller download
+        run: |
+          set -euo pipefail
+          mv verified-apk/app-debug.apk verified-apk/JHONDRIVER-0.5.0.apk
+          echo 'de9089e0094ce64b819485bc1494feacfe5464aff837a6471ceced9dfec99e94  verified-apk/JHONDRIVER-0.5.0.apk' | sha256sum --check
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose verified-apk/JHONDRIVER-0.5.0.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging verified-apk/JHONDRIVER-0.5.0.apk | grep -F "package: name='br.com.calculacorrida.avaliacao050' versionCode='16' versionName='0.5.0'"
+          python3 - <<'PY'
+          import hashlib, zipfile
+          expected = 'de9089e0094ce64b819485bc1494feacfe5464aff837a6471ceced9dfec99e94'
+          apk = 'verified-apk/JHONDRIVER-0.5.0.apk'
+          with zipfile.ZipFile('verified-apk/JHONDRIVER-0.5.0.zip', 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              archive.write(apk, 'JHONDRIVER-0.5.0.apk')
+          with zipfile.ZipFile('verified-apk/JHONDRIVER-0.5.0.zip') as archive:
+              assert archive.testzip() is None
+              assert hashlib.sha256(archive.read('JHONDRIVER-0.5.0.apk')).hexdigest() == expected
+          PY
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-0.5.0
+          target_commitish: ${{ github.sha }}
+          name: JHONDRIVER 0.5.0
+          prerelease: true
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: |
+            verified-apk/JHONDRIVER-0.5.0.apk
+            verified-apk/JHONDRIVER-0.5.0.zip
+          body: |
+            APK de avaliação com melhorias na leitura simultânea de Uber e 99 e chamas douradas no login.
+            O ZIP menor contém exatamente o mesmo APK.
+            Instala ao lado das versões anteriores, com login, permissões e configurações próprios. Desligue a leitura antiga antes de testar.
+            A leitura de ofertas reais e a compatibilidade com aplicativos bancários devem ser verificadas no dispositivo.
