@@ -93,7 +93,6 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(11), dp(12), dp(11))
             background = getDrawable(R.drawable.dashboard_city)
-            minimumHeight = dp(if(resources.configuration.screenWidthDp>=600)180 else 140)
             gravity = Gravity.CENTER_VERTICAL
             elevation = dp(5).toFloat()
         }
@@ -134,7 +133,7 @@ class MainActivity : Activity() {
             brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
         }
         header.addView(brandRow)
-        root.addView(header)
+        root.addView(header,LinearLayout.LayoutParams(-1,dp(if(resources.configuration.screenWidthDp>=600)180 else 124)))
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
