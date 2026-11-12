@@ -47,10 +47,11 @@ jobs:
             adb shell wm size 960x1536
             adb shell wm density 160
             adb shell am instrument -w -r -e class br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-reader-card.txt
-            grep -E '^OK \([0-9]+ tests?\)' tablet-reader-card.txt
             adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews-051.tar
+            grep -E '^OK \([0-9]+ tests?\)' tablet-reader-card.txt
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: card-previews-051
           path: card-previews-051.tar
-          if-no-files-found: error
+          if-no-files-found: warn

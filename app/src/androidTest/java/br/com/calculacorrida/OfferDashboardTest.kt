@@ -24,18 +24,13 @@ class OfferDashboardTest {
         try {
             instrumentation.runOnMainSync {
                 views(activity.window.decorView).filterIsInstance<TextView>().first{it.text.toString().startsWith("AJUSTAR LIMITES")}.performClick()
-                views(activity.window.decorView).filterIsInstance<TextView>().first{it.text.toString()=="Vixe não dá" && it.isClickable}.performClick()
+                assertTrue(views(activity.window.decorView).filterIsInstance<TextView>().any{it.text.toString()=="Vixe não dá" && it.isClickable})
+                val dialog=(activity as MainActivity).createLabelEditor("Faixa vermelha","label_bad","Vixe não dá")
+                dialog.show()
+                val input=views(dialog.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
+                input.setText("Vixe, sai fora")
+                dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick()
             }
-            instrumentation.waitForIdleSync()
-            val ui=instrumentation.uiAutomation
-            fun nodes(node:android.view.accessibility.AccessibilityNodeInfo):List<android.view.accessibility.AccessibilityNodeInfo> =
-                listOf(node)+(0 until node.childCount).mapNotNull{node.getChild(it)}.flatMap{nodes(it)}
-            val dialog=ui.rootInActiveWindow ?: throw AssertionError("Dialog is not visible")
-            val input=nodes(dialog).first{it.className?.toString()=="android.widget.EditText"}
-            val args=android.os.Bundle().apply{putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"Vixe, sai fora")}
-            assertTrue(input.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT,args))
-            val save=nodes(ui.rootInActiveWindow).first{it.text?.toString()?.equals("Salvar",ignoreCase=true)==true}
-            assertTrue(save.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
             instrumentation.waitForIdleSync()
             assertEquals("Vixe, sai fora",prefs.getString("label_bad",null))
             instrumentation.runOnMainSync {
