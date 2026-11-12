@@ -29,7 +29,7 @@ object OfferTextParser {
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
-        val fare = moneyRegex.findAll(text).lastOrNull()?.groupValues?.get(1)?.let(::toNumber) ?: return null
+        val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
 
         fun km(value: String, unit: String): Double? {
             val n = toNumber(value) ?: return null
