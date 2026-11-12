@@ -29,13 +29,15 @@ object OfferTextParser {
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
-        val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
+        val fare = moneyRegex.findAll(text).lastOrNull()?.groupValues?.get(1)?.let(::toNumber) ?: return null
 
         fun km(value: String, unit: String): Double? {
             val n = toNumber(value) ?: return null
             return if (unit.equals("m", true)) n / 1000.0 else n
         }
 
+        val ifoodDistance = Regex("""(?i)dist[aâ]ncia\s+total\s*[:\n ]*([0-9]+(?:[,.][0-9]+)?)\s*km""").find(text)?.groupValues?.get(1)?.let(::toNumber)
+        val ifoodMinutes = Regex("""(?i)tempo\s+aproximado\s+de\s+rota\s*[:\n ]*([0-9]+(?:[,.][0-9]+)?)\s*min""").find(text)?.groupValues?.get(1)?.let(::toNumber)
         val summary = summaryRegex.find(text)?.let {
             val mins = toNumber(it.groupValues[1])
             val dist = toNumber(it.groupValues[2])
@@ -51,7 +53,11 @@ object OfferTextParser {
         val tripKm: Double
         val totalMinutes: Double
 
-        if (summary != null && parenthesizedLegs.size >= 2) {
+        if (ifoodDistance != null && ifoodMinutes != null) {
+            pickupKm = 0.0
+            tripKm = ifoodDistance
+            totalMinutes = ifoodMinutes
+        } else if (summary != null && parenthesizedLegs.size >= 2) {
             // No cartão do Uber mostrado: o resumo (8 min • 3,5 km) já é o TOTAL.
             // As linhas detalhadas separam chegada (3 min/1,4 km) e viagem (5 min/2,1 km).
             // Somar o resumo novamente duplicaria a distância e o tempo de chegada.
