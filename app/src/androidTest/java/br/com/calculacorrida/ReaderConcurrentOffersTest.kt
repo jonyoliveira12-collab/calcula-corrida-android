@@ -158,6 +158,30 @@ class ReaderConcurrentOffersTest {
 
             shell("am force-stop com.app99.driver")
             await("Closing 99 removes only its tag", 10000) { ninetyNineTag() == null && uberTag() != null }
+
+            // A second scenario resembles a tall 99 negotiation window. A
+            // larger map window from the same app must not starve its OCR.
+            shell("am force-stop com.ubercab.driver")
+            await("Previous tags leave after the apps close", 12000) { uberTag()==null && ninetyNineTag()==null }
+            shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
+            shell("am start -W -n com.app99.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
+            val realisticSummary=listOf("24 min","11,20 km","R$ 16,80")
+            fun realistic99Tag()=findTag("99",realisticSummary,listOf("1,50","42,00","4,89"))
+            fun middle99Pane():Rect? = ui.windows.mapNotNull { window ->
+                if(window.type!=AccessibilityWindowInfo.TYPE_SYSTEM)return@mapNotNull null
+                val root=window.root ?: return@mapNotNull null
+                try {
+                    if(root.packageName?.toString()!="com.app99.driver")return@mapNotNull null
+                    Rect().also{window.getBoundsInScreen(it)}.takeIf{it.width()>=160 && it.height()>=100}
+                } finally {root.recycle()}
+            }.minByOrNull{it.left}
+            await("Tall negotiated 99 offer and Uber each have an independent tag",60000) {
+                uberTag()!=null && realistic99Tag()!=null && middle99Pane()!=null
+            }
+            assertTrue("99 tag stays with its offer instead of the larger map window",middle99Pane()!!.contains(realistic99Tag()!!.centerX(),realistic99Tag()!!.centerY()))
+            assertFalse("Both independent tags remain separate",Rect.intersects(uberTag()!!,realistic99Tag()!!))
+            shell("am force-stop com.ubercab.driver")
+            await("Closing Uber keeps the 99 tag",12000) {uberTag()==null && realistic99Tag()!=null}
         } finally {
             listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")

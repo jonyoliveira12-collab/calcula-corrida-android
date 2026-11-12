@@ -57,6 +57,9 @@ class OfferAccessibilityService : AccessibilityService() {
     private val windowExecutor=Executors.newSingleThreadExecutor()
     private val windowRefreshPending=java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var driverFrames:Map<String,DriverFrame> = emptyMap()
+    @Volatile private var driverCandidates:Map<String,List<DriverFrame>> = emptyMap()
+    // Keep the window that actually produced each app's offer for card placement.
+    private val detectedWindows=java.util.concurrent.ConcurrentHashMap<String,Int>()
     @Volatile private var foregroundSnapshot:String?=null
     @Volatile private var applicationSnapshots:Set<String> = emptySet()
     @Volatile private var snapshotAt=0L
@@ -104,6 +107,18 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun readerStatus(message: String) {
         getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
             .putString("reader_status", message).putLong("reader_seen_at", System.currentTimeMillis()).apply()
+    }
+
+    // Diagnostic state contains only status and image dimensions, never OCR text.
+    private fun captureStatus(pkg:String,message:String) {
+        val app=driverAppName(pkg) ?: return
+        getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status",message)
+            .putString("reader_capture_$app",message).apply()
+    }
+    private fun recognitionStatus(pkg:String,message:String) {
+        val app=driverAppName(pkg) ?: return
+        getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_ocr_status",message)
+            .putString("reader_ocr_$app",message).apply()
     }
 
     private fun removeBubble() {
@@ -298,7 +313,7 @@ class OfferAccessibilityService : AccessibilityService() {
         windowExecutor.execute {
             val started=android.os.SystemClock.elapsedRealtime()
             try {
-                val frames=linkedMapOf<String,DriverFrame>()
+                val candidates=linkedMapOf<String,MutableList<DriverFrame>>()
                 val applications=linkedSetOf<String>()
                 var activePkg:String?=null
                 val activeRoot=rootInActiveWindow
@@ -333,29 +348,35 @@ class OfferAccessibilityService : AccessibilityService() {
                             val bounds=Rect().also{window.getBoundsInScreen(it)}
                             if(bounds.isEmpty)continue
                             val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
-                            val score=(if(offerOverlay)1_000_000_000L else 0L)+bounds.width().toLong()*bounds.height()
-                            if(score<=(frames[pkg]?.score?:-1))continue
                             val text=StringBuilder()
                             if(readingEnabled() && bounds.width()>=dp(160) && bounds.height()>=dp(100))collectText(root,text)
-                            frames[pkg]=DriverFrame(window.id,bounds,text.toString(),if(text.isNotEmpty())findFareBounds(root)else null,score)
+                            val content=text.toString()
+                            val complete=IncomingOfferPolicy.isIncoming(pkg,content) && OfferTextParser.parse(content,pkg)!=null
+                            val score=(if(complete)5_000_000_000L else 0L)+(if(offerOverlay)1_000_000_000L else 0L)+bounds.width().toLong()*bounds.height()
+                            candidates.getOrPut(pkg){mutableListOf()}.add(DriverFrame(window.id,bounds,content,if(text.isNotEmpty())findFareBounds(root)else null,score))
                         } finally {root.recycle()}
                     }
                     val pkg=activeRoot?.packageName?.toString()
-                    if(!bankVisible && activeRoot!=null && pkg!=null && driverAppName(pkg)!=null && pkg !in frames) {
+                    if(!bankVisible && activeRoot!=null && pkg!=null && driverAppName(pkg)!=null && pkg !in candidates) {
                         val bounds=Rect().also{activeRoot.getBoundsInScreen(it)}
                         if(!bounds.isEmpty) {
                             val text=StringBuilder();if(readingEnabled())collectText(activeRoot,text)
-                            frames[pkg]=DriverFrame(activeRoot.windowId,bounds,text.toString(),null,0)
+                            candidates.getOrPut(pkg){mutableListOf()}.add(DriverFrame(activeRoot.windowId,bounds,text.toString(),null,0))
                         }
                     }
                 } finally {activeRoot?.recycle()}
-                driverFrames=frames.toMap()
+                val snapshot=candidates.mapValues{(_,frames)->frames.sortedByDescending{it.score}}
+                driverCandidates=snapshot
+                driverFrames=snapshot.mapValues{(_,frames)->frames.first()}
                 applicationSnapshots=applications.toSet()
                 foregroundSnapshot=activePkg
                 snapshotAt=android.os.SystemClock.elapsedRealtime()
-                getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_window_status","${frames.size} apps • consulta em ${snapshotAt-started} ms").apply()
+                getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_window_status","${snapshot.size} apps • ${snapshot.values.sumOf{it.size}} janelas • consulta em ${snapshotAt-started} ms").apply()
                 readerHandler.post {
                     if(!stopped) {
+                        val available=snapshot.flatMap{(pkg,frames)->frames.map{pkg to it.id}}.toSet()
+                        lastCaptureByWindow.keys.retainAll(available)
+                        detectedWindows.keys.retainAll(snapshot.keys)
                         updateForeground(foregroundSnapshot)
                         if(readingEnabled())visibleDriverPackages().forEach{readOffer(it)}
                     }
@@ -400,6 +421,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if(acceptedOfferSignatures[pkg]==signature){hideOverlay(pkg);return}
         acceptedOfferSignatures.remove(pkg)
         if(acceptedSignatures[pkg]!=signature) {
+            detectedWindows[pkg]=frame.id
             acceptedSignatures[pkg]=signature
             calculateAndShow(offer,frame.fareBounds,pkg)
         }
@@ -410,9 +432,13 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun requestOfferScreenshot(pkg: String) {
         if (Build.VERSION.SDK_INT < 30) { readerStatus("Neste Android a leitura depende do texto acessível da oferta"); return }
         if (screenshotInProgress || pkg !in visibleDriverPackages() || !readingEnabled()) return
-        val target=driverWindow(pkg) ?: run { readerStatus("${driverAppName(pkg)}: janela ainda indisponível para captura"); return }
-        val windowId = target.first
-        val bounds = target.second
+        // Try eligible windows in turn. A large map/utility overlay from one
+        // driver must not permanently hide a smaller offer window from OCR.
+        val target=driverCandidates[pkg].orEmpty().filter{it.bounds.width()>=dp(160) && it.bounds.height()>=dp(100)}
+            .minByOrNull{lastCaptureByWindow[pkg to it.id]?:Long.MIN_VALUE}
+            ?: run { readerStatus("${driverAppName(pkg)}: aguardando janela da oferta"); return }
+        val windowId = target.id
+        val bounds = Rect(target.bounds)
         if(bounds.width()<dp(160) || bounds.height()<dp(100)) {
             readerStatus("${driverAppName(pkg)}: aguardando cartão da oferta; apenas a bolinha está visível")
             return
@@ -428,13 +454,13 @@ class OfferAccessibilityService : AccessibilityService() {
         if (now - lastScreenshotAt < 700L) return
         lastScreenshotAt = now
         lastCaptureByPackage[pkg] = now
+        lastCaptureByWindow[pkg to windowId] = now
         getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_last_app",driverAppName(pkg)).putLong("reader_last_capture",System.currentTimeMillis()).apply()
         screenshotInProgress = true
         val requestTime=now
-        val captureArrived=java.util.concurrent.atomic.AtomicBoolean(false)
-        getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status","Solicitando imagem da janela ${bounds.width()}×${bounds.height()}").apply()
+        captureStatus(pkg,"Solicitando imagem da janela ${bounds.width()}×${bounds.height()}")
         readerHandler.postDelayed({
-            if(!captureArrived.get() && screenshotInProgress && lastScreenshotAt==requestTime) {
+            if(screenshotInProgress && lastScreenshotAt==requestTime) {
                 screenshotInProgress=false
                 readerStatus("Captura demorou; repetindo automaticamente")
             }
@@ -442,8 +468,7 @@ class OfferAccessibilityService : AccessibilityService() {
         try {
             val callback = object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
-                        captureArrived.set(true)
-                        if(lastScreenshotAt==requestTime)getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status","Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms").apply()
+                        if(lastScreenshotAt==requestTime)captureStatus(pkg,"Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms")
                         var bitmap: Bitmap? = null
                         try {
                             val hardwareBuffer = result.hardwareBuffer
@@ -467,8 +492,7 @@ class OfferAccessibilityService : AccessibilityService() {
                     }
 
                     override fun onFailure(errorCode: Int) {
-                        captureArrived.set(true)
-                        if(lastScreenshotAt==requestTime)getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_capture_status","Falha da captura: código $errorCode").apply()
+                        if(lastScreenshotAt==requestTime)captureStatus(pkg,"Falha da captura: código $errorCode")
                         if(lastScreenshotAt==requestTime) screenshotInProgress = false
                         readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
                     }
@@ -485,7 +509,8 @@ class OfferAccessibilityService : AccessibilityService() {
         // Offer panels are normally below the map. Isolated floating cards stay whole.
         var image=bitmap
         if(bitmap.height>=dp(320)) {
-            val fraction=if((driverAppName(pkg)=="99") && bitmap.height>bitmap.width)0.55f else 0.72f
+            // Keep the 99 negotiation heading as well as both route legs.
+            val fraction=if(driverAppName(pkg)=="99")0.75f else 0.72f
             val top=(bitmap.height*(1f-fraction)).toInt()
             image=Bitmap.createBitmap(bitmap,0,top,bitmap.width,bitmap.height-top)
         }
@@ -512,7 +537,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val recognized = visionText.text
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized,pkg) else null
-                                prefs.edit().putString("reader_ocr_status","Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms").apply()
+                                recognitionStatus(pkg,"Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms")
                                 if(offer==null)discardPreviousOfferIfFareChanged(pkg,recognized)
                                 if(offer==null && index<angles.lastIndex) {
                                     retry=true
@@ -537,6 +562,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                     ).joinToString("|")
                                     if (acceptedOfferSignatures[pkg] != signature && acceptedSignatures[pkg] != signature) {
                                         acceptedOfferSignatures.remove(pkg)
+                                        detectedWindows[pkg]=windowId
                                         acceptedSignatures[pkg] = signature
                                         calculateAndShow(offer, null, pkg)
                                     }
@@ -625,16 +651,17 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun driverWindow(pkg:String):Pair<Int,Rect>? {
         if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)return null
-        val frame=driverFrames[pkg] ?: return null
+        val frame=driverCandidates[pkg].orEmpty().firstOrNull{it.id==detectedWindows[pkg]} ?: driverFrames[pkg] ?: return null
         return frame.id to Rect(frame.bounds)
     }
     private fun visibleDriverPackages():List<String> =
         if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)emptyList()
         else driverFrames.keys.sortedBy{lastCaptureByPackage[it]?:0L}
     private val lastCaptureByPackage=mutableMapOf<String,Long>()
+    private val lastCaptureByWindow=mutableMapOf<Pair<String,Int>,Long>()
     private fun captureStillValid(pkg:String,id:Int,bounds:Rect):Boolean {
-        val current=driverWindow(pkg) ?: return false
-        return readingEnabled() && current.first==id && current.second==bounds
+        if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)return false
+        return readingEnabled() && driverCandidates[pkg].orEmpty().any{it.id==id && it.bounds==bounds}
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth:Int=0) {
@@ -830,6 +857,8 @@ class OfferAccessibilityService : AccessibilityService() {
         overlayParams.clear()
         acceptedSignatures.clear()
         lastOfferSeen.clear()
+        detectedWindows.clear()
+        lastCaptureByWindow.clear()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

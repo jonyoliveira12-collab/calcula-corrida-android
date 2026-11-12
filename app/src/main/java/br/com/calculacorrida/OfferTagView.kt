@@ -64,7 +64,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         if(neonEnabled) setPadding(dp(9),dp(25),dp(9),dp(12)) else setPadding(0,0,0,0)
         val above=prefs.getString("card_banner_position","above")=="above"
         val hasBanner=prefs.getBoolean("card_banner",true)
-        body.setPadding(dp(9),dp(if(neonEnabled && above && hasBanner)12 else 6),dp(9),dp(if(neonEnabled)24 else 6))
+        body.setPadding(dp(9),dp(if(neonEnabled && above && hasBanner)12 else 6),dp(9),dp(if(neonEnabled)28 else 6))
         val theme=prefs.getString("card_theme","light")
         val dark=theme=="dark" || theme=="colored"
         val fg=if(dark) Color.WHITE else Color.rgb(22,24,27)
@@ -153,12 +153,12 @@ class OfferTagView(context: Context) : LinearLayout(context) {
 
     private fun drawNeonBehind(canvas:Canvas) {
         val box=RectF(body.left.toFloat(),body.top.toFloat(),body.right.toFloat(),body.bottom.toFloat())
-        for((width,alpha) in listOf(14 to 45,9 to 90,5 to 155,2 to 235)) {
+        for((width,alpha) in listOf(15 to 55,10 to 105,6 to 170,2 to 240)) {
             neonPaint.color=withAlpha(neonColor,alpha);neonPaint.strokeWidth=dp(width).toFloat()
             canvas.drawRoundRect(box,dp(10).toFloat(),dp(10).toFloat(),neonPaint)
         }
         val x=box.right-dp(8);val y=box.top
-        val motion=kotlin.math.sin(flameFrame*Math.PI/12.0).toFloat()*dp(6)
+        val motion=kotlin.math.sin(flameFrame*Math.PI/12.0).toFloat()*dp(7)
         val sway=kotlin.math.sin((flameFrame+6)*Math.PI/12.0).toFloat()*dp(4)
         val flame=Path().apply {
             moveTo(x-dp(81),y+dp(3))
@@ -181,9 +181,9 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             var x=left;var index=0
             while(x<right) {
                 val end=(x+step).coerceAtMost(right);val s=end-x
-                val motion=kotlin.math.sin((flameFrame+index*3)*Math.PI/12.0).toFloat()*dp(6)
+                val motion=kotlin.math.sin((flameFrame+index*3)*Math.PI/12.0).toFloat()*dp(7)
                 val sway=kotlin.math.sin((flameFrame+index*3+6)*Math.PI/12.0).toFloat()*dp(4)
-                val peak=base-dp(12)-motion
+                val peak=base-dp(14)-motion
                 cubicTo(x+s*.18f,base,x+s*.23f,base-dp(4),x+s*.43f+sway,peak)
                 cubicTo(x+s*.33f,base-dp(5),x+s*.46f,base-dp(3),x+s*.60f,base-dp(7))
                 cubicTo(x+s*.72f,base-dp(10),x+s*.83f,base-dp(2),end,base)
@@ -192,7 +192,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             lineTo(right,body.bottom.toFloat());lineTo(left,body.bottom.toFloat());close()
         }
         val saved=canvas.save()
-        canvas.clipRect(body.left,body.bottom-dp(23),body.right,body.bottom+dp(6))
+        canvas.clipRect(body.left,body.bottom-dp(27),body.right,body.bottom+dp(6))
         drawFlameShape(canvas,flame)
         canvas.restoreToCount(saved)
     }

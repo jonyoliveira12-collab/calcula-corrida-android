@@ -27,7 +27,8 @@ public class OfferFixtureActivity extends Activity {
             return;
         }
         final String layout=getIntent().getStringExtra("layout");
-        final boolean dual="dual".equals(layout);
+        final boolean realistic="dual_realistic".equals(layout);
+        final boolean dual="dual".equals(layout) || realistic;
         final boolean floating=dual || "floating".equals(layout);
         View offer=new View(this) {
             final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -49,7 +50,11 @@ public class OfferFixtureActivity extends Activity {
                 if(getPackageName().equals("sinet.startup.inDriver"))lines=new String[]{"R$ 30,00","30 min • 12.0 km","Nota 4,90","5 min (2.0 km)","25 min (10.0 km)","Aceitar"};
                 if(dual && getPackageName().equals("com.ubercab.driver"))lines=new String[]{"UberX Exclusivo","R$ 12,00","20 min • 8.0 km • Est. de R$1,50/km","4,80 (100)","4 min (1.0 km)","16 minutos (7.0 km)","Aceitar"};
                 if(dual && getPackageName().equals("com.app99.driver"))lines=new String[]{"Negocia · Pgto. no app","R$30,00","4,90 · 110 corridas · Perfil Essencial","5min (3km)","25min (12km)","Aceitar por R$30,00","R$31,00   R$32,00   R$33,00"};
+                if(realistic && getPackageName().equals("com.app99.driver")) {
+                    lines=new String[]{"Negocia · Pgto. no app","R$ 16,80","4,89 · 120 corridas · Cartão verif.","7min (2,4km)","Rua Exemplo A","17min (8,8km)","Rua Exemplo B","Aceitar por R$ 16,80","R$17,50   R$18,00   R$18,50"};
+                }
                 float first=floating?35*d:("small".equals(layout)?getHeight()*0.42f:Math.max(35*d,getHeight()-210*d));
+                if(realistic && getPackageName().equals("com.app99.driver"))first=getHeight()*0.40f;
                 for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*32*d,paint);
             }
         };
@@ -61,15 +66,24 @@ public class OfferFixtureActivity extends Activity {
             setContentView(new View(this));
             float d=getResources().getDisplayMetrics().density;
             int screenWidth=getResources().getDisplayMetrics().widthPixels;
-            int width=dual?(int)(screenWidth/2-12*d):(int)(screenWidth-16*d);
-            WindowManager.LayoutParams p=new WindowManager.LayoutParams(width,(int)((dual?300:240)*d),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
+            int screenHeight=getResources().getDisplayMetrics().heightPixels;
+            int width=realistic?(int)(screenWidth/3-12*d):dual?(int)(screenWidth/2-12*d):(int)(screenWidth-16*d);
+            int height=realistic?screenHeight-(int)(80*d):(int)((dual?300:240)*d);
+            WindowManager.LayoutParams p=new WindowManager.LayoutParams(width,height,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
             if(dual) {
                 p.gravity=Gravity.TOP|Gravity.LEFT;
-                p.x=getPackageName().equals("com.app99.driver")?screenWidth/2+(int)(4*d):(int)(4*d);
-                p.y=(int)(90*d);
+                p.x=getPackageName().equals("com.app99.driver")?(realistic?screenWidth/3:screenWidth/2)+(int)(4*d):(int)(4*d);
+                p.y=(int)((realistic?40:90)*d);
             } else p.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL;
             WindowManager wm=(WindowManager)getApplicationContext().getSystemService(WINDOW_SERVICE);
             wm.addView(offer,p);
+            if(realistic && getPackageName().equals("com.app99.driver")) {
+                // A second, slightly larger 99 window contains only a map. It
+                // must not starve the offer window when both are accessible.
+                WindowManager.LayoutParams map=new WindowManager.LayoutParams(width,screenHeight-(int)(40*d),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
+                map.gravity=Gravity.TOP|Gravity.LEFT;map.x=screenWidth*2/3+(int)(4*d);map.y=(int)(20*d);
+                View mapOnly=new View(this);mapOnly.setBackgroundColor(0xff29333a);mapOnly.setContentDescription("Mapa sem oferta");wm.addView(mapOnly,map);
+            }
             // A later tiny driver bubble must not be chosen instead of the offer window.
             if(!dual) {
                 WindowManager.LayoutParams icon=new WindowManager.LayoutParams((int)(48*d),(int)(48*d),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);

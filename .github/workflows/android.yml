@@ -35,7 +35,7 @@ jobs:
       - name: Verify APK identity and signature
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='br.com.calculacorrida.avaliacao049'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='br.com.calculacorrida.avaliacao050'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "targetSdkVersion:'36'"
       - uses: actions/upload-artifact@v4
         with:
@@ -88,12 +88,12 @@ jobs:
             adb install -r reader-fixture/build/outputs/apk/uber/debug/reader-fixture-uber-debug.apk
             adb install -r reader-fixture/build/outputs/apk/ninetynine/debug/reader-fixture-ninetynine-debug.apk
             adb install -r reader-fixture/build/outputs/apk/indrive/debug/reader-fixture-indrive-debug.apk
-            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest br.com.calculacorrida.avaliacao049.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest br.com.calculacorrida.avaliacao050.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
-            adb exec-out run-as br.com.calculacorrida.avaliacao049 tar -cf - files/screenshots > card-previews.tar
+            adb exec-out run-as br.com.calculacorrida.avaliacao050 tar -cf - files/screenshots > card-previews.tar
             adb shell wm size 960x1536
             adb shell wm density 160
-            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao049.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
+            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao050.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
             adb shell wm size reset
             adb shell wm density reset

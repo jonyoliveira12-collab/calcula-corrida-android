@@ -56,7 +56,16 @@
                 android:textSize="10sp"
                 android:layout_marginTop="4dp"/>
         </LinearLayout>
-
+        <br.com.calculacorrida.FlameBorderLayout
+            android:id="@+id/loginFlameFrame"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingTop="21dp"
+            android:paddingBottom="21dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -194,6 +203,7 @@
                 android:visibility="gone"
                 android:layout_marginTop="12dp"/>
         </LinearLayout>
+        </br.com.calculacorrida.FlameBorderLayout>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

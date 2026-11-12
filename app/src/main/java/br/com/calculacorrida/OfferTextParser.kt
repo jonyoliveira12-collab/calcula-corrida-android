@@ -44,10 +44,9 @@ object OfferTextParser {
             if (value != null && value.isFinite() && value > 0) match to value else null
         }.toList()
 
-        // 99's negotiation card may show the current fare, a matching
-        // "Aceitar por R$..." action and several suggested counteroffers.
-        // Only the explicit accept action identifies the current offer;
-        // arbitrary monetary amounts must never be selected as the fare.
+        // A 99 negotiation card may also show counteroffer prices. The
+        // headline comes before the two route legs; suggested prices after
+        // those legs must not replace it or be mistaken for a conflict.
         if (DriverPackages.name(sourcePackage.orEmpty()) == "99") {
             val acceptPrefix = Regex("""\baceitar\s+(?:a\s+corrida\s+)?por\s*[:\-]?\s*$""", RegexOption.IGNORE_CASE)
             val buttons = matches.filter { (match, _) ->
@@ -55,14 +54,25 @@ object OfferTextParser {
             }
             val buttonValues = buttons.map { it.second }.distinct()
             if (buttonValues.size > 1) return null
+            val legs = legRegex.findAll(text).toList()
+            val firstRoute = (legs.firstOrNull()?.range?.first ?: minuteRegex.find(text)?.range?.first)
+            val beforeRoute = if(firstRoute!=null) matches.filter { it.first.range.first < firstRoute }.map { it.second }.distinct() else emptyList()
             if (buttonValues.size == 1) {
                 val value = buttonValues.single()
-                val buttonStart = buttons.first().first.range.first
-                val precedingFares = matches.filter { it.first.range.first < buttonStart }.map { it.second }.distinct()
-                // A conflicting headline may be a partially recognized fare.
-                if (precedingFares.any { kotlin.math.abs(it-value)>0.005 }) return null
+                val candidates = if(firstRoute!=null) beforeRoute else {
+                    val buttonStart = buttons.first().first.range.first
+                    matches.filter { it.first.range.first < buttonStart }.map { it.second }.distinct()
+                }
+                if (candidates.any { kotlin.math.abs(it-value)>0.005 }) return null
                 return value
             }
+            // Some cards omit the action from accessibility or OCR. Only
+            // recover the headline when a 99-specific offer marker and both
+            // route legs are present and exactly one pre-route price is clear.
+            val times=minuteRegex.findAll(text).count()
+            val distances=distanceRegex.findAll(text).count()
+            if(IncomingOfferPolicy.hasNinetyNineOfferMarker(text) && times>=2 && distances>=2 && beforeRoute.size==1)
+                return beforeRoute.single()
         }
         return matches.map { it.second }.distinct().singleOrNull()
     }

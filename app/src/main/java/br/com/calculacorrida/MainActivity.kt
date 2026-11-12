@@ -262,6 +262,8 @@ class MainActivity : Activity() {
                 "Janelas: ${prefs.getString("reader_window_status","Aguardando")}",
                 "Captura: ${prefs.getString("reader_capture_status","Aguardando")}",
                 "Reconhecimento: ${prefs.getString("reader_ocr_status","Aguardando")}",
+                "Uber: captura ${prefs.getString("reader_capture_UBER","Aguardando")} • leitura ${prefs.getString("reader_ocr_UBER","Aguardando")}",
+                "99: captura ${prefs.getString("reader_capture_99","Aguardando")} • leitura ${prefs.getString("reader_ocr_99","Aguardando")}",
                 "Modelo de leitura pronto: ${prefs.getBoolean("reader_model_ready",false)}",
                 "IA: ${prefs.getString("ai_status","Aguardando oferta")}").joinToString("\n")
             (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico JHONDRIVER",report))
