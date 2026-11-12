@@ -23,11 +23,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     private val metrics=LinearLayout(context)
     private val details=line(11f,Color.DKGRAY)
     private val ai=line(11f,Color.DKGRAY)
-    private val firePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val fireTexture by lazy {
-        android.graphics.BitmapFactory.decodeResource(resources, R.drawable.card_realistic_fire,
-            android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 })
-    }
+    private val fireBorder = RealisticFireBorder(context)
     private var neonEnabled=true
     private var neonColor=Color.RED
     private var flameFrame=0
@@ -97,14 +93,14 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         banner.compoundDrawablePadding=if(neonEnabled)dp(5) else 0
         banner.setPadding(dp(9),dp(4),dp(10),dp(4))
         banner.elevation=if(neonEnabled)dp(3).toFloat() else 0f
-        summary.text="$source  ${duration(minutes)} • ${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
+        summary.text="$source  "+(if(prefs.getBoolean("show_time",true))"${duration(minutes)} • " else "")+"${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
         summary.setTextColor(fg)
         header.gravity=Gravity.CENTER_VERTICAL
         header.addView(summary,LayoutParams(0,-2,1f))
         header.addView(line(19f,muted,true).apply{text="×";gravity=Gravity.CENTER;contentDescription="Fechar análise da oferta"},LayoutParams(dp(25),dp(25)))
         body.addView(header)
         fun metric(key:String,title:String,value:String,indicator:Int) {
-            if(!prefs.getBoolean(key,true)) return
+            if(!prefs.getBoolean(key,true) || (key=="card_rating" && !prefs.getBoolean("show_rating",true))) return
             val col=LinearLayout(context).apply {orientation=VERTICAL;setPadding(dp(3),dp(3),dp(3),0)}
             col.addView(line(11f,muted).apply{text=title})
             col.addView(line(30f,fg,true).apply{text=value;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(16,30,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
@@ -121,6 +117,17 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         metric("card_hour","R$/Hora",amount(valuePerHour),indicator(valuePerHour,"min_per_hour","good_per_hour",50f,60f))
         metric("card_rating","Nota",rating?.replace('.',',')?:"—",indicator(rating?.replace(',','.')?.toDoubleOrNull(),"min_rating","good_rating",4.8f,4.9f))
         body.addView(metrics)
+        var profitDescription = ""
+        if (prefs.getBoolean("show_profit", false) && fareValue != null) {
+            OfferProfit.estimate(fareValue, totalKm, TripCalculator.threshold(prefs.getFloat("cost_per_km", .65f)))?.let { estimate ->
+                profitDescription = "Margem estimada: ${amount(estimate.percent)}% • R$ ${amount(estimate.amount)}"
+                body.addView(line(12f, if (estimate.amount >= 0) fg else Color.rgb(209,48,57), true).apply {
+                    text = profitDescription
+                    setPadding(dp(3),dp(5),dp(3),0)
+                })
+            }
+        }
+
         details.setTextColor(muted)
         details.text="Embarque: "+(pickupMinutes?.let(::duration)?:"—")+(pickupKm?.let{" • ${amount(it)} km"}?:"")
         if(prefs.getBoolean("card_details",false))body.addView(details)
@@ -130,6 +137,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         fun addBanner(){if(hasBanner)addView(banner,LayoutParams(-2,-2).apply{gravity=Gravity.START;bottomMargin=if(neonEnabled && above)-dp(7) else dp(4);topMargin=dp(4)})}
         if(above)addBanner();addView(body,LayoutParams(-1,-2));if(!above)addBanner()
         contentDescription="$source • $shownLabel. R$ ${fareValue?.let(::amount)}. Até passageiro: ${pickupMinutes?.let(::duration)}. Total: ${duration(minutes)} • ${amount(totalKm)} km. Nota ${rating?.replace('.',',')?:"não identificada"}. R$ ${amount(valuePerKm)}/km. R$ ${amount(valuePerHour)}/h"
+        if(profitDescription.isNotEmpty())contentDescription="$contentDescription. $profitDescription"
         updateFlameAnimation()
         invalidate()
     }
@@ -162,30 +170,10 @@ class OfferTagView(context: Context) : LinearLayout(context) {
 
     /** Nine patches leave the card center clear and keep the fire in its reserved border. */
     private fun drawRealisticFire(canvas: Canvas, bottomOnly: Boolean) {
-        val bitmap = fireTexture ?: return
-        val sourceX = intArrayOf(0, (bitmap.width * .118f).toInt(), (bitmap.width * .845f).toInt(), bitmap.width)
-        val sourceY = intArrayOf(0, (bitmap.height * .36f).toInt(), (bitmap.height * .824f).toInt(), bitmap.height)
-        val x = floatArrayOf(body.left - dp(14).toFloat(), body.left.toFloat(), body.right.toFloat(), body.right + dp(14).toFloat())
-        val y = floatArrayOf(body.top - dp(32).toFloat(), body.top.toFloat(), body.bottom - dp(20).toFloat(), body.bottom + dp(12).toFloat())
-        firePaint.colorFilter = if (neonColor == Color.rgb(0, 200, 88)) {
-            android.graphics.ColorMatrixColorFilter(floatArrayOf(
-                0f, .7f, 0f, 0f, 0f,
-                1f, 0f, 0f, 0f, 0f,
-                0f, .3f, 0f, 0f, 0f,
-                0f, 0f, 0f, 1f, 0f))
-        } else null
-        for (row in 0..2) for (col in 0..2) {
-            if ((row == 1 && col == 1) || (bottomOnly != (row == 2))) continue
-            // Independent subtle height changes animate the textured flames without
-            // moving the card, its readable metrics or its close control.
-            val sway = kotlin.math.sin(flameFrame * Math.PI / 12.0 + col * 1.7).toFloat() * dp(2)
-            val top = y[row] + if (row == 0) sway else if (row == 2) -sway else 0f
-            val destination = RectF(x[col], top, x[col + 1], y[row + 1])
-            canvas.drawBitmap(bitmap,
-                android.graphics.Rect(sourceX[col], sourceY[row], sourceX[col + 1], sourceY[row + 1]),
-                destination, firePaint)
-        }
-        firePaint.colorFilter = null
+        fireBorder.draw(canvas,
+            RectF(body.left.toFloat(), body.top.toFloat(), body.right.toFloat(), body.bottom - dp(20).toFloat()),
+            dp(14).toFloat(), dp(32).toFloat(), dp(32).toFloat(), flameFrame,
+            green = neonColor == Color.rgb(0, 200, 88), bottomOnly = bottomOnly)
     }
 
     fun isCloseHit(x:Float,y:Float):Boolean = x >= body.right-dp(40) && x <= body.right+dp(4) && y >= body.top && y <= body.top+dp(35)

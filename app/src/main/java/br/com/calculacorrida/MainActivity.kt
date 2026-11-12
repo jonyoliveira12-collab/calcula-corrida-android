@@ -19,14 +19,14 @@ import android.content.res.ColorStateList
 class MainActivity : Activity() {
 
     private val bg = Color.rgb(10, 10, 12)
-    private val panel = Color.rgb(23, 23, 26)
+    private val panel = Color.rgb(25, 28, 34)
     private val gold = Color.rgb(239, 190, 65)
     private val white = Color.rgb(247, 244, 232)
     private val muted = Color.rgb(176, 172, 158)
     private val green = Color.rgb(20, 166, 123)
     private val red = Color.rgb(226, 75, 100)
     private val amber = Color.rgb(242, 157, 45)
-    private val border = Color.rgb(132, 103, 42)
+    private val border = Color.rgb(59, 61, 67)
     private val bgInput = Color.rgb(35, 35, 39)
 
     private lateinit var content: LinearLayout
@@ -271,11 +271,13 @@ class MainActivity : Activity() {
         })
         diagnostics.addView(action("ABRIR AJUSTES DE LEITURA  ›", false) { showTab("Perfil") })
         diagnostics.addView(label(prefs.getString("ai_status", "IA: aguardando oferta") ?: "IA: aguardando oferta", 12f, muted, false, 4, 0))
-        content.addView(diagnostics, margin(0,10))
+        diagnostics.visibility = View.GONE
         val status = horizontal().apply { setPadding(dp(4), dp(12), dp(4), dp(4)) }
         status.addView(label("PAINEL DO MOTORISTA", 11f, gold, true), weight())
         val online = isOperationalOnline()
         status.addView(pill(if (online) "● LEITURA ATIVA" else "● LEITURA PAUSADA", if (online) green else muted))
+        content.addView(label("Seu próximo percurso", 27f, white, true, 18, 3))
+        content.addView(label("Seus números. Suas escolhas.", 14f, muted, false, 0, 12))
         content.addView(status)
 
         val controls = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
@@ -311,7 +313,7 @@ class MainActivity : Activity() {
         content.addView(controls)
 
         val offerCard = card().apply { background = rounded(panel, 22, gold) }
-        offerCard.addView(label("⚡ ÚLTIMA OFERTA", 21f, gold, true, 0, 18))
+        offerCard.addView(label("ÚLTIMA OPORTUNIDADE", 14f, gold, true, 0, 18))
         val offer = records.firstOrNull()
         fun number(key: String): String = offer?.let { String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", it.optDouble(key)) } ?: "—"
         val totals = horizontal()
@@ -361,6 +363,10 @@ class MainActivity : Activity() {
         settings.addView(label("Autorize a leitura e a sobreposição nos ajustes. Para usar bancos, desligue a leitura.", 12f, muted, false, 6, 2))
         settings.addView(action("PERMISSÕES E AJUSTES  ›", false) { showTab("Perfil") })
         content.addView(settings, margin(0,12))
+        content.addView(action("DETALHES DA LEITURA  ›", false) {
+            diagnostics.visibility = if(diagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        })
+        content.addView(diagnostics, margin(0,10))
     }
 
     private fun chooseProfilePhoto() {
@@ -702,7 +708,8 @@ class MainActivity : Activity() {
 
     private fun buildProfile() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        content.addView(label("Perfil e ajustes", 24f, white, true, 5, 12))
+        content.addView(label("Do seu jeito", 28f, white, true, 18, 3))
+        content.addView(label("Ajustes, metas e suporte em um só lugar.", 14f, muted, false, 0, 16))
 
         val privacy = card()
         privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
@@ -783,7 +790,7 @@ class MainActivity : Activity() {
         }
         editableGoal("R$/km mínimo", "min_per_km", 1.8f)
         editableGoal("R$/hora mínimo", "min_per_hour", 50f)
-        editableGoal("Custo R$/km (combustível)", "cost_per_km", 0.65f)
+        editableGoal("Custo estimado por km", "cost_per_km", 0.65f)
 
         limits.addView(label("OPÇÕES DA TAG", 11f, gold, true, 14, 0))
 
@@ -806,7 +813,8 @@ class MainActivity : Activity() {
             buttonTintList = ColorStateList.valueOf(gold)
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("show_profit", checked).apply() }
         }
-        limits.addView(toggleRow("Mostrar lucro %", showProfitSwitch))
+        limits.addView(toggleRow("Mostrar lucro estimado (%)", showProfitSwitch))
+        limits.addView(label("Margem estimada = valor da oferta menos o custo por km do percurso total. Outros custos só entram se você os incluir nesse valor.", 12f, muted, false, 2, 10))
 
         val voiceSwitch = Switch(this).apply {
             isChecked = prefs.getBoolean("voice_enabled", false)
@@ -814,6 +822,8 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("voice_enabled", checked).apply() }
         }
         limits.addView(toggleRow("Voz (falar resultado)", voiceSwitch))
+        limits.addView(label("Quando ativada, anuncia novas ofertas pela voz do Android. Confira o volume de mídia e o idioma português do aparelho.", 12f, muted, false, 2, 8))
+        prefs.getString("voice_status", null)?.let { limits.addView(label(it, 12f, gold, false, 2, 4)) }
 
         content.addView(limits, margin(0, 10))
 
@@ -870,9 +880,9 @@ class MainActivity : Activity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(23, 23, 26), Color.rgb(18, 18, 20), Color.rgb(10, 10, 12))
+            intArrayOf(Color.rgb(30, 33, 40), Color.rgb(22, 24, 29), Color.rgb(19, 20, 24))
         ).apply {
-            cornerRadius = dp(20).toFloat()
+            cornerRadius = dp(24).toFloat()
             setStroke(dp(1), border)
         }
         elevation = dp(6).toFloat()
@@ -935,13 +945,20 @@ class MainActivity : Activity() {
         addView(label(value, 15f, white, true, 2, 0))
     }
 
-    private fun action(text: String, _ignored: Boolean, onClick: () -> Unit): TextView = TextView(this).apply {
+    private fun action(text: String, prominent: Boolean, onClick: () -> Unit): TextView = TextView(this).apply {
         this.text = text
-        setTextColor(gold)
+        setTextColor(if(prominent) Color.rgb(30,24,13) else gold)
         textSize = 12f
         typeface = Typeface.DEFAULT_BOLD
-        setPadding(0, dp(8), 0, dp(4))
+        gravity = Gravity.CENTER_VERTICAL
+        minHeight = dp(48)
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+        background = android.graphics.drawable.RippleDrawable(
+            ColorStateList.valueOf(Color.argb(45,255,220,120)),
+            rounded(if(prominent)gold else Color.rgb(36,37,42),14,if(prominent)gold else border),null)
+        layoutParams = LinearLayout.LayoutParams(-2,-2).apply {topMargin=dp(8)}
         isClickable = true
+        isFocusable = true
         setOnClickListener { onClick() }
     }
 
@@ -963,9 +980,22 @@ class MainActivity : Activity() {
 
     private fun toggleRow(title: String, sw: Switch): LinearLayout {
         val row = horizontal()
-        row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
+        val labels = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+        labels.addView(label(title, 14f, white, true))
+        val state = label(if(sw.isChecked)"Ativado" else "Desativado",12f,if(sw.isChecked)green else muted,false,3,0)
+        labels.addView(state)
+        row.addView(labels, LinearLayout.LayoutParams(0,-2,1f))
         row.addView(sw)
-        row.setPadding(0, dp(10), 0, dp(10))
+        row.setPadding(dp(12),dp(12),dp(8),dp(12))
+        row.background = rounded(Color.rgb(32,34,40),16,border)
+        row.layoutParams = LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8);bottomMargin=dp(4)}
+        sw.thumbTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(gold,Color.LTGRAY))
+        sw.trackTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(Color.rgb(133,105,39),Color.rgb(74,76,84)))
+        // Update the visual state without replacing the switch's preference listener.
+        sw.setOnClickListener {
+            state.text=if(sw.isChecked)"Ativado" else "Desativado"
+            state.setTextColor(if(sw.isChecked)green else muted)
+        }
         return row
     }
 

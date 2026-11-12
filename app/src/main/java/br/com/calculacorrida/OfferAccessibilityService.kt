@@ -72,7 +72,9 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var sensitiveWindowVisible = false
     @Volatile private var stopped = false
     private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key != null && key.startsWith("label_")) {
+        if (key == "voice_enabled") {
+            readerHandler.post { if(!getSharedPreferences("settings",MODE_PRIVATE).getBoolean("voice_enabled",false))voice.shutdown() }
+        } else if (key != null && (key.startsWith("label_") || key == "show_profit" || key == "show_time" || key == "show_rating" || key == "cost_per_km")) {
             readerHandler.post {
                 displayedOffers.forEach { (pkg,shown) ->
                     overlays[pkg]?.takeIf{it.visibility==View.VISIBLE}?.let { renderTag(it,shown.result,shown.offer,pkg) }
@@ -105,6 +107,8 @@ class OfferAccessibilityService : AccessibilityService() {
             finally { if(!stopped) readerHandler.postDelayed(this, 350L) }
         }
     }
+
+    private val voice by lazy { OfferVoice(this) { pkg -> readingEnabled() && displayedOffers.containsKey(pkg) } }
 
     private var lastHeartbeat=0L
     private fun readingEnabled(): Boolean = !sensitiveWindowVisible && foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
@@ -445,6 +449,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun forgetOffer(pkg:String) {
+        voice.stop()
         hideOverlay(pkg)
         lastOfferSeen.remove(pkg)
         missingOffers.remove(pkg)
@@ -711,6 +716,15 @@ class OfferAccessibilityService : AccessibilityService() {
         // Salva cada oferta analisada no relatório da Jornada, sem duplicar eventos repetidos.
         JourneyStore.record(this, offer, result, sourcePackage)
         showOffer(result, offer, anchor, sourcePackage)
+        val label = when(result.rating) {
+            Rating.GOOD -> prefs.getString("label_good","Bora carai")
+            Rating.REVIEW -> prefs.getString("label_review","Será?")
+            Rating.BAD -> prefs.getString("label_bad","Vixe não dá")
+        }
+        val locale = java.util.Locale.forLanguageTag("pt-BR")
+        val spoken = "${driverAppName(sourcePackage)}. $label. " +
+            String.format(locale,"%.2f reais por quilômetro. %.2f reais por hora.",result.perKm,result.perHour)
+        voice.announce(sourcePackage,spoken)
     }
 
     private fun driverWindow(pkg:String):Pair<Int,Rect>? {
@@ -930,6 +944,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun hideAllOverlays() {
+        voice.stop()
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         overlays.values.forEach { try { wm.removeView(it) } catch (_: Exception) {} }
         overlays.clear()
@@ -948,6 +963,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         stopped = true
+        voice.shutdown()
         readerHandler.removeCallbacksAndMessages(null)
         active = null
         getSharedPreferences("settings", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(appearanceListener)

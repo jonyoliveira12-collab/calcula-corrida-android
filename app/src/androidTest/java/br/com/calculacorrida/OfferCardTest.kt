@@ -20,6 +20,36 @@ class OfferCardTest {
             for(expected in listOf("R$ 18,40","3 min","4,95","R$ 1,46/km","R$ 39,43/h","28 min")) assertTrue(text,text.contains(expected))
         }
     }
+    @Test fun profitAndLegacyDisplaySwitchesChangeTheRenderedCard() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val prefs=context.getSharedPreferences("settings",0)
+        val original=prefs.all
+        fun texts(view:android.view.View):List<String> = if(view is android.view.ViewGroup)
+            (0 until view.childCount).flatMap{texts(view.getChildAt(it))}
+            else if(view is android.widget.TextView)listOf(view.text.toString())else emptyList()
+        try {
+            instrumentation.runOnMainSync {
+                val view=OfferTagView(context)
+                prefs.edit().putBoolean("show_profit",true).putBoolean("show_time",true)
+                    .putBoolean("show_rating",true).putBoolean("card_rating",true).putFloat("cost_per_km",.65f).commit()
+                view.setOffer("RECUSAR",20.0,10.0,2.0,60.0,"4.90",Color.RED,"UBER",20.0)
+                assertTrue(texts(view).any{it.contains("67,50%") && it.contains("13,50")})
+                assertTrue(texts(view).contains("Nota"))
+                assertTrue(texts(view).any{it.startsWith("UBER") && it.contains("20 min")})
+                prefs.edit().putBoolean("show_profit",false).putBoolean("show_time",false).putBoolean("show_rating",false).commit()
+                view.setOffer("RECUSAR",20.0,10.0,2.0,60.0,"4.90",Color.RED,"UBER",20.0)
+                assertFalse(texts(view).any{it.contains("Margem estimada")})
+                assertFalse(texts(view).contains("Nota"))
+                assertFalse(texts(view).any{it.startsWith("UBER") && it.contains("20 min")})
+            }
+        } finally {
+            val edit=prefs.edit().clear()
+            original.forEach{(k,v)->when(v){is Boolean->edit.putBoolean(k,v);is String->edit.putString(k,v);is Int->edit.putInt(k,v);is Float->edit.putFloat(k,v);is Long->edit.putLong(k,v)}}
+            edit.commit()
+        }
+    }
+
     @Test fun compactThemesAndOptionalFieldsRenderWithoutOverflow() {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val context=instrumentation.targetContext

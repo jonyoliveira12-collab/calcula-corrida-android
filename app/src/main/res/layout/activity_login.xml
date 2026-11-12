@@ -60,10 +60,10 @@
             android:id="@+id/loginFlameFrame"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:paddingTop="21dp"
-            android:paddingBottom="21dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="56dp"
+            android:paddingBottom="30dp"
             android:clipChildren="false"
             android:clipToPadding="false">
         <LinearLayout
@@ -207,7 +207,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="CÁLCULO INTELIGENTE   •   MAIS LUCRO   •   EM TEMPO REAL"
+            android:text="CARRO E MOTO   •   VOCÊ NO CONTROLE"
             android:textColor="#BCB6A5"
             android:textSize="9sp"
             android:letterSpacing="0.12"
