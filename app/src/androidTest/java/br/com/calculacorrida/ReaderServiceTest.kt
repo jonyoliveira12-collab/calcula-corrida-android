@@ -32,6 +32,12 @@ class ReaderServiceTest {
         }
         val oldServices = shell("settings get secure enabled_accessibility_services")
         val oldEnabled = shell("settings get secure accessibility_enabled")
+        val oldWifi = shell("settings get global wifi_on")
+        val oldData = shell("settings get global mobile_data")
+        fun restoreNetwork() {
+            shell("svc wifi " + if(oldWifi=="1")"enable" else "disable")
+            shell("svc data " + if(oldData=="1")"enable" else "disable")
+        }
         try {
             shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",true).putBoolean("reader_disclosure_accepted",true).commit()
@@ -43,9 +49,25 @@ class ReaderServiceTest {
             await(true)
             context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             await(true)
+            // Losing validated internet must pause the reader even in the background.
+            shell("svc wifi disable")
+            shell("svc data disable")
+            fun awaitNetwork(expected:Boolean) {
+                repeat(100) {
+                    if(NetworkGate.isOnline(context)==expected && hasCc()==expected)return
+                    Thread.sleep(200)
+                }
+                assertEquals("Validated internet",expected,NetworkGate.isOnline(context))
+                assertEquals("CC follows connection",expected,hasCc())
+            }
+            awaitNetwork(false)
+            assertTrue(context.getSharedPreferences("settings",0).getString("reader_status","")!!.contains("Sem internet"))
+            restoreNetwork()
+            awaitNetwork(true)
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",false).putBoolean("traffic_enabled",false).commit()
             await(false)
         } finally {
+            restoreNetwork()
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",false).commit()
             OfferAccessibilityService.stopReading()
             SessionManager(context).logout()

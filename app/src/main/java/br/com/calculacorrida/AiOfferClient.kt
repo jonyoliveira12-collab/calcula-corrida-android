@@ -15,7 +15,7 @@ object AiOfferClient {
     private val http=OkHttpClient.Builder().connectTimeout(6,TimeUnit.SECONDS).callTimeout(15,TimeUnit.SECONDS).build()
     data class Analysis(val insight:String?,val status:String)
     fun request(context:Context,result:TripResult):Analysis {
-        if(!NetworkGate.isOnline(context)) return Analysis(null,"IA sem internet; cálculos locais ativos")
+        if(!NetworkGate.isOnline(context)) return Analysis(null,"Sem internet; leitura e cálculos pausados")
         val session=SessionManager(context)
         var token=session.getAccessToken()?.takeIf { it.isNotBlank() }
             ?: return Analysis(null,"Entre na conta para ativar a IA")

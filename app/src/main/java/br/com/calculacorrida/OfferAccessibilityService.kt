@@ -111,7 +111,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private val voice by lazy { OfferVoice(this) { pkg -> readingEnabled() && displayedOffers.containsKey(pkg) } }
 
     private var lastHeartbeat=0L
-    private fun readingEnabled(): Boolean = !sensitiveWindowVisible && foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
+    private fun readingEnabled(): Boolean = NetworkGate.isOnline(this) && !sensitiveWindowVisible && foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
     private fun readerConfigured(): Boolean {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         return prefs.getBoolean("reader_disclosure_accepted", false) &&
@@ -150,6 +150,12 @@ class OfferAccessibilityService : AccessibilityService() {
         if(now-snapshotAt<=2000L) {
             visible.forEach{lastWindowSeen[it]=now}
             overlays.keys.filter { it !in visible && now-(lastWindowSeen[it]?:0)>2000L }.forEach(::forgetOffer)
+        }
+        if (!NetworkGate.isOnline(this)) {
+            hideAllOverlays()
+            removeBubble()
+            readerStatus("Sem internet; leitura e cálculos pausados")
+            return
         }
         if (!readerConfigured() || sensitiveWindowVisible || pkg == "com.nu.production") {
             hideAllOverlays()
@@ -241,12 +247,13 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
-            readerStatus("Sem internet; cálculos locais continuam ativos")
+            readerHandler.post { updateForeground(foregroundSnapshot) }
         }
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
             val validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            if (!validated) readerStatus("Sem internet; cálculos locais continuam ativos")
+            readerHandler.post { updateForeground(foregroundSnapshot) }
+            if (validated) readerHandler.post { if(readingEnabled())visibleDriverPackages().forEach{readOffer(it)} }
         }
     }
 
@@ -700,6 +707,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun calculateAndShow(offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
+        if(!readingEnabled())return
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val result = TripCalculator.calculate(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,

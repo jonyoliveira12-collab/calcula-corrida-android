@@ -27,3 +27,17 @@ Os testes usam ofertas sintéticas. A inclusão do pacote na lista e o teste de 
 - Melhorar o painel e as configurações internas, com cartões mais organizados, estados claros e botões legíveis. Os detalhes técnicos de leitura ficam em uma área expansível.
 - O seletor de lucro passa a mostrar/ocultar a margem estimada na etiqueta. Fórmula: `(oferta - distância total × custo por km) / oferta × 100`. Valores negativos permanecem visíveis. Isso não inclui custos que o motorista não configurou.
 - A opção de voz passa a anunciar novas ofertas usando a síntese de voz do Android. Desativar a opção, pausar a leitura ou remover a oferta interrompe o áudio pendente. A reprodução audível ainda precisa ser validada no tablet com mecanismo de voz português instalado.
+
+## Nova assinatura autorizada
+
+O proprietário autorizou uma instalação inicial com chave nova, seguida de atualizações com essa mesma chave. Foi gerada uma chave privada nova fora do repositório. O certificado público está fixado no workflow; a chave privada não foi adicionada ao Git. O APK assinado usa o pacote oficial `br.com.calculacorrida`, versão 0.5.1, código 17.
+
+Foi comparado o certificado do APK 0.5.0 publicado com o certificado da antiga chave do histórico: são diferentes. Não usar essa chave antiga para tentar atualizar a avaliação 0.5.0.
+
+O backup privado foi preparado separadamente. O armazenamento nos quatro Secrets do GitHub continua pendente: a integração respondeu que não tem permissão para esse recurso. A publicação automática agora exige também a aprovação dos testes no emulador.
+
+## Conexão exigida, sem aguardar a IA
+
+O proprietário escolheu exigir internet validada para ler ofertas e exibir novos cálculos, sem esperar o comentário da IA. A perda de conexão remove as etiquetas, interrompe a voz e pausa o leitor; a conexão restabelecida permite uma nova leitura. As contas determinísticas continuam no aparelho por rapidez e precisão. O comentário da IA é separado e não bloqueia a etiqueta.
+
+A função de IA publicada foi encontrada ativa e o endpoint respondeu à verificação de configuração. A geração autenticada de comentário com a conta do usuário no tablet ainda não foi validada nesta sessão. Não prometer tempo real para o comentário da IA nem confundir a validação do endpoint com um teste completo da IA.

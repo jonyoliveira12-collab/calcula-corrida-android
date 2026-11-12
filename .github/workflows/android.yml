@@ -105,7 +105,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: test
+    needs: [test, device-check]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -138,7 +138,7 @@ jobs:
           umask 077
           printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$JHONDRIVER_KEYSTORE_PATH"
           keytool -exportcert -keystore "$JHONDRIVER_KEYSTORE_PATH" -storepass:env JHONDRIVER_KEYSTORE_PASSWORD -alias "$JHONDRIVER_KEY_ALIAS" -file "$RUNNER_TEMP/signing-cert.der"
-          echo "01537f8902325696735cd4db6710ec2186eb21f8007e11ed74d757f8af30d5b8  $RUNNER_TEMP/signing-cert.der" | sha256sum --check
+          echo "d83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7  $RUNNER_TEMP/signing-cert.der" | sha256sum --check
       - name: Build signed update
         run: gradle --no-daemon assembleRelease
       - name: Check signed automatic reader configuration
