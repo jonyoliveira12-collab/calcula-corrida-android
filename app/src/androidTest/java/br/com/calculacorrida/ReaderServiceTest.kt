@@ -28,7 +28,8 @@ class ReaderServiceTest {
         }
         fun await(expected: Boolean) {
             repeat(30) { if (hasCc() == expected) return; Thread.sleep(250) }
-            assertEquals("CC visibility", expected, hasCc())
+            val prefs=context.getSharedPreferences("settings",0)
+            assertEquals("CC visibility: ${prefs.getString("reader_status","")} / online=${NetworkGate.isOnline(context)} / heartbeat=${prefs.getLong("reader_heartbeat",0)} / service=${shell("settings get secure enabled_accessibility_services")}", expected, hasCc())
         }
         val oldServices = shell("settings get secure enabled_accessibility_services")
         val oldEnabled = shell("settings get secure accessibility_enabled")
@@ -54,16 +55,21 @@ class ReaderServiceTest {
             shell("svc data disable")
             fun awaitNetwork(expected:Boolean) {
                 repeat(100) {
-                    if(NetworkGate.isOnline(context)==expected && hasCc()==expected)return
+                    if(NetworkGate.isOnline(context)==expected)return
                     Thread.sleep(200)
                 }
                 assertEquals("Validated internet",expected,NetworkGate.isOnline(context))
-                assertEquals("CC follows connection",expected,hasCc())
+
             }
             awaitNetwork(false)
+            await(false)
             assertTrue(context.getSharedPreferences("settings",0).getString("reader_status","")!!.contains("Sem internet"))
             restoreNetwork()
             awaitNetwork(true)
+            // System network settings may suppress overlays; return to the app
+            // without restarting the accessibility service before checking resume.
+            instrumentation.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            await(true)
             context.getSharedPreferences("settings",0).edit().putBoolean("copilot_enabled",false).putBoolean("traffic_enabled",false).commit()
             await(false)
         } finally {
