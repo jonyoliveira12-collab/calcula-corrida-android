@@ -429,18 +429,19 @@ class OfferAccessibilityService : AccessibilityService() {
     // A full OCR frame can be incomplete even while an offer is visible. Keep
     // the card on partial offer evidence, and require repeated readable frames
     // with no offer before dismissing it. Never persist the recognized text.
-    private fun observeFullFrame(pkg:String,windowId:Int,text:String) {
-        if(detectedWindows[pkg]!=windowId || pkg !in acceptedSignatures)return
+    private fun observeFullFrame(pkg:String,windowId:Int,text:String):Boolean {
+        if(detectedWindows[pkg]!=windowId || pkg !in acceptedSignatures)return false
         val normalized=normalizeActionText(text)
         if(looksLikeOffer(pkg,text)) {
             rememberVisibleOffer(pkg,windowId)
-            return
+            return false
         }
-        if(normalized.count{it.isLetterOrDigit()}<12)return
+        if(normalized.count{it.isLetterOrDigit()}<12)return false
         val now=android.os.SystemClock.elapsedRealtime()
         val evidence=missingOffers.getOrPut(pkg){MissingOffer(now,0)}
         evidence.samples++
         if(evidence.samples>=2 && now-evidence.since>=1200L)forgetOffer(pkg)
+        return true
     }
 
     private fun forgetOffer(pkg:String) {
@@ -597,7 +598,11 @@ class OfferAccessibilityService : AccessibilityService() {
                                 recognitionStatus(pkg,"Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms")
                                 if(offer==null) {
                                     discardPreviousOfferIfFareChanged(pkg,windowId,recognized)
-                                    if(index==1 || (index==0 && image===captured))observeFullFrame(pkg,windowId,recognized)
+                                    val fullUpright=index==1 || (index==0 && image===captured)
+                                    // Once a readable full frame shows no offer,
+                                    // release OCR for the other app immediately.
+                                    // A later independent frame must confirm it.
+                                    if(fullUpright && observeFullFrame(pkg,windowId,recognized))return@addOnSuccessListener
                                 }
                                 if(offer==null && index<angles.lastIndex) {
                                     retry=true
