@@ -4,10 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RectF
-import android.graphics.LinearGradient
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -26,12 +23,11 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     private val metrics=LinearLayout(context)
     private val details=line(11f,Color.DKGRAY)
     private val ai=line(11f,Color.DKGRAY)
-    private val neonPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style=Paint.Style.STROKE
-        strokeCap=Paint.Cap.ROUND
-        strokeJoin=Paint.Join.ROUND
+    private val firePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val fireTexture by lazy {
+        android.graphics.BitmapFactory.decodeResource(resources, R.drawable.card_realistic_fire,
+            android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 })
     }
-    private val flameFill=Paint(Paint.ANTI_ALIAS_FLAG).apply { style=Paint.Style.FILL }
     private var neonEnabled=true
     private var neonColor=Color.RED
     private var flameFrame=0
@@ -160,94 +156,38 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         if(neonEnabled && body.width>0 && body.height>0) drawBottomFlames(canvas)
     }
 
-    private fun drawNeonBehind(canvas:Canvas) {
-        val box=RectF(body.left.toFloat(),body.top.toFloat(),body.right.toFloat(),body.bottom.toFloat())
-        for((width,alpha) in listOf(15 to 55,10 to 105,6 to 170,2 to 240)) {
-            neonPaint.color=withAlpha(neonColor,alpha);neonPaint.strokeWidth=dp(width).toFloat()
-            canvas.drawRoundRect(box,dp(10).toFloat(),dp(10).toFloat(),neonPaint)
+    private fun drawNeonBehind(canvas: Canvas) = drawRealisticFire(canvas, bottomOnly = false)
+
+    private fun drawBottomFlames(canvas: Canvas) = drawRealisticFire(canvas, bottomOnly = true)
+
+    /** Nine patches leave the card center clear and keep the fire in its reserved border. */
+    private fun drawRealisticFire(canvas: Canvas, bottomOnly: Boolean) {
+        val bitmap = fireTexture ?: return
+        val sourceX = intArrayOf(0, (bitmap.width * .118f).toInt(), (bitmap.width * .845f).toInt(), bitmap.width)
+        val sourceY = intArrayOf(0, (bitmap.height * .36f).toInt(), (bitmap.height * .824f).toInt(), bitmap.height)
+        val x = floatArrayOf(body.left - dp(14).toFloat(), body.left.toFloat(), body.right.toFloat(), body.right + dp(14).toFloat())
+        val y = floatArrayOf(body.top - dp(32).toFloat(), body.top.toFloat(), body.bottom - dp(20).toFloat(), body.bottom + dp(12).toFloat())
+        firePaint.colorFilter = if (neonColor == Color.rgb(0, 200, 88)) {
+            android.graphics.ColorMatrixColorFilter(floatArrayOf(
+                0f, .7f, 0f, 0f, 0f,
+                1f, 0f, 0f, 0f, 0f,
+                0f, .3f, 0f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f))
+        } else null
+        for (row in 0..2) for (col in 0..2) {
+            if ((row == 1 && col == 1) || (bottomOnly != (row == 2))) continue
+            // Independent subtle height changes animate the textured flames without
+            // moving the card, its readable metrics or its close control.
+            val sway = kotlin.math.sin(flameFrame * Math.PI / 12.0 + col * 1.7).toFloat() * dp(2)
+            val top = y[row] + if (row == 0) sway else if (row == 2) -sway else 0f
+            val destination = RectF(x[col], top, x[col + 1], y[row + 1])
+            canvas.drawBitmap(bitmap,
+                android.graphics.Rect(sourceX[col], sourceY[row], sourceX[col + 1], sourceY[row + 1]),
+                destination, firePaint)
         }
-        // Dense individual tongues move out of phase, like the chosen fuller
-        // fire concept. They are drawn behind the body, outside the numbers.
-        val baseline=box.top+dp(3)
-        val step=dp(19).toFloat().coerceAtLeast(1f)
-        val path=Path().apply {
-            moveTo(box.left,baseline)
-            var x=box.left; var index=0
-            while(x<box.right) {
-                val end=(x+step).coerceAtMost(box.right); val s=end-x
-                val phase=flameFrame*Math.PI/12.0+index*1.31
-                val height=dp(15)+dp(9)*(0.5f+0.5f*kotlin.math.sin(phase).toFloat())
-                val sway=dp(4)*kotlin.math.sin(phase*0.8+1.7).toFloat()
-                cubicTo(x+s*.14f,baseline-dp(4),x+s*.35f,baseline-dp(4),x+s*.52f+sway,baseline-height)
-                cubicTo(x+s*.76f+sway,baseline-height*.55f,x+s*.68f,baseline-dp(3),end,baseline)
-                x=end; index++
-            }
-            lineTo(box.right,box.top+dp(6));lineTo(box.left,box.top+dp(6));close()
-        }
-        drawFlameShape(canvas,path,box.top-dp(30),baseline)
-        for(side in listOf(-1,1)) {
-            val edge=if(side<0)box.left else box.right
-            val sideFlames=Path().apply {
-                moveTo(edge,box.top)
-                var y=box.top; var index=0
-                while(y<box.bottom) {
-                    val end=(y+step).coerceAtMost(box.bottom);val span=end-y
-                    val phase=flameFrame*Math.PI/12.0+index*1.17+side
-                    val width=dp(5)+dp(5)*(0.5f+0.5f*kotlin.math.sin(phase).toFloat())
-                    val sway=dp(3)*kotlin.math.sin(phase+1).toFloat()
-                    cubicTo(edge+side*dp(3),y+span*.2f,edge+side*dp(4),y+span*.36f,edge+side*width,y+span*.5f+sway)
-                    cubicTo(edge+side*dp(6),y+span*.68f,edge+side*dp(2),end-dp(2),edge,end)
-                    y=end;index++
-                }
-                lineTo(edge-side*dp(3),box.bottom);lineTo(edge-side*dp(3),box.top);close()
-            }
-            drawFlameShape(canvas,sideFlames,box.top,box.bottom)
-        }
+        firePaint.colorFilter = null
     }
 
-    private fun drawBottomFlames(canvas:Canvas) {
-        val left=body.left+dp(8).toFloat();val right=body.right-dp(8).toFloat()
-        val base=body.bottom-dp(4).toFloat();val step=dp(52).toFloat().coerceAtLeast(1f)
-        val flame=Path().apply {
-            moveTo(left,base)
-            var x=left;var index=0
-            while(x<right) {
-                val end=(x+step).coerceAtMost(right);val s=end-x
-                val motion=kotlin.math.sin((flameFrame+index*3)*Math.PI/12.0).toFloat()*dp(7)
-                val sway=kotlin.math.sin((flameFrame+index*3+6)*Math.PI/12.0).toFloat()*dp(4)
-                val peak=base-dp(14)-motion
-                cubicTo(x+s*.18f,base,x+s*.23f,base-dp(4),x+s*.43f+sway,peak)
-                cubicTo(x+s*.33f,base-dp(5),x+s*.46f,base-dp(3),x+s*.60f,base-dp(7))
-                cubicTo(x+s*.72f,base-dp(10),x+s*.83f,base-dp(2),end,base)
-                x=end;index++
-            }
-            lineTo(right,body.bottom.toFloat());lineTo(left,body.bottom.toFloat());close()
-        }
-        val saved=canvas.save()
-        canvas.clipRect(body.left,body.bottom-dp(27),body.right,body.bottom+dp(6))
-        drawFlameShape(canvas,flame,base-dp(27),body.bottom.toFloat())
-        canvas.restoreToCount(saved)
-    }
-
-    private fun drawFlameShape(canvas:Canvas,path:Path,top:Float,bottom:Float) {
-        for((width,alpha) in listOf(10 to 55,6 to 110,3 to 200)) {
-            neonPaint.color=withAlpha(neonColor,alpha);neonPaint.strokeWidth=dp(width).toFloat().coerceAtLeast(1f)
-            canvas.drawPath(path,neonPaint)
-        }
-        val core=when(neonColor) {
-            Color.rgb(0,200,88) -> Color.rgb(206,255,133)
-            Color.rgb(255,170,0) -> Color.rgb(255,247,133)
-            else -> Color.rgb(255,225,77)
-        }
-        flameFill.shader=LinearGradient(0f,top,0f,bottom, intArrayOf(withAlpha(neonColor,185),core,neonColor),floatArrayOf(0f,.52f,1f),Shader.TileMode.CLAMP)
-        canvas.drawPath(path,flameFill)
-        flameFill.shader=null
-        neonPaint.color=withAlpha(core,190)
-        neonPaint.strokeWidth=(resources.displayMetrics.density*1.3f).coerceAtLeast(1f)
-        canvas.drawPath(path,neonPaint)
-    }
-
-    private fun withAlpha(color:Int,alpha:Int)=Color.argb(alpha,Color.red(color),Color.green(color),Color.blue(color))
     fun isCloseHit(x:Float,y:Float):Boolean = x >= body.right-dp(40) && x <= body.right+dp(4) && y >= body.top && y <= body.top+dp(35)
     fun setAiInsight(message:String){ai.text=message.take(140)}
     fun setDiagnostic(message:String){banner.text=message}

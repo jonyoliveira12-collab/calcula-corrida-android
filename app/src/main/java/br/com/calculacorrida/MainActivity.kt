@@ -687,6 +687,19 @@ class MainActivity : Activity() {
         }, margin(0, 10))
     }
 
+    private fun openSupportContact(intent: Intent) {
+        try { startActivity(intent) }
+        catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "Nenhum aplicativo disponível. Você pode copiar o contato abaixo.", Toast.LENGTH_LONG).show()
+            val contact = if (intent.action == Intent.ACTION_DIAL) "+55 41 99597-6826" else "gbrigante71@gmail.com"
+            AlertDialog.Builder(this).setTitle("Contato do suporte").setMessage(contact)
+                .setPositiveButton("Copiar") { _, _ ->
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Suporte JHONDRIVER", contact))
+                }.setNegativeButton("Fechar", null).show()
+        }
+    }
+
     private fun buildProfile() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         content.addView(label("Perfil e ajustes", 24f, white, true, 5, 12))
@@ -704,6 +717,18 @@ class MainActivity : Activity() {
         updates.addView(label("Você será avisado ao abrir o app quando houver uma versão compatível publicada.", 13f, muted, false))
         updates.addView(action("VERIFICAR ATUALIZAÇÃO", false) { AppUpdates.check(this, manual = true) })
         content.addView(updates, margin(0, 10))
+
+        val support = card()
+        support.addView(label("Suporte", 18f, gold, true))
+        support.addView(label("Precisa de ajuda com o JHONDRIVER? Entre em contato.", 13f, muted, false))
+        support.addView(action("TELEFONE: (41) 99597-6826", false) {
+            openSupportContact(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+5541995976826")))
+        })
+        support.addView(action("E-MAIL: gbrigante71@gmail.com", false) {
+            openSupportContact(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:gbrigante71@gmail.com"))
+                .putExtra(Intent.EXTRA_SUBJECT, "Suporte JHONDRIVER"))
+        })
+        content.addView(support, margin(0, 10))
 
         // Perfil do motorista: foto selecionável e identificação da conta.
         val userCard = card()
