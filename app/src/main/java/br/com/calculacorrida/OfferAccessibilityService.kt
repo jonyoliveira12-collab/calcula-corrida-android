@@ -39,6 +39,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private val displayedOffers = mutableMapOf<String,DisplayedOffer>()
     private data class MissingOffer(var since:Long,var samples:Int)
     private val missingOffers = mutableMapOf<String,MissingOffer>()
+    private val missingSourceWindows = mutableMapOf<String,Long>()
     private data class PendingOffer(val signature: String, val offer: OfferTextParser.ParsedOffer, var hits: Int, var lastSeen: Long)
     private val pendingOffers = mutableMapOf<String, PendingOffer>()
     private val acceptedSignatures = mutableMapOf<String, String>()
@@ -411,7 +412,16 @@ class OfferAccessibilityService : AccessibilityService() {
                     if(!stopped) {
                         val available=snapshot.flatMap{(pkg,frames)->frames.map{pkg to it.id}}.toSet()
                         lastCaptureByWindow.keys.retainAll(available)
-                        detectedWindows.keys.retainAll(snapshot.keys)
+                        val observedAt=android.os.SystemClock.elapsedRealtime()
+                        detectedWindows.entries.toList().forEach { (pkg,id) ->
+                            if(snapshot[pkg].orEmpty().any{it.id==id})missingSourceWindows.remove(pkg)
+                            else {
+                                val since=missingSourceWindows.getOrPut(pkg){observedAt}
+                                // The offer popup can close while the same app's map
+                                // remains visible. Confirm its own window disappeared.
+                                if(observedAt-since>=1500L)forgetOffer(pkg)
+                            }
+                        }
                         updateForeground(foregroundSnapshot)
                         if(readingEnabled())visibleDriverPackages().forEach{readOffer(it)}
                     }
@@ -443,6 +453,7 @@ class OfferAccessibilityService : AccessibilityService() {
         detectedWindows[pkg]=windowId
         lastOfferSeen[pkg]=android.os.SystemClock.elapsedRealtime()
         missingOffers.remove(pkg)
+        missingSourceWindows.remove(pkg)
     }
 
     // A full OCR frame can be incomplete even while an offer is visible. Keep
@@ -469,6 +480,7 @@ class OfferAccessibilityService : AccessibilityService() {
         hideOverlay(pkg)
         lastOfferSeen.remove(pkg)
         missingOffers.remove(pkg)
+        missingSourceWindows.remove(pkg)
         acceptedSignatures.remove(pkg)
         acceptedOfferSignatures.remove(pkg)
         detectedWindows.remove(pkg)
@@ -990,6 +1002,7 @@ class OfferAccessibilityService : AccessibilityService() {
         overlayParams.clear()
         displayedOffers.clear()
         missingOffers.clear()
+        missingSourceWindows.clear()
         acceptedSignatures.clear()
         lastOfferSeen.clear()
         detectedWindows.clear()

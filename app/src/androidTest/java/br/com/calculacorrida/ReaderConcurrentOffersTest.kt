@@ -243,6 +243,11 @@ class ReaderConcurrentOffersTest {
             assertFalse("Both independent tags remain separate",Rect.intersects(uberTag()!!,realistic99Tag()!!))
             shell("am force-stop com.ubercab.driver")
             await("Closing Uber keeps the 99 tag",12000) {uberTag()==null && realistic99Tag()!=null}
+            shell("am broadcast -a br.com.calculacorrida.fixture.REMOVE_OFFER_WINDOW -p com.app99.driver")
+            await("Closing the 99 offer popup removes its tag while the map stays open",12000) {
+                driverWindow("com.app99.driver")!=null && realistic99Tag()==null
+            }
+
         } finally {
             listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")

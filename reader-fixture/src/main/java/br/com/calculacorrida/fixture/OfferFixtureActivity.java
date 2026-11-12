@@ -71,6 +71,10 @@ public class OfferFixtureActivity extends Activity {
         offer.setClickable(true);
         offerController=new BroadcastReceiver() {
             @Override public void onReceive(Context context,Intent intent) {
+                if("br.com.calculacorrida.fixture.REMOVE_OFFER_WINDOW".equals(intent.getAction())) {
+                    try {((WindowManager)getApplicationContext().getSystemService(WINDOW_SERVICE)).removeView(offer);}catch(IllegalArgumentException ignored){}
+                    return;
+                }
                 offerVisible="br.com.calculacorrida.fixture.SHOW_OFFER".equals(intent.getAction());
                 offer.invalidate();
             }
@@ -78,6 +82,7 @@ public class OfferFixtureActivity extends Activity {
         IntentFilter filter=new IntentFilter();
         filter.addAction("br.com.calculacorrida.fixture.SHOW_OFFER");
         filter.addAction("br.com.calculacorrida.fixture.HIDE_OFFER");
+        filter.addAction("br.com.calculacorrida.fixture.REMOVE_OFFER_WINDOW");
         if(android.os.Build.VERSION.SDK_INT>=33)registerReceiver(offerController,filter,Context.RECEIVER_EXPORTED);
         else registerReceiver(offerController,filter);
         if(floating) {
