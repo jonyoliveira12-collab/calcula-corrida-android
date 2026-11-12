@@ -12,6 +12,7 @@ class CardStyleActivity : Activity() {
     private lateinit var page:LinearLayout
     private lateinit var preview:OfferTagView
     private var state=0
+    private val gold=Color.rgb(239,190,65)
     private data class DemoOffer(val app:String,val fare:Double,val pickupKm:Double,val tripKm:Double,val minutes:Double,val rating:Double,val pickupMinutes:Double)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
     override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);window.statusBarColor=Color.rgb(14,15,18);window.navigationBarColor=Color.rgb(14,15,18);window.decorView.systemUiVisibility=0
@@ -23,7 +24,7 @@ class CardStyleActivity : Activity() {
             insets
         }
 
-        page.addView(Button(this).apply{text="‹  Voltar";isAllCaps=false;setOnClickListener{finish()}})
+        page.addView(Button(this).apply{text="‹  Voltar";isAllCaps=false;styleButton(this);setOnClickListener{finish()}})
         title("Sua etiqueta, do seu jeito",24)
         title("Arraste a etiqueta pela tela durante a leitura. A posição é salva separadamente para cada aplicativo e orientação.",13)
         title("Prévia da oferta",15)
@@ -31,11 +32,11 @@ class CardStyleActivity : Activity() {
         preview=OfferTagView(this);page.addView(preview,LinearLayout.LayoutParams(dp(310),-2).apply{gravity=android.view.Gravity.CENTER_HORIZONTAL;topMargin=dp(10);bottomMargin=dp(20)})
         title("Tamanho do cartão",16)
         val size=TextView(this).apply{setTextColor(Color.rgb(245,216,130))};page.addView(size)
-        page.addView(SeekBar(this).apply{max=100;progress=prefs.getInt("overlay_scale",100).coerceIn(60,160)-60;setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{override fun onProgressChanged(v:SeekBar?,n:Int,user:Boolean){size.text="${n+60}%";if(user){prefs.edit().putInt("overlay_scale",n+60).apply();refresh()}};override fun onStartTrackingTouch(v:SeekBar?){};override fun onStopTrackingTouch(v:SeekBar?) {}});size.text="${progress+60}%"})
+        page.addView(SeekBar(this).apply{progressTintList=android.content.res.ColorStateList.valueOf(gold);thumbTintList=android.content.res.ColorStateList.valueOf(gold);max=100;progress=prefs.getInt("overlay_scale",100).coerceIn(60,160)-60;setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{override fun onProgressChanged(v:SeekBar?,n:Int,user:Boolean){size.text="${n+60}%";if(user){prefs.edit().putInt("overlay_scale",n+60).apply();refresh()}};override fun onStartTrackingTouch(v:SeekBar?){};override fun onStopTrackingTouch(v:SeekBar?) {}});size.text="${progress+60}%"})
         title("POSIÇÃO LIVRE",13)
         title("Toque e arraste a etiqueta para cima, para baixo ou para os lados. Ela não fica mais presa à janela da oferta.",13)
         page.addView(Button(this).apply {
-            text="Restaurar posições automáticas";isAllCaps=false
+            text="Restaurar posições automáticas";isAllCaps=false;styleButton(this)
             setOnClickListener {
                 val editor=prefs.edit()
                 prefs.all.keys.filter{it.startsWith("offer_tag_x_") || it.startsWith("offer_tag_y_")}.forEach{editor.remove(it)}
@@ -69,8 +70,41 @@ class CardStyleActivity : Activity() {
         refresh()
     }
     private fun title(text:String,size:Int){page.addView(TextView(this).apply{this.text=text;textSize=size.toFloat();setTextColor(Color.rgb(245,216,130));typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(14),0,dp(10))})}
-    private fun toggle(text:String,key:String,default:Boolean){page.addView(Switch(this).apply{this.text=text;textSize=16f;setTextColor(Color.rgb(245,244,238));isChecked=prefs.getBoolean(key,default);setPadding(dp(12),dp(12),dp(12),dp(12));background=GradientDrawable().apply{setColor(Color.rgb(30,33,40));cornerRadius=dp(12).toFloat()};setOnCheckedChangeListener{_,value->prefs.edit().putBoolean(key,value).apply();refresh()}})}
-    private fun choices(labels:List<String>,selected:Int,change:(Int)->Unit){val row=LinearLayout(this);val buttons=labels.mapIndexed {i,label->Button(this).apply{text=label;textSize=12f;isAllCaps=false;setTextColor(if(i==selected)Color.rgb(0,137,108) else Color.DKGRAY);row.addView(this,LinearLayout.LayoutParams(0,dp(52),1f))}};buttons.forEachIndexed{i,b->b.setOnClickListener{buttons.forEachIndexed{j,v->v.setTextColor(if(i==j)Color.rgb(0,137,108)else Color.DKGRAY)};change(i)}};page.addView(row)}
+    private fun styleButton(button:Button,selected:Boolean=false) {
+        button.setTextColor(if(selected)Color.BLACK else gold)
+        button.typeface=Typeface.DEFAULT_BOLD
+        button.textSize=12f
+        button.backgroundTintList=null
+        button.background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            if(selected)intArrayOf(Color.rgb(255,232,139),gold)else intArrayOf(Color.rgb(34,35,39),Color.rgb(20,21,24))).apply{
+            cornerRadius=dp(12).toFloat();setStroke(dp(1),if(selected)gold else Color.rgb(128,105,47))
+        }
+        button.minHeight=dp(48)
+        button.setPadding(dp(10),dp(8),dp(10),dp(8))
+    }
+    private fun toggle(text:String,key:String,default:Boolean) {
+        page.addView(Switch(this).apply{
+            this.text=text;textSize=16f;setTextColor(Color.rgb(245,244,238))
+            isChecked=prefs.getBoolean(key,default)
+            thumbTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(gold,Color.LTGRAY))
+            trackTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(Color.rgb(133,105,39),Color.rgb(74,76,84)))
+            setPadding(dp(12),dp(12),dp(12),dp(12))
+            background=GradientDrawable().apply{setColor(Color.rgb(30,33,40));cornerRadius=dp(12).toFloat()}
+            setOnCheckedChangeListener{_,value->prefs.edit().putBoolean(key,value).apply();refresh()}
+        },LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(7)})
+    }
+    private fun choices(labels:List<String>,selected:Int,change:(Int)->Unit) {
+        val row=LinearLayout(this)
+        val buttons=labels.mapIndexed{i,label->Button(this).apply{
+            text=label;isAllCaps=false;styleButton(this,i==selected)
+            row.addView(this,LinearLayout.LayoutParams(0,dp(52),1f).apply{leftMargin=dp(3);rightMargin=dp(3)})
+        }}
+        buttons.forEachIndexed{i,button->button.setOnClickListener{
+            buttons.forEachIndexed{j,view->styleButton(view,i==j)}
+            change(i)
+        }}
+        page.addView(row)
+    }
     private fun refresh(){
         if(!::preview.isInitialized)return
         preview.layoutParams=preview.layoutParams.apply{width=(dp(310)*prefs.getInt("overlay_scale",100)/100).coerceAtMost(resources.displayMetrics.widthPixels-dp(36))}

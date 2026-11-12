@@ -289,16 +289,21 @@ class OfferCardTest {
                 containsAll("Será?","R$ 1,67/km","R$ 50,00/h","4,85")
                 select("Boa")
                 containsAll("Bora carai","R$ 2,00/km","R$ 72,00/h","4,96")
+                val toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Chamas realistas"}
+                assertTrue(toggle.isChecked)
+                toggle.performClick()
+                assertNull((preview.getChildAt(0) as android.widget.TextView).compoundDrawables[0])
+                toggle.performClick()
+                select("Recusar")
+            }
+            instrumentation.waitForIdleSync()
+            instrumentation.runOnMainSync {
                 val screen=activity!!.window.decorView
                 val bitmap=android.graphics.Bitmap.createBitmap(screen.width,screen.height,android.graphics.Bitmap.Config.ARGB_8888)
                 screen.draw(android.graphics.Canvas(bitmap))
                 val directory=java.io.File(context.filesDir,"screenshots").apply{mkdirs()}
                 java.io.File(directory,"tag-settings-current.png").outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
                 bitmap.recycle()
-                val toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Chamas realistas"}
-                assertTrue(toggle.isChecked)
-                toggle.performClick()
-                assertNull((preview.getChildAt(0) as android.widget.TextView).compoundDrawables[0])
             }
         } finally {
             activity?.let{instrumentation.runOnMainSync{it.finish()}}
