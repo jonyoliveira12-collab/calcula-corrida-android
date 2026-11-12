@@ -1,4 +1,4 @@
-# JHONDRIVER 0.4.1 — análise automática
+# JHONDRIVER 0.5.1 — análise automática
 
 A função principal é ler automaticamente a oferta exibida pela Uber/99/inDrive/iFood, calcular os indicadores no aparelho e apresentar o cartão sobre o app de motorista. O botão CC funciona com o app em segundo plano, enquanto Copiloto ou Semáforo e as permissões necessárias estiverem ativos. A edição 0.4.0 por imagem foi retirada; não há mais fluxo para escolher foto de oferta.
 
@@ -10,7 +10,7 @@ A leitura/OCR e os cálculos acontecem localmente. Depois de consentimento expl�
 
 A função `analyze-offer` está publicada no projeto `hyoaomusfpeccdchgoik`, com validação JWT obrigatória e verificação da sessão na função. As funções existentes `hello-world` e `quick-responder` foram preservadas. O código está em `supabase/functions/analyze-offer/index.ts`. Verificação ao vivo: OPTIONS retornou 200 com chave GEMINI_API_KEY configurada (somente presença, sem revelar valor); POST sem autenticação retornou 401. Teste direto de geração com números fictícios: gemini-2.5-flash retornou 404 apesar de aparecer no catálogo. O padrão foi migrado para gemini-3.5-flash-lite, que respondeu HTTP 200 e produziu orientação em português em 6,17 s (incluindo inicialização e rede). O código temporário de verificação foi removido; o POST normal continua exigindo sessão válida. O fluxo completo com a conta real no Android ainda precisa de teste no aparelho. Não é necessária outra versão do APK 0.4.1 para essa correção no servidor.
 
-O cliente mostra estados distintos para função ausente, falta de configuração, sessão expirada e indisponibilidade. As métricas locais continuam independentes da IA. Novos logins guardam o refresh token em armazenamento privado do app e renovam a sessão em resposta a um 401, sem registrar tokens nos logs.
+O cliente mostra estados distintos para função ausente, falta de configuração, sessão expirada e indisponibilidade. As métricas continuam independentes do comentário da IA. Na 0.5.1, o leitor exige conexão validada: sem internet, as etiquetas são removidas e a leitura fica pausada. Novos logins guardam o refresh token em armazenamento privado do app e renovam a sessão em resposta a um 401, sem registrar tokens nos logs.
 
 ## Permissões, segundo plano e bancos
 
@@ -30,7 +30,7 @@ O botão de olho mostra/esconde a senha e volta a escondê-la quando a tela perd
 
 ## Publicação e atualizações
 
-A publicação oficial exige os secrets privados `JHONDRIVER_KEYSTORE_BASE64`, `JHONDRIVER_KEYSTORE_PASSWORD`, `JHONDRIVER_KEY_ALIAS` e `JHONDRIVER_KEY_PASSWORD` no GitHub Actions, mantendo o certificado original conferido pelo pipeline. A exposição anterior da chave no histórico não foi desfeita e ainda exige planejamento de rotação. A configuração privada e publicação oficial continuam pendentes.
+A publicação oficial exige os secrets privados `JHONDRIVER_KEYSTORE_BASE64`, `JHONDRIVER_KEYSTORE_PASSWORD`, `JHONDRIVER_KEY_ALIAS` e `JHONDRIVER_KEY_PASSWORD` no GitHub Actions, mantendo o certificado original conferido pelo pipeline. A chave antiga continua exposta no histórico e não é reutilizada na nova instalação-base. A instalação-base 0.5.1 usa uma chave privada nova, com backup persistente no Vault privado do projeto JHONDRIVER, autorizado pelo proprietário. A configuração dos Secrets para assinatura automática no GitHub continua pendente; o backup privado permite assinar atualizações compatíveis sem trocar novamente de chave.
 
 O app está configurado para Android 16 (API 36), exigido em novos envios à Play. O pipeline gera um AAB **sem assinatura** para verificar a compilação; esse arquivo não é uma versão pronta para publicar. A assinatura oficial, os dados da loja, as declarações de acessibilidade/privacidade e os testes no dispositivo real ainda são necessários.
 
@@ -113,3 +113,7 @@ The card uses a small colored verdict with no large filled warning banner and a
 CI synthetic fixtures cover portrait, landscape, 99 countdown pricing, inDrive, and
 a separate Uber overlay over Android Settings alongside a smaller driver bubble.
 No user screenshots are published in the repository or bundled in the APK.
+
+### Etiquetas e painel (0.5.1)
+
+O painel segue a referência preta e dourada, com cabeçalho compacto de cidade, filtros por aplicativo e métricas reais das ofertas. A etiqueta pode ser arrastada por toda a tela; cada aplicativo e orientação guarda sua posição. O tamanho ajustável de 60% a 160% inclui o texto. As configurações oferecem restauração das posições automáticas, margem estimada opcional, voz opcional e suporte por telefone/e-mail. Há ajuda opcional para a confirmação de configurações restritas do Android; essa proteção não foi contornada.

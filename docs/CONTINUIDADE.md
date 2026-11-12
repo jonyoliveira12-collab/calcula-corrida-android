@@ -49,3 +49,11 @@ O proprietário pediu que as etiquetas possam ser arrastadas para qualquer ponto
 A nova referência visual interna usa preto, dourado, cidade no cabeçalho, oferta central destacada, atalhos laterais e resumo em quatro cartões. Os atalhos filtram as ofertas registradas por aplicativo. Os totais de ofertas não são apresentados como faturamento de corridas concluídas, e a meta mostra a projeção por hora da oferta, pois o aplicativo ainda não registra confirmação de conclusão das corridas.
 
 A confirmação de configurações restritas pertence ao Android e não foi contornada. Foi adicionado um guia opcional com atalhos para as informações do próprio app e para a acessibilidade. A distribuição pela Play depende da aprovação e das regras da loja e não garante ausência dessa confirmação em todos os aparelhos.
+
+## Backup persistente da assinatura verificado
+
+O proprietário confirmou que o projeto Supabase JHONDRIVER é seu ou de confiança e autorizou explicitamente guardar a chave de assinatura e as senhas nesse destino. O backup foi salvo no Vault desse projeto sob o nome `jhondriver_android_release_signing_v051`.
+
+O registro contém o PKCS12 em base64, alias, senhas, pacote e certificado público. A integridade do conteúdo completo e a correspondência do certificado foram verificadas no servidor. Os papéis `anon` e `authenticated` não têm acesso ao schema Vault nem à visão de segredos descriptografados. A chave privada nova não está em arquivos do repositório nem em assets da release.
+
+Esse backup é a identidade persistente para as atualizações da instalação oficial `br.com.calculacorrida` iniciada com a versão 0.5.1. As próximas versões precisam reutilizar essa chave e aumentar o código de versão. A automação de assinatura dentro do GitHub Actions ainda requer cadastrar os quatro Secrets; enquanto isso, a chave pode ser recuperada privadamente do Vault para gerar e publicar um APK assinado compatível.
