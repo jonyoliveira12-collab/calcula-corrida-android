@@ -66,6 +66,9 @@ object OfferTextParser {
                 if (candidates.any { kotlin.math.abs(it-value)>0.005 }) return null
                 return value
             }
+            // A price that only appears after the route can be a suggested
+            // counteroffer, never assume it is the missing headline fare.
+            if(firstRoute!=null && beforeRoute.isEmpty())return null
             // Some cards omit the action from accessibility or OCR. Only
             // recover the headline when a 99-specific offer marker and both
             // route legs are present and exactly one pre-route price is clear.

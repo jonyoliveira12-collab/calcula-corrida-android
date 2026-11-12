@@ -52,6 +52,8 @@ R$ 17,50   R$ 18,00   R$ 18,50"""
         assertNull(OfferTextParser.parse(offer.replace("R$ 16,80\n", "R$ 16,80  R$ 15,00\n"),app))
         assertNull(OfferTextParser.parse(offer+"\nAceitar por R$ 15,00",app))
         assertNull(OfferTextParser.parse(offer.substringBefore("17min"),app))
+        val missingFare=offer.replace("R$ 16,80\n","").substringBefore("R$ 18,00")
+        assertNull("A single counteroffer must not become the missing fare",OfferTextParser.parse(missingFare,app))
         assertNull(OfferTextParser.parse(offer.replace("Negocia · Pgto. no app", "").replace("Cartão verif.", "").substringBefore("R$ 17,50"),app))
         assertFalse(IncomingOfferPolicy.isIncoming(app,offer+"\nEm viagem"))
         assertFalse(IncomingOfferPolicy.isIncoming("com.taxis99",offer))
