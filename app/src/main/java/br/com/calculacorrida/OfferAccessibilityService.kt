@@ -956,6 +956,9 @@ class OfferAccessibilityService : AccessibilityService() {
         val view = ensureOverlay(sourcePackage, anchor) ?: return
         displayedOffers[sourcePackage]=DisplayedOffer(r,offer)
         renderTag(view,r,offer,sourcePackage)
+        // Move a reused tag into its newly detected window before exposing the
+        // new offer; a later layout pass will refine its height once measured.
+        reflowOverlay(sourcePackage)
         val generation = android.os.SystemClock.elapsedRealtimeNanos()
         view.tag = generation
         view.setAiInsight("Consultando IA; cálculos locais prontos")

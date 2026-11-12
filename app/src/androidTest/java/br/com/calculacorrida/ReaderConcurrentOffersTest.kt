@@ -234,8 +234,10 @@ class ReaderConcurrentOffersTest {
                     Rect().also{window.getBoundsInScreen(it)}.takeIf{it.width()>=160 && it.height()>=100}
                 } finally {root.recycle()}
             }.minByOrNull{it.left}
-            await("Tall negotiated 99 offer and Uber each have an independent tag",60000) {
-                uberTag()!=null && realistic99Tag()!=null && middle99Pane()!=null
+            await("Tall negotiated 99 offer and Uber each have an independent tag in the correct window",60000) {
+                val tag=realistic99Tag()
+                val pane=middle99Pane()
+                uberTag()!=null && tag!=null && pane!=null && pane.contains(tag.centerX(),tag.centerY())
             }
             assertTrue("99 tag stays with its offer instead of the larger map window",middle99Pane()!!.contains(realistic99Tag()!!.centerX(),realistic99Tag()!!.centerY()))
             assertFalse("Both independent tags remain separate",Rect.intersects(uberTag()!!,realistic99Tag()!!))
