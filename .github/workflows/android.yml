@@ -98,6 +98,7 @@ jobs:
             adb shell wm size reset
             adb shell wm density reset
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: card-previews
           path: card-previews.tar

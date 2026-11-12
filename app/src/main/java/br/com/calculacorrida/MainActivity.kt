@@ -761,7 +761,7 @@ class MainActivity : Activity() {
         }
         profileRow.addView(profileInfo, LinearLayout.LayoutParams(0, -2, 1f))
         userCard.addView(profileRow)
-        content.addView(userCard, margin(0, 10))
+        content.addView(userCard, 2, margin(0, 10))
 
         // Metas
         val limits = card()

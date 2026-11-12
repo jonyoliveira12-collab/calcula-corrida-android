@@ -75,6 +75,30 @@ class OfferDashboardTest {
                 awaitText(if(fare==12.77)"R$ 12,77" else "R$ 12,02")
                 awaitText("19,00 min")
             }
+            fun saveScreen(name:String) {
+                instrumentation.waitForIdleSync()
+                instrumentation.runOnMainSync {
+                    val view=activity.window.decorView
+                    val bitmap=android.graphics.Bitmap.createBitmap(view.width,view.height,android.graphics.Bitmap.Config.ARGB_8888)
+                    view.draw(android.graphics.Canvas(bitmap))
+                    val directory=java.io.File(context.filesDir,"screenshots").apply{mkdirs()}
+                    java.io.File(directory,name).outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
+                    bitmap.recycle()
+                }
+            }
+            saveScreen("dashboard-current.png")
+            instrumentation.runOnMainSync {
+                fun openProfile(view:View):Boolean {
+                    if(view is TextView && view.text.toString()=="Perfil") {
+                        (view.parent as? View)?.performClick()
+                        return true
+                    }
+                    if(view is ViewGroup)for(i in 0 until view.childCount)if(openProfile(view.getChildAt(i)))return true
+                    return false
+                }
+                assertTrue("Profile navigation is available",openProfile(activity.window.decorView))
+            }
+            saveScreen("profile-current.png")
         } finally {
             instrumentation.runOnMainSync {activity.finish()}
             prefs.edit().apply{if(original==null)remove("offers")else putString("offers",original)}.commit()
