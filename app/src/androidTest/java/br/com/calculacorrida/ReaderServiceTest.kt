@@ -118,7 +118,7 @@ class ReaderServiceTest {
             await("CC starts") { hasCc() }
             instrumentation.runOnMainSync {
                 // Open the bank control after Android connects the service.
-                (findText(activity!!.window.decorView, "Perfil")!!.parent as View).performClick()
+                (findText(activity!!.window.decorView, "Configurações")!!.parent as View).performClick()
                 val button = findText(activity!!.window.decorView, "DESLIGAR PARA USAR BANCO")
                 assertNotNull("Bank control is available", button)
                 button!!.performClick()

@@ -19,19 +19,20 @@ import android.content.res.ColorStateList
 class MainActivity : Activity() {
 
     private val bg = Color.rgb(10, 10, 12)
-    private val panel = Color.rgb(25, 28, 34)
+    private val panel = Color.rgb(15, 16, 18)
     private val gold = Color.rgb(239, 190, 65)
     private val white = Color.rgb(247, 244, 232)
     private val muted = Color.rgb(176, 172, 158)
     private val green = Color.rgb(20, 166, 123)
     private val red = Color.rgb(226, 75, 100)
     private val amber = Color.rgb(242, 157, 45)
-    private val border = Color.rgb(59, 61, 67)
+    private val border = Color.rgb(141, 112, 44)
     private val bgInput = Color.rgb(35, 35, 39)
 
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
     private var selectedTab = "Início"
+    private var selectedOfferApp:String? = null
     private val liveOfferHandler=android.os.Handler(android.os.Looper.getMainLooper())
     private var observingOffers=false
     private val refreshLatestOffer=Runnable {
@@ -91,18 +92,15 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(11), dp(12), dp(11))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(16, 16, 19), Color.rgb(54, 42, 20), Color.rgb(17, 17, 20))
-            ).apply {
-                cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), Color.rgb(190, 145, 42))
-            }
+            background = getDrawable(R.drawable.dashboard_city)
+            minimumHeight = dp(if(resources.configuration.screenWidthDp>=600)180 else 140)
+            gravity = Gravity.CENTER_VERTICAL
             elevation = dp(5).toFloat()
         }
         val brandRow = horizontal()
+        brandRow.addView(action("☰", false) { showTab("Perfil") }.apply{textSize=24f;contentDescription="Abrir configurações"})
         brandRow.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            layoutParams = LinearLayout.LayoutParams(dp(if(resources.configuration.screenWidthDp>=600)64 else 40), dp(if(resources.configuration.screenWidthDp>=600)64 else 40))
             setImageResource(R.drawable.jhondriver_logo)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Logo JHONDRIVER"
@@ -110,7 +108,10 @@ class MainActivity : Activity() {
         val brandText = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
-            addView(label("JHONDRIVER", 21f, Color.WHITE, true))
+            addView(label("JHONDRIVER", if(resources.configuration.screenWidthDp>=600)32f else 22f, Color.WHITE, true).apply {
+                typeface=Typeface.create("sans-serif-condensed",Typeface.BOLD_ITALIC)
+                text=android.text.SpannableString("JHONDRIVER").apply{setSpan(android.text.style.ForegroundColorSpan(gold),0,4,0)}
+            })
             addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, gold, true))
             addView(label("Versão ${packageManager.getPackageInfo(packageName,0).versionName}", 9f, gold, false))
         }
@@ -127,8 +128,11 @@ class MainActivity : Activity() {
             contentDescription = "Foto do motorista. Toque para alterar."
             setOnClickListener { chooseProfilePhoto() }
         }
-        brandRow.addView(avatar)
-        brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
+        brandRow.addView(pill(if(NetworkGate.isOnline(this))"● Online" else "Sem conexão",if(NetworkGate.isOnline(this))green else red))
+        if(resources.configuration.screenWidthDp>=600) {
+            brandRow.addView(avatar)
+            brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
+        }
         header.addView(brandRow)
         root.addView(header)
 
@@ -156,7 +160,7 @@ class MainActivity : Activity() {
             elevation = dp(8).toFloat()
             setPadding(dp(3), dp(5), dp(3), dp(5))
         }
-        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(72)))
+        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(80)))
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -211,9 +215,10 @@ class MainActivity : Activity() {
         bottom.removeAllViews()
         val tabs = listOf(
             Triple("Início", "⌂", "Início"),
-            Triple("Histórico", "◷", "Histórico"),
-            Triple("Finanças", "▤", "Finanças"),
-            Triple("Perfil", "◎", "Perfil")
+            Triple("Finanças", "▥", "Relatórios"),
+            Triple("Semáforo", "◎", "Metas"),
+            Triple("Histórico", "↶", "Histórico"),
+            Triple("Perfil", "⚙", "Configurações")
         )
         tabs.forEach { item ->
             val active = item.first == selectedTab
@@ -221,12 +226,12 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(4), dp(4), dp(4), dp(4))
-                if (active) background = rounded(Color.rgb(65, 47, 12), 14, gold)
+                if(active) background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(255,232,139),gold,Color.rgb(213,151,18))).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),Color.rgb(255,239,169))}
                 isClickable = true
                 setOnClickListener { showTab(item.first) }
             }
-            cell.addView(label(item.second, 21f, if (active) gold else muted, false))
-            cell.addView(label(item.third, 10f, if (active) gold else muted, active))
+            cell.addView(label(item.second, 26f, if (active) Color.BLACK else gold, true))
+            cell.addView(label(item.third, if(resources.configuration.screenWidthDp>=600)12f else 9f, if (active) Color.BLACK else white, active))
             bottom.addView(cell, LinearLayout.LayoutParams(0, -1, 1f))
         }
     }
@@ -276,8 +281,6 @@ class MainActivity : Activity() {
         status.addView(label("PAINEL DO MOTORISTA", 11f, gold, true), weight())
         val online = isOperationalOnline()
         status.addView(pill(if (online) "● LEITURA ATIVA" else "● LEITURA PAUSADA", if (online) green else muted))
-        content.addView(label("Seu próximo percurso", 27f, white, true, 18, 3))
-        content.addView(label("Seus números. Suas escolhas.", 14f, muted, false, 0, 12))
         content.addView(status)
 
         val controls = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
@@ -312,9 +315,10 @@ class MainActivity : Activity() {
         feature("● Semáforo", "traffic_enabled")
         content.addView(controls)
 
-        val offerCard = card().apply { background = rounded(panel, 22, gold) }
-        offerCard.addView(label("ÚLTIMA OPORTUNIDADE", 14f, gold, true, 0, 18))
-        val offer = records.firstOrNull()
+        val offerCard = card().apply { background = GoldPanelDrawable(resources.displayMetrics.density,true) }
+        offerCard.addView(label("⚡ ÚLTIMA OFERTA", 22f, gold, true, 0, 18).apply{gravity=Gravity.CENTER})
+        val offer = records.firstOrNull { selectedOfferApp == null || it.optString("app").equals(selectedOfferApp,true) }
+        selectedOfferApp?.let{offerCard.addView(pill(it,gold))}
         fun number(key: String): String = offer?.let { String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", it.optDouble(key)) } ?: "—"
         val totals = horizontal()
         totals.addView(metric("VALOR", if (offer == null) "—" else "R$ " + number("fare")), weight())
@@ -332,7 +336,9 @@ class MainActivity : Activity() {
         val classification = offer?.optString("classification")
         offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else white, true, 18, 8).apply {
             gravity = Gravity.CENTER
-            background = rounded(when (classification) { "GOOD" -> Color.rgb(16, 85, 36); "BAD" -> Color.rgb(99, 26, 26); "REVIEW" -> Color.rgb(87, 62, 14); else -> Color.rgb(31,31,34) }, 12, border)
+            val edge=when(classification){"GOOD"->Color.rgb(54,240,71);"BAD"->Color.rgb(237,78,69);"REVIEW"->gold;else->border}
+            val fill=when(classification){"GOOD"->Color.rgb(0,106,20);"BAD"->Color.rgb(106,19,19);"REVIEW"->Color.rgb(106,73,5);else->panel}
+            background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(edge,fill)).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),edge)}
         }, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(18) })
         offerCard.addView(label(if (offer == null) "Ative a leitura e abra o aplicativo de motorista." else "Valores brutos • inclui chegada quando informada na oferta.", 12f, muted, false, 12, 0))
 
@@ -343,20 +349,57 @@ class MainActivity : Activity() {
         filters.addView(label("Mínimo por hora", 13f, muted, false))
         filters.addView(label(money(prefs.getFloat("good_per_hour", 60f)), 23f, gold, true, 4, 8))
         filters.addView(action("AJUSTAR LIMITES  ›", false) { showTab("Semáforo") })
-        if (wide) {
-            val main = horizontal().apply { gravity = Gravity.TOP }
-            main.addView(offerCard, LinearLayout.LayoutParams(0, -2, 2f).apply { topMargin = dp(14); rightMargin = dp(12) })
-            main.addView(filters, LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(14) })
+        val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=GoldPanelDrawable(resources.displayMetrics.density);setPadding(dp(7),dp(8),dp(7),dp(8))}
+        for((app,color) in listOf("Todos" to Color.rgb(33,33,35),"Uber" to Color.BLACK,"99" to Color.rgb(255,214,32),"inDrive" to Color.rgb(151,234,18),"iFood" to Color.rgb(231,27,49))) {
+            rail.addView(label(app,if(app=="Todos")10f else 16f,if(app=="99" || app=="inDrive")Color.BLACK else Color.WHITE,true).apply {
+                gravity=Gravity.CENTER;minHeight=dp(56)
+                background=rounded(color,14,if(selectedOfferApp==app || (app=="Todos" && selectedOfferApp==null))gold else border)
+                isClickable=true;isFocusable=true;contentDescription="Mostrar ofertas: $app"
+                setOnClickListener{selectedOfferApp=if(app=="Todos")null else app;showTab("Início")}
+            },LinearLayout.LayoutParams(-1,dp(58)).apply{topMargin=dp(6)})
+        }
+        val target=prefs.getFloat("min_per_hour",50f).toDouble()
+        val actual=offer?.optDouble("perHour") ?: 0.0
+        val goal=card()
+        goal.addView(label("◎ Meta por hora",19f,gold,true,0,10))
+        goal.addView(label((if(offer==null)"—" else money(actual.toFloat()))+" / "+money(target.toFloat()),17f,white,true))
+        goal.addView(ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal).apply{
+            max=100;progress=if(target>0)(actual/target*100).toInt().coerceIn(0,100)else 0
+            progressTintList=ColorStateList.valueOf(gold)
+        },LinearLayout.LayoutParams(-1,dp(18)).apply{topMargin=dp(12)})
+        goal.addView(label("Projeção da oferta atual",11f,muted,false,8,0))
+        if(wide) {
+            val main=horizontal().apply{gravity=Gravity.TOP}
+            main.addView(rail,LinearLayout.LayoutParams(dp(78),-2).apply{topMargin=dp(14);rightMargin=dp(10)})
+            main.addView(offerCard,LinearLayout.LayoutParams(0,-2,2.2f).apply{topMargin=dp(14);rightMargin=dp(10)})
+            val side=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+            side.addView(goal);side.addView(filters,margin(0,12))
+            main.addView(side,LinearLayout.LayoutParams(0,-2,1f).apply{topMargin=dp(14)})
             content.addView(main)
         } else {
-            content.addView(offerCard, margin(0, 14))
-            content.addView(filters, margin(0, 12))
+            rail.orientation=LinearLayout.HORIZONTAL
+            for(i in 0 until rail.childCount)rail.getChildAt(i).layoutParams=LinearLayout.LayoutParams(0,dp(52),1f).apply{leftMargin=dp(3);rightMargin=dp(3)}
+            content.addView(rail,margin(0,12));content.addView(offerCard,margin(0,12))
+            content.addView(goal,margin(0,12));content.addView(filters,margin(0,12))
         }
-        val summaries = horizontal()
-        val count = card().apply { addView(metric("OFERTAS ANALISADAS", records.size.toString())) }
-        val average = card().apply { addView(metric("MÉDIA R$/KM", if (records.isEmpty()) "—" else "R$ " + String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", records.map { it.optDouble("perKm") }.average()))) }
-        summaries.addView(count, LinearLayout.LayoutParams(0,-2,1f).apply { topMargin=dp(12);rightMargin=dp(6) })
-        summaries.addView(average, LinearLayout.LayoutParams(0,-2,1f).apply { topMargin=dp(12);leftMargin=dp(6) })
+        val dayStart=java.util.Calendar.getInstance().apply{set(java.util.Calendar.HOUR_OF_DAY,0);set(java.util.Calendar.MINUTE,0);set(java.util.Calendar.SECOND,0);set(java.util.Calendar.MILLISECOND,0)}.timeInMillis
+        val today=records.filter{it.optLong("timestamp")>=dayStart}
+        val values=listOf(
+            Triple("◉","OFERTAS HOJE",today.size.toString()),
+            Triple("▤","VALOR EM OFERTAS",money(today.sumOf{it.optDouble("fare")}.toFloat())),
+            Triple("╱","MÉDIA R$/KM",if(today.isEmpty())"—" else money(today.map{it.optDouble("perKm")}.average().toFloat())),
+            Triple("◷","MÉDIA R$/HORA",if(today.isEmpty())"—" else money(today.map{it.optDouble("perHour")}.average().toFloat()))
+        )
+        val summaries=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        val perRow=if(wide)4 else 2
+        values.chunked(perRow).forEach{group->
+            val row=horizontal()
+            group.forEach{(icon,title,value)->row.addView(card().apply{
+                addView(label(icon,30f,gold,true).apply{gravity=Gravity.CENTER})
+                addView(metric(title,value))
+            },LinearLayout.LayoutParams(0,-2,1f).apply{topMargin=dp(12);leftMargin=dp(3);rightMargin=dp(3)})}
+            summaries.addView(row)
+        }
         content.addView(summaries)
         val settings = card()
         settings.addView(label("PRONTO PARA TRABALHAR?", 14f, white, true))
@@ -440,6 +483,16 @@ class MainActivity : Activity() {
         if (!isAccessibilityEnabled()) {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+    }
+
+    private fun showRestrictedSettingsHelp() {
+        AlertDialog.Builder(this).setTitle("Ajuda para ativar a acessibilidade")
+            .setMessage("Se o Android mostrar ‘Configuração restrita’ ao ativar o JHONDRIVER:\n\n1. Abra as informações do aplicativo.\n2. Se disponível, abra o menu de três pontos e escolha ‘Permitir configurações restritas’.\n3. Volte à Acessibilidade, selecione JHONDRIVER e confirme a ativação.\n\nO nome e a disponibilidade dessa opção variam conforme o Android e o fabricante. Essa confirmação pertence ao sistema; o JHONDRIVER não pode aprová-la por você.")
+            .setNeutralButton("Informações do app") { _, _ ->
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")))
+            }
+            .setPositiveButton("Abrir acessibilidade") { _, _ -> openReaderAccessibilitySettings() }
+            .setNegativeButton("Fechar",null).show()
     }
 
     private fun openReaderAccessibilitySettings() {
@@ -725,6 +778,14 @@ class MainActivity : Activity() {
         updates.addView(action("VERIFICAR ATUALIZAÇÃO", false) { AppUpdates.check(this, manual = true) })
         content.addView(updates, margin(0, 10))
 
+        val floatingTag = card()
+        floatingTag.addView(label("Etiqueta flutuante",18f,gold,true))
+        floatingTag.addView(label("Escolha o tamanho e a aparência. Durante a leitura, arraste cada etiqueta para onde preferir na tela; sua posição fica salva.",13f,muted,false,4,8))
+        floatingTag.addView(action("TAMANHO E POSIÇÃO DAS ETIQUETAS  ›",true) {
+            startActivity(Intent(this,CardStyleActivity::class.java))
+        })
+        content.addView(floatingTag,margin(0,10))
+
         val support = card()
         support.addView(label("Suporte", 18f, gold, true))
         support.addView(label("Precisa de ajuda com o JHONDRIVER? Entre em contato.", 13f, muted, false))
@@ -836,6 +897,7 @@ class MainActivity : Activity() {
         val backgroundCard = card()
         backgroundCard.addView(label("FUNCIONAMENTO EM SEGUNDO PLANO", 11f, gold, true))
         backgroundCard.addView(label("Mantenha a acessibilidade e a permissão de sobreposição ativadas para o leitor e a etiqueta funcionarem sobre Uber e 99.", 12f, muted, false, 5, 8))
+        backgroundCard.addView(action("ACESSIBILIDADE BLOQUEADA? VER AJUDA",false) { showRestrictedSettingsHelp() })
         backgroundCard.addView(permissionRow("Acessibilidade", isAccessibilityEnabled()) {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         })
@@ -878,13 +940,7 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(30, 33, 40), Color.rgb(22, 24, 29), Color.rgb(19, 20, 24))
-        ).apply {
-            cornerRadius = dp(24).toFloat()
-            setStroke(dp(1), border)
-        }
+        background = GoldPanelDrawable(resources.displayMetrics.density)
         elevation = dp(6).toFloat()
         layoutParams = margin(0, 10)
     }
@@ -936,7 +992,7 @@ class MainActivity : Activity() {
     private fun metric(title: String, value: String): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         addView(label(title, 10f, muted, true))
-        addView(label(value, 20f, gold, true, 6, 0))
+        addView(label(value, 26f, gold, true, 6, 0).apply{maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(14,28,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
     }
 
     private fun financeStat(title: String, value: String): LinearLayout = LinearLayout(this).apply {

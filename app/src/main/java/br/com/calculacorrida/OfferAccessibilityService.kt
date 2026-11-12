@@ -34,6 +34,7 @@ class OfferAccessibilityService : AccessibilityService() {
     // Uma etiqueta independente por aplicativo (Uber, 99 e inDrive).
     private val overlays = linkedMapOf<String, OfferTagView>()
     private val overlayParams = linkedMapOf<String, WindowManager.LayoutParams>()
+    private val draggingTags = mutableSetOf<String>()
     private data class DisplayedOffer(val result: TripResult, val offer: OfferTextParser.ParsedOffer)
     private val displayedOffers = mutableMapOf<String,DisplayedOffer>()
     private data class MissingOffer(var since:Long,var samples:Int)
@@ -81,7 +82,14 @@ class OfferAccessibilityService : AccessibilityService() {
                 }
             }
         } else if (key != null && (key.startsWith("card_") || key == "overlay_scale" || key == "reader_paused")) {
-            readerHandler.post { hideAllOverlays() }
+            readerHandler.post {
+                hideAllOverlays()
+                if(key.startsWith("card_position_") || key == "card_reset_positions") {
+                    val manager=getSystemService(WINDOW_SERVICE) as WindowManager
+                    overlays.values.forEach { try { manager.removeView(it) } catch (_:Exception) {} }
+                    overlays.clear();overlayParams.clear();draggingTags.clear()
+                }
+            }
         }
     }
     private val lastWindowSeen=mutableMapOf<String,Long>()
@@ -456,6 +464,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun forgetOffer(pkg:String) {
+        draggingTags.remove(pkg)
         voice.stop()
         hideOverlay(pkg)
         lastOfferSeen.remove(pkg)
@@ -797,8 +806,8 @@ class OfferAccessibilityService : AccessibilityService() {
         val screenHeightPx = metrics.heightPixels
         val screenWidthDp = (screenWidthPx / metrics.density).toInt()
         val screenHeightDp = (screenHeightPx / metrics.density).toInt()
-        val scale = prefs.getInt("overlay_scale", 100).coerceIn(65, 130) / 100f
-        val overlayWidth = (310 * scale).toInt().coerceIn(220, (screenWidthDp - 16).coerceAtLeast(180))
+        val scale = prefs.getInt("overlay_scale", 100).coerceIn(60, 160) / 100f
+        val overlayWidth = (310 * scale).toInt().coerceIn(180, (screenWidthDp - 16).coerceAtLeast(180))
         var view = overlays[sourcePackage]
         var params = overlayParams[sourcePackage]
 
@@ -844,6 +853,7 @@ class OfferAccessibilityService : AccessibilityService() {
             view.setOnTouchListener { v, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
+                        draggingTags.add(sourcePackage)
                         downX = event.rawX
                         downY = event.rawY
                         startX = params!!.x
@@ -864,6 +874,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         true
                     }
                     MotionEvent.ACTION_UP -> {
+                        draggingTags.remove(sourcePackage)
                         if (moved) {
                             prefs.edit()
                                 .putInt("offer_tag_x_$suffix", params!!.x)
@@ -871,6 +882,11 @@ class OfferAccessibilityService : AccessibilityService() {
                         } else if (closeTap) {
                             hideOverlay(sourcePackage)
                         }
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        draggingTags.remove(sourcePackage)
+                        reflowOverlay(sourcePackage)
                         true
                     }
                     else -> true
@@ -902,11 +918,22 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun reflowOverlay(pkg: String) {
         val view = overlays[pkg] ?: return
         val params = overlayParams[pkg] ?: return
-        val pane = driverWindow(pkg)?.second ?: return
-        if (pane.isEmpty || !isOfferSized(pane)) return
+        if(pkg in draggingTags)return
+        val driverPane = driverWindow(pkg)?.second ?: return
+        if (driverPane.isEmpty || !isOfferSized(driverPane)) return
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        val width = dp((310 * prefs.getInt("overlay_scale", 100).coerceIn(65, 130) / 100f).toInt()).coerceAtMost((pane.width()-dp(12)).coerceAtLeast(dp(100)))
+        val suffix=pkg.hashCode().toString()+"_"+resources.configuration.orientation
+        // A manually placed tag belongs to its app but may sit anywhere on screen.
+        // Automatic tags still start inside their respective driver windows.
+        val pane=if(prefs.contains("offer_tag_x_$suffix"))
+            Rect(0,dp(24),resources.displayMetrics.widthPixels,resources.displayMetrics.heightPixels-dp(8))
+            else driverPane
+        val width = dp((310 * prefs.getInt("overlay_scale", 100).coerceIn(60, 160) / 100f).toInt()).coerceAtMost((pane.width()-dp(12)).coerceAtLeast(dp(100)))
         val oldWidth=params.width;val oldX=params.x;val oldY=params.y
+        if(prefs.contains("offer_tag_x_$suffix")) {
+            params.x=prefs.getInt("offer_tag_x_$suffix",params.x)
+            params.y=prefs.getInt("offer_tag_y_$suffix",params.y)
+        }
         params.width = width
         val maxX = (pane.right-width-dp(4)).coerceAtLeast(pane.left)
         params.x = params.x.coerceIn(pane.left, maxX)
@@ -952,6 +979,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun hideAllOverlays() {
+        draggingTags.clear()
         voice.stop()
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         overlays.values.forEach { try { wm.removeView(it) } catch (_: Exception) {} }

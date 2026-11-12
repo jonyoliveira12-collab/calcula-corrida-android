@@ -120,6 +120,8 @@ class ReaderConcurrentOffersTest {
         val prefs = context.getSharedPreferences("settings", 0)
         val originalBad=prefs.getString("label_bad",null)
         val originalGood=prefs.getString("label_good",null)
+        val oldPositions=prefs.all.filterKeys{it.startsWith("offer_tag_x_") || it.startsWith("offer_tag_y_")}
+
         val originalJourney = context.getSharedPreferences("journey", 0).getString("offers", null)
         try {
             shell("settings delete secure enabled_accessibility_services")
@@ -166,6 +168,28 @@ class ReaderConcurrentOffersTest {
             assertTrue("Uber tag is inside the Uber window", uberPane.contains(uber.centerX(), uber.centerY()))
             assertTrue("99 tag is inside the 99 window", ninetyNinePane.contains(ninetyNine.centerX(), ninetyNine.centerY()))
             assertFalse("The tags do not overlap", Rect.intersects(uber, ninetyNine))
+            // A driver may drag a tag outside the offer pane and keep it there.
+            val screen=ui.takeScreenshot()!!
+            val targetY=screen.height-uber.height()/2-80
+            screen.recycle()
+            val startX=uber.centerX().toFloat()
+            val startY=uber.centerY().toFloat()
+            val started=android.os.SystemClock.uptimeMillis()
+            fun touch(action:Int,x:Float,y:Float) {
+                val event=android.view.MotionEvent.obtain(started,android.os.SystemClock.uptimeMillis(),action,x,y,0)
+                event.source=android.view.InputDevice.SOURCE_TOUCHSCREEN
+                try { assertTrue("Tag drag input delivered",ui.injectInputEvent(event,true)) } finally {event.recycle()}
+            }
+            touch(android.view.MotionEvent.ACTION_DOWN,startX,startY)
+            repeat(8){step->
+                Thread.sleep(25)
+                touch(android.view.MotionEvent.ACTION_MOVE,startX,startY+(targetY-startY)*(step+1)/8f)
+            }
+            touch(android.view.MotionEvent.ACTION_UP,startX,targetY.toFloat())
+            await("Dragged tag stays outside the original offer window",12000){(uberTag()?.top ?: 0)>uberPane.bottom}
+            Thread.sleep(1200)
+            assertTrue("Polling preserves the freely chosen tag position",uberTag()!!.top>uberPane.bottom)
+
             val records = JourneyStore.getRecords(context).filter { it.optLong("timestamp") >= startedAt }
             assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-12.0)<0.001 })
             assertTrue("99 offer recorded", records.any { it.optString("app") == "99" && kotlin.math.abs(it.optDouble("fare")-30.0)<0.001 })
@@ -220,6 +244,10 @@ class ReaderConcurrentOffersTest {
         } finally {
             listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")
+            prefs.edit().apply {
+                prefs.all.keys.filter{it.startsWith("offer_tag_x_") || it.startsWith("offer_tag_y_")}.forEach{remove(it)}
+                oldPositions.forEach{(key,value)->if(value is Int)putInt(key,value)}
+            }.commit()
             prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).remove("card_hold_seconds").apply {
                 if(originalBad==null)remove("label_bad") else putString("label_bad",originalBad)
                 if(originalGood==null)remove("label_good") else putString("label_good",originalGood)

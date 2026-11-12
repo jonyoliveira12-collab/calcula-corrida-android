@@ -41,3 +41,11 @@ O backup privado foi preparado separadamente. O armazenamento nos quatro Secrets
 O proprietário escolheu exigir internet validada para ler ofertas e exibir novos cálculos, sem esperar o comentário da IA. A perda de conexão remove as etiquetas, interrompe a voz e pausa o leitor; a conexão restabelecida permite uma nova leitura. As contas determinísticas continuam no aparelho por rapidez e precisão. O comentário da IA é separado e não bloqueia a etiqueta.
 
 A função de IA publicada foi encontrada ativa e o endpoint respondeu à verificação de configuração. A geração autenticada de comentário com a conta do usuário no tablet ainda não foi validada nesta sessão. Não prometer tempo real para o comentário da IA nem confundir a validação do endpoint com um teste completo da IA.
+
+## Posição, tamanho e nova referência visual
+
+O proprietário pediu que as etiquetas possam ser arrastadas para qualquer ponto da tela. O limite antigo à janela da oferta foi removido para posições manuais; as posições automáticas continuam associadas à janela correta. Cada aplicativo e orientação guarda sua posição. Há controle de tamanho de 60% a 160%, incluindo o texto, e restauração das posições automáticas. A configuração tem acesso destacado no Perfil.
+
+A nova referência visual interna usa preto, dourado, cidade no cabeçalho, oferta central destacada, atalhos laterais e resumo em quatro cartões. Os atalhos filtram as ofertas registradas por aplicativo. Os totais de ofertas não são apresentados como faturamento de corridas concluídas, e a meta mostra a projeção por hora da oferta, pois o aplicativo ainda não registra confirmação de conclusão das corridas.
+
+A confirmação de configurações restritas pertence ao Android e não foi contornada. Foi adicionado um guia opcional com atalhos para as informações do próprio app e para a acessibilidade. A distribuição pela Play depende da aprovação e das regras da loja e não garante ausência dessa confirmação em todos os aparelhos.

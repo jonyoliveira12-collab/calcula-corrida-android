@@ -16,6 +16,7 @@ import java.util.Locale
 /** Compact automatic metrics. AI never alters the local calculation. */
 class OfferTagView(context: Context) : LinearLayout(context) {
     private val prefs=context.getSharedPreferences("settings",Context.MODE_PRIVATE)
+    private val cardScale get()=prefs.getInt("overlay_scale",100).coerceIn(60,160)/100f
     private val banner=line(13f,Color.WHITE,true)
     private val body=LinearLayout(context)
     private val header=LinearLayout(context)
@@ -41,7 +42,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
     init { orientation=VERTICAL;clipToPadding=false;clipChildren=false;setChildrenDrawingOrderEnabled(true);body.orientation=VERTICAL;metrics.orientation=HORIZONTAL }
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
     private fun line(size:Float,color:Int,bold:Boolean=false)=TextView(context).apply {
-        textSize=size;setTextColor(color);if(bold) typeface=Typeface.DEFAULT_BOLD
+        textSize=size*cardScale;setTextColor(color);if(bold) typeface=Typeface.DEFAULT_BOLD
     }
     private fun amount(n:Double)=String.format(Locale.forLanguageTag("pt-BR"),"%.2f",n)
     private fun duration(n:Double)=if(n%1.0==0.0) "${n.toInt()} min" else String.format(Locale.forLanguageTag("pt-BR"),"%.1f min",n)
@@ -81,7 +82,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         val badgeColor=when(label){"ACEITAR","BOA CORRIDA","BOA"->Color.rgb(20,125,69);"ATENÇÃO","ANALISAR"->Color.rgb(243,182,66);else->Color.rgb(201,47,63)}
         val badgeText=if(label=="ATENÇÃO" || label=="ANALISAR")Color.rgb(30,24,8) else Color.WHITE
         banner.setTextColor(badgeText)
-        banner.textSize=13f
+        banner.textSize=13f*cardScale
         banner.maxLines=if(prefs.getBoolean("card_compact_reason",false))2 else 1
         banner.background=if(neonEnabled) GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(neonColor,badgeColor)).apply {
             cornerRadius=dp(18).toFloat();setStroke(dp(1),neonColor)
@@ -95,6 +96,9 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         banner.elevation=if(neonEnabled)dp(3).toFloat() else 0f
         summary.text="$source  "+(if(prefs.getBoolean("show_time",true))"${duration(minutes)} • " else "")+"${amount(totalKm)} km"+(fareValue?.let{" • R$ ${amount(it)}"}?:"")
         summary.setTextColor(fg)
+        summary.textSize=12f*cardScale
+        details.textSize=11f*cardScale
+        ai.textSize=11f*cardScale
         header.gravity=Gravity.CENTER_VERTICAL
         header.addView(summary,LayoutParams(0,-2,1f))
         header.addView(line(19f,muted,true).apply{text="×";gravity=Gravity.CENTER;contentDescription="Fechar análise da oferta"},LayoutParams(dp(25),dp(25)))
@@ -103,7 +107,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
             if(!prefs.getBoolean(key,true) || (key=="card_rating" && !prefs.getBoolean("show_rating",true))) return
             val col=LinearLayout(context).apply {orientation=VERTICAL;setPadding(dp(3),dp(3),dp(3),0)}
             col.addView(line(11f,muted).apply{text=title})
-            col.addView(line(30f,fg,true).apply{text=value;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(16,30,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
+            col.addView(line(30f,fg,true).apply{text=value;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration((16*cardScale).toInt().coerceAtLeast(9),(30*cardScale).toInt().coerceAtLeast(10),1,android.util.TypedValue.COMPLEX_UNIT_SP)})
             col.addView(View(context).apply{setBackgroundColor(if(theme=="colored")Color.WHITE else indicator)},LayoutParams(-1,dp(2)))
             metrics.addView(col,LayoutParams(0,-2,1f))
         }

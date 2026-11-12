@@ -89,7 +89,7 @@ class OfferDashboardTest {
             saveScreen("dashboard-current.png")
             instrumentation.runOnMainSync {
                 fun openProfile(view:View):Boolean {
-                    if(view is TextView && view.text.toString()=="Perfil") {
+                    if(view is TextView && view.text.toString()=="Configurações") {
                         (view.parent as? View)?.performClick()
                         return true
                     }

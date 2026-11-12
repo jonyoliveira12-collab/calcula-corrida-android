@@ -50,6 +50,33 @@ class OfferCardTest {
         }
     }
 
+    @Test fun resizingChangesTextAndCardHeightAtBothEndsOfTheRange() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val prefs=context.getSharedPreferences("settings",0)
+        val old=prefs.getInt("overlay_scale",100)
+        try {
+            instrumentation.runOnMainSync {
+                var smallHeight=0
+                var smallText=0f
+                for(scale in listOf(60,160)) {
+                    prefs.edit().putInt("overlay_scale",scale).commit()
+                    val view=OfferTagView(context)
+                    view.setOffer("RECUSAR",20.0,10.0,2.0,60.0,"4.90",Color.RED,"UBER",20.0)
+                    val width=(310*scale/100f*context.resources.displayMetrics.density).toInt()
+                    view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(0,android.view.View.MeasureSpec.UNSPECIFIED))
+                    view.layout(0,0,width,view.measuredHeight)
+                    val badge=view.getChildAt(0) as android.widget.TextView
+                    if(scale==60){smallHeight=view.height;smallText=badge.textSize}
+                    else {
+                        assertTrue("Larger text is actually larger",badge.textSize>smallText*2)
+                        assertTrue("Larger card grows vertically",view.height>smallHeight)
+                    }
+                }
+            }
+        } finally {prefs.edit().putInt("overlay_scale",old).commit()}
+    }
+
     @Test fun compactThemesAndOptionalFieldsRenderWithoutOverflow() {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val context=instrumentation.targetContext
