@@ -6,6 +6,14 @@ import java.text.Normalizer
 object OfferTextParser {
     data class ParsedOffer(
         val fare: Double,
+        val motoLegs = if (summary == null && parenthesizedLegs.isEmpty()) {
+            motoLegRegex.findAll(text).mapNotNull {
+                val mins = toNumber(it.groupValues[1])
+                val dist = toNumber(it.groupValues[2])
+                if (mins != null && dist != null && mins > 0 && dist > 0) mins to dist else null
+            }.toList()
+        } else emptyList()
+
         val pickupKm: Double,
         val tripKm: Double,
         val minutes: Double,
@@ -19,6 +27,11 @@ object OfferTextParser {
     private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(?:min(?:uto)?s?)\b""", RegexOption.IGNORE_CASE)
     private val legRegex = Regex(
         """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*(\()\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    // Moto cards may show two legs as "16 min 6,7 km" without parentheses.
+    private val motoLegRegex = Regex(
+        """([0-9]+(?:[,.][0-9]+)?)\\s*min(?:uto)?s?\\s*[·•-]?\\s*([0-9]+(?:[,.][0-9]+)?)\\s*km\\b""",
         RegexOption.IGNORE_CASE
     )
     private val summaryRegex = Regex(
@@ -80,6 +93,14 @@ object OfferTextParser {
             pickupKm = parenthesizedLegs.first().second
             tripKm = parenthesizedLegs.drop(1).sumOf { it.second }
             totalMinutes = parenthesizedLegs.sumOf { it.first }
+        } else if (motoLegs.size >= 2) {
+            pickupKm = motoLegs.first().second
+            tripKm = motoLegs.drop(1).sumOf { it.second }
+            totalMinutes = motoLegs.sumOf { it.first }
+        } else if (motoLegs.size == 1) {
+            pickupKm = 0.0
+            tripKm = motoLegs.first().second
+            totalMinutes = motoLegs.first().first
         } else if (parenthesizedLegs.size == 1) {
             pickupKm = 0.0
             tripKm = parenthesizedLegs.first().second
