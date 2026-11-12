@@ -250,7 +250,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                     java.text.Normalizer.Form.NFD)
                                     .replace(Regex("\\p{Mn}+"), "")
                                     .lowercase(java.util.Locale.ROOT)
-                                val hasAccept = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
+                                val hasAccept = Regex("""\b(aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b""")
                                     .containsMatchIn(normalized)
                                 val offer = if (hasAccept && Regex("""r\$\s*[0-9]""").containsMatchIn(normalized))
                                     OfferTextParser.parse(recognized) else null
@@ -297,7 +297,7 @@ class OfferAccessibilityService : AccessibilityService() {
             .lowercase(java.util.Locale.ROOT)
 
         // O cartão do Uber pode usar "Tenho interesse" em vez de "Aceitar".
-        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
+        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b""")
             .containsMatchIn(normalized)
         val hasFare = Regex("""r\$\s*[0-9]""").containsMatchIn(normalized)
         val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")
@@ -319,7 +319,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun isAcceptActionNode(node: AccessibilityNodeInfo?): Boolean {
         if (node == null) return false
         val label = normalizeActionText(node.text).ifBlank { normalizeActionText(node.contentDescription) }
-        return Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""").containsMatchIn(label)
+        return Regex("""\b(aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b""").containsMatchIn(label)
     }
 
     private fun hasVisibleAcceptAction(node: AccessibilityNodeInfo): Boolean {
