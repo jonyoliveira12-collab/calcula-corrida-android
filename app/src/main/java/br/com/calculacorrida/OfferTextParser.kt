@@ -54,6 +54,10 @@ object OfferTextParser {
             }
             val buttonValues = buttons.map { it.second }.distinct()
             if (buttonValues.size > 1) return null
+            val hasAccept=Regex("""\b(?:aceitar|aceite|accept|aceptar|confirmar)\b""",RegexOption.IGNORE_CASE).containsMatchIn(text)
+            // An unqualified action next to several different prices is
+            // ambiguous; do not infer which value the driver would receive.
+            if(buttonValues.isEmpty() && hasAccept && matches.map{it.second}.distinct().size>1)return null
             val legs = legRegex.findAll(text).toList()
             val firstRoute = (legs.firstOrNull()?.range?.first ?: minuteRegex.find(text)?.range?.first)
             val beforeRoute = if(firstRoute!=null) matches.filter { it.first.range.first < firstRoute }.map { it.second }.distinct() else emptyList()
@@ -74,8 +78,10 @@ object OfferTextParser {
             // route legs are present and exactly one pre-route price is clear.
             val times=minuteRegex.findAll(text).count()
             val distances=distanceRegex.findAll(text).count()
-            if((IncomingOfferPolicy.hasNinetyNineOfferMarker(text) || IncomingOfferPolicy.hasNinetyNineNegotiationPrices(text)) && times>=2 && distances>=2 && beforeRoute.size==1)
+            val offerMarker=IncomingOfferPolicy.hasNinetyNineOfferMarker(text) || IncomingOfferPolicy.hasNinetyNineNegotiationPrices(text)
+            if(offerMarker && times>=2 && distances>=2 && beforeRoute.size==1)
                 return beforeRoute.single()
+            if(times>=2 && distances>=2 && !hasAccept && !offerMarker)return null
         }
         return matches.map { it.second }.distinct().singleOrNull()
     }
