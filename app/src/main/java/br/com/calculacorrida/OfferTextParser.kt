@@ -6,14 +6,6 @@ import java.text.Normalizer
 object OfferTextParser {
     data class ParsedOffer(
         val fare: Double,
-        val motoLegs = if (summary == null && parenthesizedLegs.isEmpty()) {
-            motoLegRegex.findAll(text).mapNotNull {
-                val mins = toNumber(it.groupValues[1])
-                val dist = toNumber(it.groupValues[2])
-                if (mins != null && dist != null && mins > 0 && dist > 0) mins to dist else null
-            }.toList()
-        } else emptyList()
-
         val pickupKm: Double,
         val tripKm: Double,
         val minutes: Double,
@@ -65,6 +57,14 @@ object OfferTextParser {
             val dist = km(it.groupValues[3], it.groupValues[4]) ?: return@mapNotNull null
             if (mins > 0 && dist > 0) mins to dist else null
         }.toList()
+
+        val motoLegs = if (summary == null && parenthesizedLegs.isEmpty()) {
+            motoLegRegex.findAll(text).mapNotNull {
+                val mins = toNumber(it.groupValues[1])
+                val dist = toNumber(it.groupValues[2])
+                if (mins != null && dist != null && mins > 0 && dist > 0) mins to dist else null
+            }.toList()
+        } else emptyList()
 
         val pickupKm: Double
         val tripKm: Double
