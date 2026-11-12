@@ -29,7 +29,11 @@ object OfferTextParser {
     fun parse(rawText: String): ParsedOffer? {
         if (rawText.isBlank()) return null
         val text = Normalizer.normalize(rawText.replace('\u00A0', ' '), Normalizer.Form.NFKC)
-        val fare = moneyRegex.find(text)?.groupValues?.get(1)?.let(::toNumber) ?: return null
+        // Do not combine the fare of one visible card with the distance of another.
+        // Multi-card layouts require card-level isolation before classification.
+        val fares = moneyRegex.findAll(text).toList()
+        if (fares.size != 1) return null
+        val fare = fares.single().groupValues[1].let(::toNumber) ?: return null
 
         fun km(value: String, unit: String): Double? {
             val n = toNumber(value) ?: return null
