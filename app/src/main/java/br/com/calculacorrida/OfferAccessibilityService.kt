@@ -102,7 +102,7 @@ class OfferAccessibilityService : AccessibilityService() {
             val now = android.os.SystemClock.elapsedRealtime()
             // A timeout is only a fallback when Android no longer supplies any
             // usable observation. Positive evidence keeps the offer alive.
-            lastOfferSeen.filterValues { now - it > 60_000L }.keys.toList().forEach(::forgetOffer)
+            lastOfferSeen.filter { (pkg, seen) -> now - seen > 60_000L && pkg !in visibleDriverPackages() }.keys.toList().forEach(::forgetOffer)
             } catch (_: Exception) { readerStatus("Falha temporária da janela; tentando novamente") }
             finally { if(!stopped) readerHandler.postDelayed(this, 350L) }
         }

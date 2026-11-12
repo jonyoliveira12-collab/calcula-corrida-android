@@ -20,3 +20,10 @@ A publicação oficial já prevê chave privada nos secrets do GitHub Actions e 
 ## Validação
 
 Os testes usam ofertas sintéticas. A inclusão do pacote na lista e o teste de análise numérica não comprovam leitura de todas as versões reais dos aplicativos, principalmente de entregas e moto. Ainda é necessário validar ofertas reais no tablet.
+
+## Ajustes adicionais confirmados
+
+- Preservar o layout da entrada; aumentar apenas as chamas realistas, com altura maior acima do formulário.
+- Melhorar o painel e as configurações internas, com cartões mais organizados, estados claros e botões legíveis. Os detalhes técnicos de leitura ficam em uma área expansível.
+- O seletor de lucro passa a mostrar/ocultar a margem estimada na etiqueta. Fórmula: `(oferta - distância total × custo por km) / oferta × 100`. Valores negativos permanecem visíveis. Isso não inclui custos que o motorista não configurou.
+- A opção de voz passa a anunciar novas ofertas usando a síntese de voz do Android. Desativar a opção, pausar a leitura ou remover a oferta interrompe o áudio pendente. A reprodução audível ainda precisa ser validada no tablet com mecanismo de voz português instalado.

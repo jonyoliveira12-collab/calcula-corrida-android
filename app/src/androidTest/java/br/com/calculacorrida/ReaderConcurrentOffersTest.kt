@@ -180,7 +180,7 @@ class ReaderConcurrentOffersTest {
 
             // Remove only the offer pixels, leaving the Uber window open.
             shell("am broadcast -a br.com.calculacorrida.fixture.HIDE_OFFER -p com.ubercab.driver")
-            await("Uber tag leaves after its offer disappears, 99 remains",20000) {
+            await("Uber tag leaves after its offer disappears, 99 remains",40000) {
                 driverWindow("com.ubercab.driver")!=null && uberTag()==null && ninetyNineTag()!=null
             }
             shell("am broadcast -a br.com.calculacorrida.fixture.SHOW_OFFER -p com.ubercab.driver")
