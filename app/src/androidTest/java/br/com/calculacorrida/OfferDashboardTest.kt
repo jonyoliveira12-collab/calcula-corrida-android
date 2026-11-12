@@ -21,15 +21,19 @@ class OfferDashboardTest {
         SessionManager(context).saveUser("labels-test@example.invalid")
         val activity=instrumentation.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         fun views(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{views(v.getChildAt(it))} else emptyList()
+        var editor:android.app.AlertDialog?=null
         try {
             instrumentation.runOnMainSync {
                 views(activity.window.decorView).filterIsInstance<TextView>().first{it.text.toString().startsWith("AJUSTAR LIMITES")}.performClick()
                 assertTrue(views(activity.window.decorView).filterIsInstance<TextView>().any{it.text.toString()=="Vixe não dá" && it.isClickable})
-                val dialog=(activity as MainActivity).createLabelEditor("Faixa vermelha","label_bad","Vixe não dá")
-                dialog.show()
-                val input=views(dialog.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
+                editor=(activity as MainActivity).createLabelEditor("Faixa vermelha","label_bad","Vixe não dá")
+                editor!!.show()
+            }
+            instrumentation.waitForIdleSync()
+            instrumentation.runOnMainSync {
+                val input=views(editor!!.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
                 input.setText("Vixe, sai fora")
-                dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick()
+                editor!!.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick()
             }
             instrumentation.waitForIdleSync()
             assertEquals("Vixe, sai fora",prefs.getString("label_bad",null))
