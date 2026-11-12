@@ -82,7 +82,8 @@ class ReaderConcurrentOffersTest {
                 }
                 val windows = describeWindows()
                 val fixtureOcr = if (label.startsWith("Distinct")) describeSyntheticNinetyNineOcr() else ""
-                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr")
+                val crashes=if(label.startsWith("Tall")) shell("logcat -d -b crash -v brief -t 100").takeLast(6000) else ""
+                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr / fixture crashes=$crashes")
             }
         }
         fun findTag(source: String, summary: List<String>, metrics: List<String>): Rect? {
@@ -163,8 +164,13 @@ class ReaderConcurrentOffersTest {
             // larger map window from the same app must not starve its OCR.
             shell("am force-stop com.ubercab.driver")
             await("Previous tags leave after the apps close", 12000) { uberTag()==null && ninetyNineTag()==null }
-            shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
-            shell("am start -W -n com.app99.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
+            // Clear the fake app's old task: Android otherwise resumes the
+            // backdrop without creating the new fixture or its offer window.
+            val uberStart=shell("am start -W -S -f 0x10008000 -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
+            val ninetyNineStart=shell("am start -W -S -f 0x10008000 -n com.app99.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
+            instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream","Fixture start: Uber=$uberStart / 99=$ninetyNineStart\n")})
+            assertFalse("Uber fixture must be recreated",uberStart.contains("Activity not started"))
+            assertFalse("99 fixture must be recreated",ninetyNineStart.contains("Activity not started"))
             val realisticSummary=listOf("24 min","11,20 km","R$ 16,80")
             fun realistic99Tag()=findTag("99",realisticSummary,listOf("1,50","42,00","4,89"))
             fun middle99Pane():Rect? = ui.windows.mapNotNull { window ->
