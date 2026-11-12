@@ -1,6 +1,6 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged|typeWindowsChanged|typeViewTextChanged|typeViewScrolled|typeViewClicked"
-    android:packageNames="com.ubercab.driver,com.app99.driver,com.didiglobal.driver,sinet.startup.inDriver,br.com.ifood.driver.app,br.com.calculacorrida,br.com.calculacorrida.teste,br.com.calculacorrida.avaliacao,br.com.calculacorrida.avaliacao047,br.com.calculacorrida.avaliacao048,br.com.calculacorrida.avaliacao049,br.com.calculacorrida.avaliacao050"
+    android:packageNames="com.ubercab.driver,com.app99.driver,com.didiglobal.driver,sinet.startup.inDriver,br.com.ifood.driver.app,br.com.calculacorrida,br.com.calculacorrida.teste,br.com.calculacorrida.avaliacao,br.com.calculacorrida.avaliacao047,br.com.calculacorrida.avaliacao048,br.com.calculacorrida.avaliacao049,br.com.calculacorrida.avaliacao050,br.com.calculacorrida.avaliacao051"
     android:isAccessibilityTool="false"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="100"

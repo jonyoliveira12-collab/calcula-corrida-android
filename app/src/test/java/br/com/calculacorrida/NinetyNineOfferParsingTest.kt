@@ -39,11 +39,20 @@ R$ 17,50   R$ 18,00   R$ 18,50"""
         assertEquals(16.8,OfferTextParser.parse(withoutHeader,app)!!.fare,0.000001)
     }
 
+    @Test fun readsNegotiationEvenWhenOcrMissesHeaderAndAction() {
+        val withoutHeading=offer.substringAfter('\n').replace("Cartão verif.","")
+        assertTrue(IncomingOfferPolicy.isIncoming(app,withoutHeading))
+        val parsed=OfferTextParser.parse(withoutHeading,app)!!
+        assertEquals(16.8,parsed.fare,0.000001)
+        assertEquals(11.2,parsed.pickupKm+parsed.tripKm,0.000001)
+        assertEquals(24.0,parsed.minutes,0.000001)
+    }
+
     @Test fun incompleteOrConflictingOffersAreNotGuessed() {
         assertNull(OfferTextParser.parse(offer.replace("R$ 16,80\n", "R$ 16,80  R$ 15,00\n"),app))
         assertNull(OfferTextParser.parse(offer+"\nAceitar por R$ 15,00",app))
         assertNull(OfferTextParser.parse(offer.substringBefore("17min"),app))
-        assertNull(OfferTextParser.parse(offer.replace("Negocia · Pgto. no app", "").replace("Cartão verif.", ""),app))
+        assertNull(OfferTextParser.parse(offer.replace("Negocia · Pgto. no app", "").replace("Cartão verif.", "").substringBefore("R$ 17,50"),app))
         assertFalse(IncomingOfferPolicy.isIncoming(app,offer+"\nEm viagem"))
         assertFalse(IncomingOfferPolicy.isIncoming("com.taxis99",offer))
         assertFalse(IncomingOfferPolicy.isIncoming("com.ubercab.driver",offer))

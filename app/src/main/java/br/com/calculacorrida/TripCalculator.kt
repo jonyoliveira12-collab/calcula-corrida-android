@@ -16,6 +16,10 @@ data class TripResult(
 )
 
 object TripCalculator {
+    // Preferences are stored as Float; retain the decimal value displayed in
+    // settings instead of expanding binary Float error into a Double threshold.
+    fun threshold(value:Float):Double = value.toString().toDouble()
+
     fun calculate(
         fare: Double,
         pickupKm: Double,

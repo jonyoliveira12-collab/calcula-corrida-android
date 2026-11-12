@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OfferCalculationTest {
+    @Test fun decimalThresholdMatchesTheValueShownInSettings() {
+        assertEquals(4.90,TripCalculator.threshold(4.90f),0.0)
+        assertEquals(1.80,TripCalculator.threshold(1.80f),0.0)
+        val result=TripCalculator.calculate(30.0,3.0,12.0,30.0,
+            badPerKm=TripCalculator.threshold(1.5f),goodPerKm=TripCalculator.threshold(1.8f),
+            badPerHour=TripCalculator.threshold(50f),goodPerHour=TripCalculator.threshold(60f),
+            passengerRating=4.90,minPassengerRating=TripCalculator.threshold(4.8f),goodPassengerRating=TripCalculator.threshold(4.9f))!!
+        assertEquals(Rating.GOOD,result.rating)
+    }
     @Test fun onlyTheOfficialNinetyNineDriverPackageIsRecognized() {
         assertEquals("99", DriverPackages.name("com.app99.driver"))
         assertNull(DriverPackages.name("com.taxis99"))

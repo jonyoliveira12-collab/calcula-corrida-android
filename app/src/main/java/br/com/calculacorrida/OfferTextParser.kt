@@ -71,7 +71,7 @@ object OfferTextParser {
             // route legs are present and exactly one pre-route price is clear.
             val times=minuteRegex.findAll(text).count()
             val distances=distanceRegex.findAll(text).count()
-            if(IncomingOfferPolicy.hasNinetyNineOfferMarker(text) && times>=2 && distances>=2 && beforeRoute.size==1)
+            if((IncomingOfferPolicy.hasNinetyNineOfferMarker(text) || IncomingOfferPolicy.hasNinetyNineNegotiationPrices(text)) && times>=2 && distances>=2 && beforeRoute.size==1)
                 return beforeRoute.single()
         }
         return matches.map { it.second }.distinct().singleOrNull()

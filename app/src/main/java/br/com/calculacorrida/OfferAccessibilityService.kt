@@ -34,6 +34,10 @@ class OfferAccessibilityService : AccessibilityService() {
     // Uma etiqueta independente por aplicativo (Uber, 99 e inDrive).
     private val overlays = linkedMapOf<String, OfferTagView>()
     private val overlayParams = linkedMapOf<String, WindowManager.LayoutParams>()
+    private data class DisplayedOffer(val result: TripResult, val offer: OfferTextParser.ParsedOffer)
+    private val displayedOffers = mutableMapOf<String,DisplayedOffer>()
+    private data class MissingOffer(var since:Long,var samples:Int)
+    private val missingOffers = mutableMapOf<String,MissingOffer>()
     private data class PendingOffer(val signature: String, val offer: OfferTextParser.ParsedOffer, var hits: Int, var lastSeen: Long)
     private val pendingOffers = mutableMapOf<String, PendingOffer>()
     private val acceptedSignatures = mutableMapOf<String, String>()
@@ -68,7 +72,13 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var sensitiveWindowVisible = false
     @Volatile private var stopped = false
     private val appearanceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key != null && (key.startsWith("card_") || key == "overlay_scale" || key == "reader_paused")) {
+        if (key != null && key.startsWith("label_")) {
+            readerHandler.post {
+                displayedOffers.forEach { (pkg,shown) ->
+                    overlays[pkg]?.takeIf{it.visibility==View.VISIBLE}?.let { renderTag(it,shown.result,shown.offer,pkg) }
+                }
+            }
+        } else if (key != null && (key.startsWith("card_") || key == "overlay_scale" || key == "reader_paused")) {
             readerHandler.post { hideAllOverlays() }
         }
     }
@@ -88,9 +98,9 @@ class OfferAccessibilityService : AccessibilityService() {
             if (readingEnabled()) visibleDriverPackages().forEach { readOffer(it) }
             overlays.keys.toList().forEach { reflowOverlay(it) }
             val now = android.os.SystemClock.elapsedRealtime()
-            lastOfferSeen.filterValues { now - it > getSharedPreferences("settings",MODE_PRIVATE).getInt("card_hold_seconds",20).coerceIn(10,120)*1000L }.keys.toList().forEach { expired ->
-                hideOverlay(expired);lastOfferSeen.remove(expired);acceptedSignatures.remove(expired)
-            }
+            // A timeout is only a fallback when Android no longer supplies any
+            // usable observation. Positive evidence keeps the offer alive.
+            lastOfferSeen.filterValues { now - it > 60_000L }.keys.toList().forEach(::forgetOffer)
             } catch (_: Exception) { readerStatus("Falha temporária da janela; tentando novamente") }
             finally { if(!stopped) readerHandler.postDelayed(this, 350L) }
         }
@@ -131,8 +141,12 @@ class OfferAccessibilityService : AccessibilityService() {
         foregroundPackage = pkg
         val visible = visibleDriverPackages()
         val now=android.os.SystemClock.elapsedRealtime()
-        visible.forEach{lastWindowSeen[it]=now}
-        overlays.keys.filter { it !in visible && now-(lastWindowSeen[it]?:0)>2000L }.forEach { hideOverlay(it); acceptedSignatures.remove(it) }
+        // A stale snapshot means Android is still querying windows; it is not
+        // evidence that an offer disappeared during a resize or a slow scan.
+        if(now-snapshotAt<=2000L) {
+            visible.forEach{lastWindowSeen[it]=now}
+            overlays.keys.filter { it !in visible && now-(lastWindowSeen[it]?:0)>2000L }.forEach(::forgetOffer)
+        }
         if (!readerConfigured() || sensitiveWindowVisible || pkg == "com.nu.production") {
             hideAllOverlays()
             removeBubble()
@@ -286,6 +300,8 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private var lastEventScan=0L
+    // Small 99 floating cards must be eligible, while a 48 dp app bubble is not.
+    private fun isOfferSized(bounds:Rect)=bounds.width()>=dp(120) && bounds.height()>=dp(80)
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if(event==null || stopped)return
         val now=android.os.SystemClock.elapsedRealtime()
@@ -347,9 +363,9 @@ class OfferAccessibilityService : AccessibilityService() {
                             if(pkg!=originalPackage)continue
                             val bounds=Rect().also{window.getBoundsInScreen(it)}
                             if(bounds.isEmpty)continue
-                            val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && bounds.width()>=dp(160) && bounds.height()>=dp(100)
+                            val offerOverlay=window.type==android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM && isOfferSized(bounds)
                             val text=StringBuilder()
-                            if(readingEnabled() && bounds.width()>=dp(160) && bounds.height()>=dp(100))collectText(root,text)
+                            if(readingEnabled() && isOfferSized(bounds))collectText(root,text)
                             val content=text.toString()
                             val complete=IncomingOfferPolicy.isIncoming(pkg,content) && OfferTextParser.parse(content,pkg)!=null
                             val score=(if(complete)5_000_000_000L else 0L)+(if(offerOverlay)1_000_000_000L else 0L)+bounds.width().toLong()*bounds.height()
@@ -386,14 +402,55 @@ class OfferAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun discardPreviousOfferIfFareChanged(pkg:String,text:String) {
+    private fun looksLikeOffer(pkg:String,text:String):Boolean {
+        val n=normalizeActionText(text)
+        val hasFare=Regex("""r\s*\$\s*[0-9]""").containsMatchIn(n)
+        val hasAction=Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""").containsMatchIn(n)
+        val hasRoute=Regex("""\d+\s*min(?:uto)?s?\b""").containsMatchIn(n) &&
+            Regex("""\d+(?:[,.]\d+)?\s*(?:km|m)\b""").containsMatchIn(n)
+        return hasFare && (hasAction || hasRoute || (driverAppName(pkg)=="99" && IncomingOfferPolicy.hasNinetyNineOfferMarker(text)))
+    }
+
+    private fun discardPreviousOfferIfFareChanged(pkg:String,windowId:Int,text:String) {
+        if(detectedWindows[pkg]!=windowId || !looksLikeOffer(pkg,text))return
         val fare=OfferTextParser.fareOrNull(text,pkg) ?: return
         val previous=acceptedSignatures[pkg]?.substringBefore('|')?.toDoubleOrNull() ?: return
         if(kotlin.math.abs(fare-previous)>0.005) {
-            hideOverlay(pkg)
-            acceptedSignatures.remove(pkg)
-            lastOfferSeen.remove(pkg)
+            forgetOffer(pkg)
         }
+    }
+
+    private fun rememberVisibleOffer(pkg:String,windowId:Int) {
+        detectedWindows[pkg]=windowId
+        lastOfferSeen[pkg]=android.os.SystemClock.elapsedRealtime()
+        missingOffers.remove(pkg)
+    }
+
+    // A full OCR frame can be incomplete even while an offer is visible. Keep
+    // the card on partial offer evidence, and require repeated readable frames
+    // with no offer before dismissing it. Never persist the recognized text.
+    private fun observeFullFrame(pkg:String,windowId:Int,text:String) {
+        if(detectedWindows[pkg]!=windowId || pkg !in acceptedSignatures)return
+        val normalized=normalizeActionText(text)
+        if(looksLikeOffer(pkg,text)) {
+            rememberVisibleOffer(pkg,windowId)
+            return
+        }
+        if(normalized.count{it.isLetterOrDigit()}<12)return
+        val now=android.os.SystemClock.elapsedRealtime()
+        val evidence=missingOffers.getOrPut(pkg){MissingOffer(now,0)}
+        evidence.samples++
+        if(evidence.samples>=2 && now-evidence.since>=1200L)forgetOffer(pkg)
+    }
+
+    private fun forgetOffer(pkg:String) {
+        hideOverlay(pkg)
+        lastOfferSeen.remove(pkg)
+        missingOffers.remove(pkg)
+        acceptedSignatures.remove(pkg)
+        acceptedOfferSignatures.remove(pkg)
+        detectedWindows.remove(pkg)
+        displayedOffers.remove(pkg)
     }
 
     private fun readOffer(pkg: String) {
@@ -403,17 +460,17 @@ class OfferAccessibilityService : AccessibilityService() {
         if(!IncomingOfferPolicy.isIncoming(pkg,screenText)) {
             val n=normalizeActionText(screenText)
             if(listOf("encerrar viagem","finalizar viagem","em viagem","cheguei").any{n.contains(it)}) {
-                hideOverlay(pkg);lastOfferSeen.remove(pkg);acceptedSignatures.remove(pkg);return
+                forgetOffer(pkg);return
             }
             requestOfferScreenshot(pkg)
             return
         }
         val offer=OfferTextParser.parse(screenText,pkg) ?: run {
-            discardPreviousOfferIfFareChanged(pkg,screenText)
+            discardPreviousOfferIfFareChanged(pkg,frame.id,screenText)
             readerStatus("Conferindo os trechos da oferta antes de calcular")
             requestOfferScreenshot(pkg);return
         }
-        lastOfferSeen[pkg]=android.os.SystemClock.elapsedRealtime()
+        rememberVisibleOffer(pkg,frame.id)
         val signature=listOf(
             "%.2f".format(java.util.Locale.US,offer.fare),"%.2f".format(java.util.Locale.US,offer.pickupKm),
             "%.2f".format(java.util.Locale.US,offer.tripKm),"%.1f".format(java.util.Locale.US,offer.minutes),
@@ -421,7 +478,6 @@ class OfferAccessibilityService : AccessibilityService() {
         if(acceptedOfferSignatures[pkg]==signature){hideOverlay(pkg);return}
         acceptedOfferSignatures.remove(pkg)
         if(acceptedSignatures[pkg]!=signature) {
-            detectedWindows[pkg]=frame.id
             acceptedSignatures[pkg]=signature
             calculateAndShow(offer,frame.fareBounds,pkg)
         }
@@ -434,12 +490,12 @@ class OfferAccessibilityService : AccessibilityService() {
         if (screenshotInProgress || pkg !in visibleDriverPackages() || !readingEnabled()) return
         // Try eligible windows in turn. A large map/utility overlay from one
         // driver must not permanently hide a smaller offer window from OCR.
-        val target=driverCandidates[pkg].orEmpty().filter{it.bounds.width()>=dp(160) && it.bounds.height()>=dp(100)}
+        val target=driverCandidates[pkg].orEmpty().filter{isOfferSized(it.bounds)}
             .minByOrNull{lastCaptureByWindow[pkg to it.id]?:Long.MIN_VALUE}
             ?: run { readerStatus("${driverAppName(pkg)}: aguardando janela da oferta"); return }
         val windowId = target.id
         val bounds = Rect(target.bounds)
-        if(bounds.width()<dp(160) || bounds.height()<dp(100)) {
+        if(!isOfferSized(bounds)) {
             readerStatus("${driverAppName(pkg)}: aguardando cartão da oferta; apenas a bolinha está visível")
             return
         }
@@ -464,7 +520,7 @@ class OfferAccessibilityService : AccessibilityService() {
                 screenshotInProgress=false
                 readerStatus("Captura demorou; repetindo automaticamente")
             }
-        },6000L)
+        },12000L)
         try {
             val callback = object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
@@ -514,7 +570,8 @@ class OfferAccessibilityService : AccessibilityService() {
             val top=(bitmap.height*(1f-fraction)).toInt()
             image=Bitmap.createBitmap(bitmap,0,top,bitmap.width,bitmap.height-top)
         }
-        val factor=kotlin.math.sqrt(1_200_000.0/(image.width.toDouble()*image.height)).coerceAtMost(1.0)
+        // Keep more detail in dense tablet / floating-window offer cards.
+        val factor=kotlin.math.sqrt(2_000_000.0/(image.width.toDouble()*image.height)).coerceAtMost(1.0)
         if(factor<1.0) {
             val scaled=Bitmap.createScaledBitmap(image,(image.width*factor).toInt().coerceAtLeast(1),(image.height*factor).toInt().coerceAtLeast(1),true)
             if(image!==bitmap && scaled!==image)image.recycle()
@@ -538,7 +595,10 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized,pkg) else null
                                 recognitionStatus(pkg,"Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms")
-                                if(offer==null)discardPreviousOfferIfFareChanged(pkg,recognized)
+                                if(offer==null) {
+                                    discardPreviousOfferIfFareChanged(pkg,windowId,recognized)
+                                    if(index==1 || (index==0 && image===captured))observeFullFrame(pkg,windowId,recognized)
+                                }
                                 if(offer==null && index<angles.lastIndex) {
                                     retry=true
                                     recognizeCaptured(pkg,windowId,bounds,captured,requestTime,if(index==0 && image===captured)2 else index+1)
@@ -549,7 +609,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                     // A partial OCR frame must not erase a complete recent offer.
                                     // The per-window expiry removes stale cards if the offer disappears.
                                 } else {
-                                    lastOfferSeen[pkg] = android.os.SystemClock.elapsedRealtime()
+                                    rememberVisibleOffer(pkg,windowId)
                                     val signature = listOf(
                                         "%.2f".format(java.util.Locale.US, offer.fare),
                                         "%.2f".format(java.util.Locale.US, offer.pickupKm),
@@ -562,7 +622,6 @@ class OfferAccessibilityService : AccessibilityService() {
                                     ).joinToString("|")
                                     if (acceptedOfferSignatures[pkg] != signature && acceptedSignatures[pkg] != signature) {
                                         acceptedOfferSignatures.remove(pkg)
-                                        detectedWindows[pkg]=windowId
                                         acceptedSignatures[pkg] = signature
                                         calculateAndShow(offer, null, pkg)
                                     }
@@ -634,13 +693,13 @@ class OfferAccessibilityService : AccessibilityService() {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         val result = TripCalculator.calculate(
             offer.fare, offer.pickupKm, offer.tripKm, offer.minutes,
-            prefs.getFloat("bad_per_km", 1.50f).toDouble(),
-            prefs.getFloat("min_per_km", 1.80f).toDouble(),
-            prefs.getFloat("min_per_hour", 50f).toDouble(),
-            prefs.getFloat("good_per_hour", 60f).toDouble(),
+            TripCalculator.threshold(prefs.getFloat("bad_per_km", 1.50f)),
+            TripCalculator.threshold(prefs.getFloat("min_per_km", 1.80f)),
+            TripCalculator.threshold(prefs.getFloat("min_per_hour", 50f)),
+            TripCalculator.threshold(prefs.getFloat("good_per_hour", 60f)),
             offer.passengerRating?.toDoubleOrNull(),
-            prefs.getFloat("min_rating", 4.80f).toDouble(),
-            prefs.getFloat("good_rating", 4.90f).toDouble()
+            TripCalculator.threshold(prefs.getFloat("min_rating", 4.80f)),
+            TripCalculator.threshold(prefs.getFloat("good_rating", 4.90f))
         ) ?: return // Dados incompletos não apagam uma etiqueta válida já exibida.
         readerStatus("Oferta detectada em ${driverAppName(sourcePackage)}")
         prefs.edit().putLong("reader_last_detection",System.currentTimeMillis()).apply()
@@ -661,15 +720,18 @@ class OfferAccessibilityService : AccessibilityService() {
     private val lastCaptureByWindow=mutableMapOf<Pair<String,Int>,Long>()
     private fun captureStillValid(pkg:String,id:Int,bounds:Rect):Boolean {
         if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)return false
-        return readingEnabled() && driverCandidates[pkg].orEmpty().any{it.id==id && it.bounds==bounds}
+        // A per-window capture remains tied to this package and window even
+        // if the driver resizes it while OCR is running. Full-display captures
+        // on older Android versions still require the original bounds.
+        return readingEnabled() && driverCandidates[pkg].orEmpty().any{it.id==id && (Build.VERSION.SDK_INT>=34 || it.bounds==bounds)}
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth:Int=0) {
         if (depth>60 || out.length>30000) return
         val text = node.text?.toString()?.trim().orEmpty()
         val description = node.contentDescription?.toString()?.trim().orEmpty()
-        if (text.isNotEmpty()) out.append(text).append('\n')
-        if (description.isNotEmpty() && description != text) out.append(description).append('\n')
+        if (node.isVisibleToUser && text.isNotEmpty()) out.append(text).append('\n')
+        if (node.isVisibleToUser && description.isNotEmpty() && description != text) out.append(description).append('\n')
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { child ->
                 collectText(child, out, depth+1)
@@ -807,7 +869,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val view = overlays[pkg] ?: return
         val params = overlayParams[pkg] ?: return
         val pane = driverWindow(pkg)?.second ?: return
-        if (pane.isEmpty || pane.width()<dp(160) || pane.height()<dp(100)) return
+        if (pane.isEmpty || !isOfferSized(pane)) return
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val width = dp((310 * prefs.getInt("overlay_scale", 100).coerceIn(65, 130) / 100f).toInt()).coerceAtMost((pane.width()-dp(12)).coerceAtLeast(dp(100)))
         val oldWidth=params.width;val oldX=params.x;val oldY=params.y
@@ -819,15 +881,20 @@ class OfferAccessibilityService : AccessibilityService() {
             try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view, params) } catch (_: Exception) {}
     }
 
-    private fun showOffer(r: TripResult, offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
+    private fun renderTag(view:OfferTagView,r:TripResult,offer:OfferTextParser.ParsedOffer,sourcePackage:String) {
         val (label, color) = when (r.rating) {
             Rating.GOOD -> Pair("ACEITAR", Color.rgb(25, 145, 76))
             Rating.REVIEW -> Pair("ATENÇÃO", Color.rgb(205, 132, 0))
             Rating.BAD -> Pair("RECUSAR", Color.rgb(190, 40, 40))
         }
-        val view = ensureOverlay(sourcePackage, anchor) ?: return
         val appName = driverAppName(sourcePackage) ?: "APP"
         view.setOffer(label, r.minutes, r.totalKm, r.perKm, r.perHour, offer.passengerRating, color, appName, r.fare, offer.pickupMinutes, offer.pickupKm.takeIf { offer.pickupMinutes != null || it > 0 }, r.reason)
+    }
+
+    private fun showOffer(r: TripResult, offer: OfferTextParser.ParsedOffer, anchor: Rect?, sourcePackage: String) {
+        val view = ensureOverlay(sourcePackage, anchor) ?: return
+        displayedOffers[sourcePackage]=DisplayedOffer(r,offer)
+        renderTag(view,r,offer,sourcePackage)
         val generation = android.os.SystemClock.elapsedRealtimeNanos()
         view.tag = generation
         view.setAiInsight("Consultando IA; cálculos locais prontos")
@@ -855,6 +922,8 @@ class OfferAccessibilityService : AccessibilityService() {
         overlays.values.forEach { try { wm.removeView(it) } catch (_: Exception) {} }
         overlays.clear()
         overlayParams.clear()
+        displayedOffers.clear()
+        missingOffers.clear()
         acceptedSignatures.clear()
         lastOfferSeen.clear()
         detectedWindows.clear()

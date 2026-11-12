@@ -118,6 +118,8 @@ class ReaderConcurrentOffersTest {
         val oldServices = shell("settings get secure enabled_accessibility_services")
         val oldEnabled = shell("settings get secure accessibility_enabled")
         val prefs = context.getSharedPreferences("settings", 0)
+        val originalBad=prefs.getString("label_bad",null)
+        val originalGood=prefs.getString("label_good",null)
         val originalJourney = context.getSharedPreferences("journey", 0).getString("offers", null)
         try {
             shell("settings delete secure enabled_accessibility_services")
@@ -146,6 +148,17 @@ class ReaderConcurrentOffersTest {
             fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("2,00", "60,00", "4,90"))
             await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
 
+            // Changing a label must refresh an already-visible card too.
+            prefs.edit().putString("label_bad","Vixe, sai fora").putString("label_good","Bora, carai!").commit()
+            fun labelVisible(source:String,label:String):Boolean = ui.windows.any { window ->
+                val root=window.root ?: return@any false
+                try {root.packageName?.toString()==context.packageName && nodeText(root).any{it.startsWith("$source •") && it.contains(label)}}
+                finally {root.recycle()}
+            }
+            await("Custom names refresh the two visible tags",12000) {
+                labelVisible("UBER","Vixe, sai fora") && labelVisible("99","Bora, carai!")
+            }
+
             val uber = uberTag()!!
             val ninetyNine = ninetyNineTag()!!
             val uberPane = driverWindow("com.ubercab.driver")!!
@@ -156,6 +169,21 @@ class ReaderConcurrentOffersTest {
             val records = JourneyStore.getRecords(context).filter { it.optLong("timestamp") >= startedAt }
             assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-12.0)<0.001 })
             assertTrue("99 offer recorded", records.any { it.optString("app") == "99" && kotlin.math.abs(it.optDouble("fare")-30.0)<0.001 })
+
+            // The expiry setting used by older builds must no longer remove a
+            // valid offer. Both fixture windows remain visible during this time.
+            prefs.edit().putInt("card_hold_seconds",10).commit()
+            Thread.sleep(11500)
+            assertNotNull("Uber tag remains while its offer is visible",uberTag())
+            assertNotNull("99 tag remains while its offer is visible",ninetyNineTag())
+
+            // Remove only the offer pixels, leaving the Uber window open.
+            shell("am broadcast -a br.com.calculacorrida.fixture.HIDE_OFFER -p com.ubercab.driver")
+            await("Uber tag leaves after its offer disappears, 99 remains",20000) {
+                driverWindow("com.ubercab.driver")!=null && uberTag()==null && ninetyNineTag()!=null
+            }
+            shell("am broadcast -a br.com.calculacorrida.fixture.SHOW_OFFER -p com.ubercab.driver")
+            await("Uber tag returns for a new visible offer",30000) {uberTag()!=null && ninetyNineTag()!=null}
 
             shell("am force-stop com.app99.driver")
             await("Closing 99 removes only its tag", 10000) { ninetyNineTag() == null && uberTag() != null }
@@ -191,7 +219,10 @@ class ReaderConcurrentOffersTest {
         } finally {
             listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")
-            prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).remove("card_hold_seconds").commit()
+            prefs.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).remove("card_hold_seconds").apply {
+                if(originalBad==null)remove("label_bad") else putString("label_bad",originalBad)
+                if(originalGood==null)remove("label_good") else putString("label_good",originalGood)
+            }.commit()
             context.getSharedPreferences("journey", 0).edit().apply {
                 if (originalJourney == null) remove("offers") else putString("offers", originalJourney)
             }.commit()

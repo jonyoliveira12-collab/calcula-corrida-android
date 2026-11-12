@@ -2,6 +2,15 @@ package br.com.calculacorrida
 
 /** Identifies offer layouts without confusing ongoing-trip navigation with an offer. */
 object IncomingOfferPolicy {
+    /** Negotiation can still be identified if OCR misses its heading/button. */
+    fun hasNinetyNineNegotiationPrices(text:String):Boolean {
+        val legs=Regex("""\d+\s*min(?:uto)?s?\s*\(\s*\d+(?:[,.]\d+)?\s*km\b""",RegexOption.IGNORE_CASE).findAll(text).toList()
+        if(legs.size!=2)return false
+        val price=Regex("""r\s*\$\s*\d+(?:[,.]\d{1,2})?""",RegexOption.IGNORE_CASE)
+        val before=price.findAll(text.substring(0,legs.first().range.first)).map{it.value.replace(" ","").lowercase()}.distinct().count()
+        val after=price.findAll(text.substring(legs.last().range.last+1)).map{it.value.replace(" ","").lowercase()}.distinct().count()
+        return before==1 && after>=2
+    }
     /** Markers of the driver's 99 offer card, including negotiated offers. */
     fun hasNinetyNineOfferMarker(text:String):Boolean {
         val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFD)
@@ -23,6 +32,6 @@ object IncomingOfferPolicy {
         val legs=Regex("""\d+\s*min(?:uto)?s?\s*\(\s*\d+(?:[,.]\d+)?\s*km""").findAll(n).count()
         val times=Regex("""\d+\s*min(?:uto)?s?\b""").findAll(n).count()
         val distances=Regex("""\d+(?:[,.]\d+)?\s*(?:km|m)\b""").findAll(n).count()
-        return is99 && marker && (legs>=2 || (times>=2 && distances>=2))
+        return is99 && (marker || hasNinetyNineNegotiationPrices(n)) && (legs>=2 || (times>=2 && distances>=2))
     }
 }

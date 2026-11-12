@@ -469,13 +469,25 @@ class MainActivity : Activity() {
             val row = horizontal()
             row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(action(prefs.getString(key, defaultValue) ?: defaultValue, false) {
-                val input = EditText(this).apply { setText(prefs.getString(key, defaultValue) ?: defaultValue); setSingleLine(true) }
-                AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar", null)
-                    .setPositiveButton("Salvar") { _, _ ->
+                val input = EditText(this).apply {
+                    setText(prefs.getString(key, defaultValue) ?: defaultValue)
+                    setSingleLine(true)
+                    filters = arrayOf(android.text.InputFilter.LengthFilter(32))
+                    setSelection(text.length)
+                }
+                val dialog=AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar", null)
+                    .setPositiveButton("Salvar", null).create()
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val value = input.text.toString().trim()
-                        if (value.isNotEmpty()) prefs.edit().putString(key, value).apply()
+                        if (value.isEmpty()) { input.error="Digite um nome para a faixa"; return@setOnClickListener }
+                        prefs.edit().putString(key, value).apply()
+                        dialog.dismiss()
                         showTab("Semáforo")
-                    }.show()
+                        Toast.makeText(this,"Nome da faixa atualizado",Toast.LENGTH_SHORT).show()
+                    }
+                }
+                dialog.show()
             })
             row.setPadding(0, dp(7), 0, dp(7))
             names.addView(row)

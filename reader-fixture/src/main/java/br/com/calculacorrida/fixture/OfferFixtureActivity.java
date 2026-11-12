@@ -8,9 +8,15 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.Gravity;
 import android.graphics.PixelFormat;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 
 /** CI-only synthetic offer pixels; no accounts, networking or accessible offer labels. */
 public class OfferFixtureActivity extends Activity {
+    private boolean offerVisible=true;
+    private BroadcastReceiver offerController;
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         if(getPackageName().equals("com.nu.production")) {
@@ -41,6 +47,7 @@ public class OfferFixtureActivity extends Activity {
                 boolean dark=(floating && !dual) || getPackageName().equals("com.app99.driver");
                 canvas.drawColor(dark?0xff20242c:Color.WHITE);paint.setColor(dark?Color.WHITE:Color.BLACK);
                 float d=getResources().getDisplayMetrics().density;paint.setTextSize(18*d);
+                if(!offerVisible) {canvas.drawText("Mapa aberto sem chamada ativa",12*d,45*d,paint);return;}
                 String[] lines={"R$ 28,81","31 min • 19.1 km","4,76 (164)","6 min (2.2 km)","25 minutos (16.9 km)","Tenho interesse"};
                 if("partial".equals(layout))lines=new String[]{"R$ 12,77","19 min • 12.0 km","4,99 (1763)","8 min (5.0 km)","11 minutos (7.0 km)","Tenho interesse"};
                 if("partial_dot".equals(layout))lines=new String[]{"R$ 24,00","30 min • 12.0 km • Est. de R$2,00/km","4,90 (100)","10 min (4.0 km)","20 minutos (8.0 km)","Tenho interesse"};
@@ -62,6 +69,17 @@ public class OfferFixtureActivity extends Activity {
         offer.setContentDescription("partial".equals(layout)?"R$ 12,77 8 min (5.0 km) Nota 4,99 Tenho interesse":
             ("partial_dot".equals(layout)?"R$ 24,00 10 min • 4,0 km Nota 4,90 Tenho interesse":"Synthetic driver offer pixels"));
         offer.setClickable(true);
+        offerController=new BroadcastReceiver() {
+            @Override public void onReceive(Context context,Intent intent) {
+                offerVisible="br.com.calculacorrida.fixture.SHOW_OFFER".equals(intent.getAction());
+                offer.invalidate();
+            }
+        };
+        IntentFilter filter=new IntentFilter();
+        filter.addAction("br.com.calculacorrida.fixture.SHOW_OFFER");
+        filter.addAction("br.com.calculacorrida.fixture.HIDE_OFFER");
+        if(android.os.Build.VERSION.SDK_INT>=33)registerReceiver(offerController,filter,Context.RECEIVER_EXPORTED);
+        else registerReceiver(offerController,filter);
         if(floating) {
             setContentView(new View(this));
             float d=getResources().getDisplayMetrics().density;
@@ -92,5 +110,10 @@ public class OfferFixtureActivity extends Activity {
             }
             startActivity(new android.content.Intent().setClassName("br.com.calculacorrida.fixture.backdrop","br.com.calculacorrida.fixture.OfferFixtureActivity"));
         } else setContentView(offer);
+    }
+
+    @Override protected void onDestroy() {
+        if(offerController!=null)unregisterReceiver(offerController);
+        super.onDestroy();
     }
 }

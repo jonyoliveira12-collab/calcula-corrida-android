@@ -82,10 +82,11 @@ class OfferCardTest {
         val original=prefs.all
         try {
             prefs.edit().putBoolean("card_banner",true).putString("card_banner_position","above")
-                .putBoolean("card_neon_flames",true).putBoolean("card_compact_reason",false).commit()
+                .putBoolean("card_neon_flames",true).putBoolean("card_compact_reason",false)
+                .remove("label_bad").remove("label_review").remove("label_good").commit()
             instrumentation.runOnMainSync {
                 val view=OfferTagView(context)
-                for((label,shown) in listOf("RECUSAR" to "RECUSAR","ATENÇÃO" to "ANALISAR","ACEITAR" to "BOA")) {
+                for((label,shown) in listOf("RECUSAR" to "Vixe não dá","ATENÇÃO" to "Hum, talvez","ACEITAR" to "Bora carai")) {
                     view.setOffer(label,19.0,12.0,1.0641666667,40.3263157895,"4.99",Color.RED,"UBER",12.77)
                     val badge=view.getChildAt(0) as android.widget.TextView
                     assertEquals(shown,badge.text.toString())
@@ -109,6 +110,32 @@ class OfferCardTest {
         }
     }
 
+    @Test fun customNamesAppearForEachClassificationWithoutChangingMetrics() {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val context=instrumentation.targetContext
+        val prefs=context.getSharedPreferences("settings",0)
+        val original=prefs.all
+        try {
+            prefs.edit().putString("label_bad","Vixe, sai fora")
+                .putString("label_review","Será?").putString("label_good","Bora, carai!")
+                .putBoolean("card_banner",true).putBoolean("card_neon_flames",true)
+                .putString("card_banner_position","above").putBoolean("card_compact_reason",false).commit()
+            instrumentation.runOnMainSync {
+                val view=OfferTagView(context)
+                for((classification,name) in listOf("RECUSAR" to "Vixe, sai fora","ATENÇÃO" to "Será?","ACEITAR" to "Bora, carai!")) {
+                    view.setOffer(classification,20.0,10.0,1.5,45.0,"4.90",Color.RED,"UBER",15.0)
+                    assertEquals(name,(view.getChildAt(0) as android.widget.TextView).text.toString())
+                    assertTrue(view.contentDescription.toString().contains("R$ 1,50/km"))
+                    assertTrue(view.contentDescription.toString().contains("R$ 45,00/h"))
+                }
+            }
+        } finally {
+            val edit=prefs.edit().clear()
+            original.forEach{(k,v)->when(v){is Boolean->edit.putBoolean(k,v);is String->edit.putString(k,v);is Int->edit.putInt(k,v);is Float->edit.putFloat(k,v);is Long->edit.putLong(k,v)}}
+            edit.commit()
+        }
+    }
+
     @Test fun neonFlamesRenderForAllVerdictsAndCanBeTurnedOff() {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val context=instrumentation.targetContext
@@ -118,7 +145,7 @@ class OfferCardTest {
             prefs.edit().remove("card_neon_flames").putString("card_theme","light").putBoolean("card_banner",true)
                 .putBoolean("card_km",true).putBoolean("card_hour",true).putBoolean("card_rating",true)
                 .putBoolean("card_compact_reason",false).putBoolean("card_details",false).putBoolean("card_ai",false)
-                .putString("card_banner_position","above").commit()
+                .putString("card_banner_position","above").remove("label_bad").commit()
             instrumentation.runOnMainSync {
                 val dir=java.io.File(context.filesDir,"screenshots").apply{mkdirs()}
                 for((label,name,color) in listOf(
@@ -171,7 +198,7 @@ class OfferCardTest {
                 val plain=OfferTagView(context)
                 plain.setOffer("RECUSAR",20.0,10.0,1.0,30.0,"4.70",Color.RED,"UBER",10.0)
                 val badge=plain.getChildAt(0) as android.widget.TextView
-                assertEquals("● RECUSAR",badge.text.toString())
+                assertEquals("● Vixe não dá",badge.text.toString())
                 assertNull("Flame icon is removed when disabled",badge.compoundDrawables[0])
             }
         } finally {
@@ -189,7 +216,8 @@ class OfferCardTest {
         var activity:android.app.Activity?=null
         try {
             prefs.edit().putBoolean("card_neon_flames",true).putBoolean("card_banner",true)
-                .putString("card_banner_position","above").putBoolean("card_compact_reason",false).commit()
+                .putString("card_banner_position","above").putBoolean("card_compact_reason",false)
+                .remove("label_bad").remove("label_review").remove("label_good").commit()
             activity=instrumentation.startActivitySync(android.content.Intent(context,CardStyleActivity::class.java)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK))
             instrumentation.runOnMainSync {
@@ -199,11 +227,11 @@ class OfferCardTest {
                 val preview=all.filterIsInstance<OfferTagView>().single()
                 fun select(label:String){all.filterIsInstance<android.widget.Button>().single{it.text.toString()==label}.performClick()}
                 fun containsAll(vararg values:String){for(value in values)assertTrue(preview.contentDescription.toString(),preview.contentDescription.toString().contains(value))}
-                containsAll("RECUSAR","R$ 1,00/km","R$ 30,00/h","4,70")
+                containsAll("Vixe não dá","R$ 1,00/km","R$ 30,00/h","4,70")
                 select("Analisar")
-                containsAll("ANALISAR","R$ 1,67/km","R$ 50,00/h","4,85")
+                containsAll("Hum, talvez","R$ 1,67/km","R$ 50,00/h","4,85")
                 select("Boa")
-                containsAll("BOA","R$ 2,00/km","R$ 72,00/h","4,96")
+                containsAll("Bora carai","R$ 2,00/km","R$ 72,00/h","4,96")
                 val toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Chamas neon"}
                 assertTrue(toggle.isChecked)
                 toggle.performClick()
