@@ -5,30 +5,38 @@ plugins {
 
 android {
     namespace = "br.com.calculacorrida"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "br.com.calculacorrida"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        targetSdk = 36
+        versionCode = 18
+        versionName = "0.5.2"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // Assinatura debug persistente: permite atualizar sem trocar a identidade do app.
-    signingConfigs {
-        getByName("debug") {
-            storeFile = file("jhondriver-debug.keystore")
-            storePassword = "JHondriverDebug2026!"
-            keyAlias = "jhondriver"
-            keyPassword = "JHondriverDebug2026!"
-        }
+    buildTypes.getByName("debug") {
+        // Evaluation installs alongside older builds signed with a different key.
+        applicationIdSuffix = ".avaliacao051"
     }
 
-    buildTypes {
-        getByName("debug") {
-            signingConfig = signingConfigs.getByName("debug")
+    // Signing material is injected from private Actions secrets, never from source control.
+    val signingPath = providers.environmentVariable("JHONDRIVER_KEYSTORE_PATH").orNull
+    val signingPassword = providers.environmentVariable("JHONDRIVER_KEYSTORE_PASSWORD").orNull
+    val signingAlias = providers.environmentVariable("JHONDRIVER_KEY_ALIAS").orNull
+    val signingKeyPassword = providers.environmentVariable("JHONDRIVER_KEY_PASSWORD").orNull
+    if (!signingPath.isNullOrBlank()) {
+        require(!signingPassword.isNullOrBlank() && !signingAlias.isNullOrBlank() && !signingKeyPassword.isNullOrBlank()) {
+            "Missing private signing configuration"
         }
+        signingConfigs.create("privateRelease") {
+            storeFile = file(signingPath)
+            storePassword = signingPassword
+            keyAlias = signingAlias
+            keyPassword = signingKeyPassword
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("privateRelease")
     }
 
     compileOptions {
@@ -42,6 +50,9 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")

@@ -4,9 +4,14 @@
     android:layout_height="match_parent"
     android:fillViewport="true"
     android:background="@drawable/login_background">
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:id="@+id/authContent"
+        android:layout_gravity="center"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
         android:paddingStart="24dp"
@@ -19,10 +24,10 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="vertical"
-            android:layout_marginBottom="18dp">
+            android:layout_marginBottom="14dp">
             <ImageView
-                android:layout_width="76dp"
-                android:layout_height="76dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:src="@drawable/jhondriver_logo"
                 android:contentDescription="Logo JHONDRIVER"
                 android:scaleType="fitCenter"
@@ -32,49 +37,65 @@
                 android:layout_height="wrap_content"
                 android:text="JHONDRIVER"
                 android:textColor="#FFFFFF"
-                android:textSize="27sp"
+                android:textSize="25sp"
                 android:letterSpacing="0.13"
                 android:textStyle="bold"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="INTELIGÊNCIA PARA CADA PERCURSO"
-                android:textColor="#D9E8FF"
+                android:textColor="#E9C76C"
                 android:textSize="9sp"
                 android:letterSpacing="0.12"
                 android:layout_marginTop="3dp"/>
+            <TextView
+                android:id="@+id/appVersionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#E9C76C"
+                android:textSize="10sp"
+                android:layout_marginTop="4dp"/>
         </LinearLayout>
-
+        <br.com.calculacorrida.FlameBorderLayout
+            android:id="@+id/loginFlameFrame"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="56dp"
+            android:paddingBottom="30dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:orientation="vertical"
-            android:padding="22dp"
+            android:padding="20dp"
             android:background="@drawable/login_card"
             android:elevation="8dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sua próxima corrida começa aqui"
-                android:textColor="#26345F"
+                android:text="Acesse sua conta"
+                android:textColor="#FFF8E4"
                 android:textSize="19sp"
                 android:textStyle="bold"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Entre para ver suas oportunidades com inteligência."
-                android:textColor="#7180A3"
+                android:text="Inteligência para cada percurso."
+                android:textColor="#BCB6A5"
                 android:textSize="12sp"
                 android:layout_marginTop="4dp"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="12dp"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="E-MAIL"
-                android:textColor="#52628D"
+                android:textColor="#E9C76C"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="5dp"/>
@@ -87,8 +108,8 @@
                 android:singleLine="true"
                 android:paddingHorizontal="14dp"
                 android:textSize="14sp"
-                android:textColor="#25345B"
-                android:textColorHint="#98A3BC"
+                android:textColor="#FFF8E4"
+                android:textColorHint="#AAA69B"
                 android:background="@drawable/login_input"/>
             <CheckBox
                 android:id="@+id/rememberEmailCheck"
@@ -96,37 +117,55 @@
                 android:layout_height="wrap_content"
                 android:text="Lembrar meu e-mail"
                 android:textSize="11sp"
-                android:textColor="#647294"
-                android:buttonTint="#596FE8"
+                android:textColor="#BCB6A5"
+                android:buttonTint="#E9C76C"
                 android:checked="true"
                 android:layout_marginTop="2dp"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="SENHA"
-                android:textColor="#52628D"
+                android:textColor="#E9C76C"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:layout_marginTop="9dp"
                 android:layout_marginBottom="5dp"/>
-            <EditText
-                android:id="@+id/passwordInput"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:hint="Digite sua senha"
-                android:inputType="textPassword"
-                android:singleLine="true"
-                android:paddingHorizontal="14dp"
-                android:textSize="14sp"
-                android:textColor="#25345B"
-                android:textColorHint="#98A3BC"
-                android:background="@drawable/login_input"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/login_input">
+                <EditText
+                    android:id="@+id/passwordInput"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    android:hint="Digite sua senha"
+                    android:inputType="textPassword"
+                    android:autofillHints="password"
+                    android:singleLine="true"
+                    android:paddingHorizontal="14dp"
+                    android:textSize="14sp"
+                    android:textColor="#FFF8E4"
+                    android:textColorHint="#BBB7AB"
+                    android:background="@android:color/transparent"/>
+                <ImageButton
+                    android:id="@+id/togglePasswordButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_visibility"
+                    android:tint="#FFE07D"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Mostrar senha"/>
+            </LinearLayout>
             <TextView
                 android:id="@+id/forgotPasswordText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Esqueci minha senha"
-                android:textColor="#586CE0"
+                android:textColor="#E9C76C"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:gravity="end"
@@ -141,18 +180,18 @@
                 android:text="ENTRAR"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"
+                android:textColor="#16120A"
                 android:background="@drawable/login_primary_button"
                 android:backgroundTint="@null"
                 android:layout_marginTop="12dp"/>
             <Button
                 android:id="@+id/registerButton"
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="48dp"
                 android:text="CRIAR CONTA"
-                android:textSize="12sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#4058C8"
+                android:textColor="#FFE07D"
                 android:background="@drawable/login_secondary_button"
                 android:backgroundTint="@null"
                 android:layout_marginTop="7dp"/>
@@ -164,14 +203,16 @@
                 android:visibility="gone"
                 android:layout_marginTop="12dp"/>
         </LinearLayout>
+        </br.com.calculacorrida.FlameBorderLayout>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ACESSO SEGURO  •  JHONDRIVER"
-            android:textColor="#68769A"
+            android:text="CARRO E MOTO   •   VOCÊ NO CONTROLE"
+            android:textColor="#BCB6A5"
             android:textSize="9sp"
             android:letterSpacing="0.12"
             android:gravity="center"
             android:layout_marginTop="16dp"/>
     </LinearLayout>
+    </FrameLayout>
 </ScrollView>

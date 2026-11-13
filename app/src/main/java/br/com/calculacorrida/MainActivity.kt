@@ -18,20 +18,48 @@ import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
 
-    private val bg = Color.rgb(242, 246, 255)
-    private val panel = Color.rgb(255, 255, 255)
-    private val gold = Color.rgb(83, 101, 232)
-    private val white = Color.rgb(35, 43, 68)
-    private val muted = Color.rgb(105, 117, 145)
+    private val bg = Color.rgb(10, 10, 12)
+    private val panel = Color.rgb(15, 16, 18)
+    private val gold = Color.rgb(239, 190, 65)
+    private val white = Color.rgb(247, 244, 232)
+    private val muted = Color.rgb(176, 172, 158)
     private val green = Color.rgb(20, 166, 123)
     private val red = Color.rgb(226, 75, 100)
     private val amber = Color.rgb(242, 157, 45)
-    private val border = Color.rgb(213, 222, 244)
-    private val bgInput = Color.rgb(240, 244, 252)
+    private val border = Color.rgb(141, 112, 44)
+    private val bgInput = Color.rgb(35, 35, 39)
 
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
     private var selectedTab = "Início"
+    private var selectedOfferApp:String? = null
+    private val liveOfferHandler=android.os.Handler(android.os.Looper.getMainLooper())
+    private var observingOffers=false
+    private val refreshLatestOffer=Runnable {
+        if(observingOffers && !isFinishing && ::content.isInitialized && selectedTab=="Início") {
+            val scroll=content.parent as? ScrollView
+            val y=scroll?.scrollY ?: 0
+            showTab("Início")
+            scroll?.let {host->host.post {host.scrollTo(0,y)}}
+        }
+    }
+    private val liveOfferListener=android.content.SharedPreferences.OnSharedPreferenceChangeListener {_,key->
+        if(key=="offers" && observingOffers) {
+            liveOfferHandler.removeCallbacks(refreshLatestOffer)
+            liveOfferHandler.postDelayed(refreshLatestOffer,100)
+        }
+    }
+    override fun onStart() {
+        super.onStart()
+        observingOffers=true
+        getSharedPreferences("journey",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(liveOfferListener)
+    }
+    override fun onStop() {
+        observingOffers=false
+        getSharedPreferences("journey",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(liveOfferListener)
+        liveOfferHandler.removeCallbacks(refreshLatestOffer)
+        super.onStop()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,18 +92,14 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(11), dp(12), dp(11))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.rgb(47, 73, 139), Color.rgb(91, 83, 177), Color.rgb(34, 139, 143))
-            ).apply {
-                cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), Color.rgb(126, 151, 224))
-            }
+            background = getDrawable(R.drawable.dashboard_city)
+            gravity = Gravity.CENTER_VERTICAL
             elevation = dp(5).toFloat()
         }
         val brandRow = horizontal()
+        brandRow.addView(action("☰", false) { showTab("Perfil") }.apply{textSize=24f;contentDescription="Abrir configurações"})
         brandRow.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            layoutParams = LinearLayout.LayoutParams(dp(if(resources.configuration.screenWidthDp>=600)64 else 40), dp(if(resources.configuration.screenWidthDp>=600)64 else 40))
             setImageResource(R.drawable.jhondriver_logo)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Logo JHONDRIVER"
@@ -83,15 +107,19 @@ class MainActivity : Activity() {
         val brandText = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
-            addView(label("JHONDRIVER", 21f, Color.WHITE, true))
-            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, Color.rgb(221, 233, 255), true))
+            addView(label("JHONDRIVER", if(resources.configuration.screenWidthDp>=600)32f else 22f, Color.WHITE, true).apply {
+                typeface=Typeface.create("sans-serif-condensed",Typeface.BOLD_ITALIC)
+                text=android.text.SpannableString("JHONDRIVER").apply{setSpan(android.text.style.ForegroundColorSpan(gold),0,4,0)}
+            })
+            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, gold, true))
+            addView(label("Versão ${packageManager.getPackageInfo(packageName,0).versionName}", 9f, gold, false))
         }
         brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         val avatar = ImageView(this).apply {
             val size = dp(44)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { leftMargin = dp(8) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(224, 233, 255), 24, gold)
+            background = rounded(panel, 24, gold)
             clipToOutline = true
             val savedPhoto = getSharedPreferences("settings", MODE_PRIVATE).getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -99,10 +127,13 @@ class MainActivity : Activity() {
             contentDescription = "Foto do motorista. Toque para alterar."
             setOnClickListener { chooseProfilePhoto() }
         }
-        brandRow.addView(avatar)
-        brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
+        brandRow.addView(pill(if(NetworkGate.isOnline(this))"● Online" else "Sem conexão",if(NetworkGate.isOnline(this))green else red))
+        if(resources.configuration.screenWidthDp>=600) {
+            brandRow.addView(avatar)
+            brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
+        }
         header.addView(brandRow)
-        root.addView(header)
+        root.addView(header,LinearLayout.LayoutParams(-1,dp(if(resources.configuration.screenWidthDp>=600)180 else 124)))
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -120,27 +151,44 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(255, 255, 255), Color.rgb(237, 243, 255))
+                intArrayOf(Color.rgb(23, 23, 26), Color.rgb(18, 18, 21))
             ).apply {
                 cornerRadius = dp(19).toFloat()
-                setStroke(dp(1), Color.rgb(202, 213, 240))
+                setStroke(dp(1), Color.rgb(132, 103, 42))
             }
             elevation = dp(8).toFloat()
             setPadding(dp(3), dp(5), dp(3), dp(5))
         }
-        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(72)))
+        root.addView(bottom, LinearLayout.LayoutParams(-1, dp(80)))
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding(dp(12) + bars.left, dp(8) + bars.top, dp(12) + bars.right, dp(4) + bars.bottom)
+            insets
+        }
         setContentView(root)
+        AppUpdates.check(this)
         showTab("Início")
     }
 
     override fun onResume() {
         super.onResume()
+        if (!isFinishing) AppUpdates.check(this)
         if (!NetworkGate.isOnline(this)) {
             startActivity(Intent(this, LoginActivity::class.java))
             Toast.makeText(this, "Conexão perdida. Reconecte-se à internet para continuar.", Toast.LENGTH_LONG).show()
             finish()
             return
+        }
+        val readerPrefs = getSharedPreferences("settings", MODE_PRIVATE)
+        val pendingFeature = readerPrefs.getString("reader_pending_feature", null)
+        if (pendingFeature != null && readerPrefs.getBoolean("reader_disclosure_accepted", false)) {
+            if (Settings.canDrawOverlays(this) && isAccessibilityEnabled()) {
+                readerPrefs.edit().putBoolean(pendingFeature, true).remove("reader_pending_feature").remove("reader_permission_step").apply()
+            } else if (Settings.canDrawOverlays(this) && readerPrefs.getString("reader_permission_step", null) == "overlay") {
+                readerPrefs.edit().putString("reader_permission_step", "accessibility").apply()
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
         }
         // Atualiza o indicador assim que o usuário retorna das configurações do Android.
         if (::content.isInitialized && (selectedTab == "Perfil" || selectedTab == "Início")) {
@@ -166,9 +214,10 @@ class MainActivity : Activity() {
         bottom.removeAllViews()
         val tabs = listOf(
             Triple("Início", "⌂", "Início"),
-            Triple("Histórico", "◷", "Histórico"),
-            Triple("Finanças", "▤", "Finanças"),
-            Triple("Perfil", "◎", "Perfil")
+            Triple("Finanças", "▥", "Relatórios"),
+            Triple("Semáforo", "◎", "Metas"),
+            Triple("Histórico", "↶", "Histórico"),
+            Triple("Perfil", "⚙", "Configurações")
         )
         tabs.forEach { item ->
             val active = item.first == selectedTab
@@ -176,128 +225,190 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(4), dp(4), dp(4), dp(4))
+                if(active) background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(255,232,139),gold,Color.rgb(213,151,18))).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),Color.rgb(255,239,169))}
                 isClickable = true
                 setOnClickListener { showTab(item.first) }
             }
-            cell.addView(label(item.second, 21f, if (active) gold else muted, false))
-            cell.addView(label(item.third, 10f, if (active) gold else muted, active))
+            cell.addView(label(item.second, 26f, if (active) Color.BLACK else gold, true))
+            cell.addView(label(item.third, if(resources.configuration.screenWidthDp>=600)12f else 9f, if (active) Color.BLACK else white, active))
             bottom.addView(cell, LinearLayout.LayoutParams(0, -1, 1f))
         }
     }
 
     private fun buildHome() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-
-        val welcome = card()
-        val row = horizontal()
-        row.addView(label("DIA DE TRABALHO", 11f, muted, true), LinearLayout.LayoutParams(0, -2, 1f))
+        val records = JourneyStore.getRecords(this)
+        val wide = resources.configuration.screenWidthDp >= 600
+        val enabledServices=Settings.Secure.getString(contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        if(ReaderVersions.hasOtherEnabledService(enabledServices,packageName)) {
+            val conflict=card()
+            conflict.addView(label("Outra versão está lendo corridas",16f,gold,true))
+            conflict.addView(label("Desligue a acessibilidade das versões antigas do JHONDRIVER e deixe ativa somente a desta versão. Seus dados antigos continuam guardados.",13f,white,false,4,8))
+            conflict.addView(action("ABRIR AJUSTES DE ACESSIBILIDADE  ›",false) { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
+            content.addView(conflict,margin(0,10))
+        }
+        val diagnostics = card()
+        val serviceOn = isAccessibilityEnabled()
+        diagnostics.addView(label("LEITURA DE OFERTAS", 12f, gold, true))
+        diagnostics.addView(label(if (!serviceOn) "Acessibilidade desligada: ative nos ajustes" else prefs.getString("reader_status", "Serviço ativado; aguardando conexão") ?: "Aguardando oferta", 13f, white, false, 6, 2))
+        val heartbeat=prefs.getLong("reader_heartbeat",0)
+        val alive=serviceOn && System.currentTimeMillis()-heartbeat in 0..10000
+        diagnostics.addView(label(if(alive) "Serviço respondendo em segundo plano" else "Serviço sem resposta recente; confira a acessibilidade",12f,if(alive)green else red,false))
+        diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
+            prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
+        })
+        diagnostics.addView(action("COPIAR DIAGNÓSTICO", false) {
+            val report=listOf("JHONDRIVER ${packageManager.getPackageInfo(packageName,0).versionName}","Android ${android.os.Build.VERSION.RELEASE} • ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+                "Acessibilidade: $serviceOn • Serviço respondendo: $alive • Sobreposição: ${Settings.canDrawOverlays(this)}",
+                "Copiloto: ${prefs.getBoolean("copilot_enabled",false)} • Semáforo: ${prefs.getBoolean("traffic_enabled",false)} • Pausa: ${prefs.getBoolean("reader_paused",false)}",
+                "Estado: ${prefs.getString("reader_status","Sem registro")}","Último app: ${prefs.getString("reader_last_app","—")}",
+                "Última captura: ${prefs.getLong("reader_last_capture",0)} • Última detecção: ${prefs.getLong("reader_last_detection",0)}",
+                "Janelas: ${prefs.getString("reader_window_status","Aguardando")}",
+                "Captura: ${prefs.getString("reader_capture_status","Aguardando")}",
+                "Reconhecimento: ${prefs.getString("reader_ocr_status","Aguardando")}",
+                "Uber: captura ${prefs.getString("reader_capture_UBER","Aguardando")} • leitura ${prefs.getString("reader_ocr_UBER","Aguardando")}",
+                "99: captura ${prefs.getString("reader_capture_99","Aguardando")} • leitura ${prefs.getString("reader_ocr_99","Aguardando")}",
+                "Modelo de leitura pronto: ${prefs.getBoolean("reader_model_ready",false)}",
+                "IA: ${prefs.getString("ai_status","Aguardando oferta")}").joinToString("\n")
+            (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico JHONDRIVER",report))
+            android.widget.Toast.makeText(this,"Diagnóstico copiado; não inclui imagem, endereço nem chave",android.widget.Toast.LENGTH_LONG).show()
+        })
+        diagnostics.addView(action("ABRIR AJUSTES DE LEITURA  ›", false) { showTab("Perfil") })
+        diagnostics.addView(label(prefs.getString("ai_status", "IA: aguardando oferta") ?: "IA: aguardando oferta", 12f, muted, false, 4, 0))
+        diagnostics.visibility = View.GONE
+        val status = horizontal().apply { setPadding(dp(4), dp(12), dp(4), dp(4)) }
+        status.addView(label("PAINEL DO MOTORISTA", 11f, gold, true), weight())
         val online = isOperationalOnline()
-        row.addView(pill(if (online) "● ONLINE" else "● OFF", if (online) green else red))
-        welcome.addView(row)
-        welcome.addView(label("Seu painel inteligente", 22f, white, true, 12, 3))
-        welcome.addView(label("Todas as suas ofertas em um só lugar.", 12f, muted, false, 0, 12))
-        val metrics = horizontal()
-        metrics.addView(metric("GANHOS", "R$ 0,00"), weight())
-        metrics.addView(metric("POR HORA", "R$ 0,00"), weight())
-        metrics.addView(metric("CORRIDAS", "0"), weight())
-        welcome.addView(metrics)
-        content.addView(welcome, margin(0, 10))
+        status.addView(pill(if (online) "● LEITURA ATIVA" else "● LEITURA PAUSADA", if (online) green else muted))
+        content.addView(status)
 
-        val copilot = card()
-        val copilotRow = horizontal()
-        copilotRow.addView(iconTile("✧"))
-        copilotRow.addView(verticalText("Copiloto", "Análise automática de ofertas"), LinearLayout.LayoutParams(0, -2, 1f))
-        val aiSwitch = Switch(this).apply {
-            isChecked = prefs.getBoolean("copilot_enabled", false)
-            buttonTintList = ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked ->
-                if (checked && !ensureRequiredPermissions()) {
-                    isChecked = false
-                    prefs.edit().putBoolean("copilot_enabled", false).apply()
-                } else {
-                    prefs.edit().putBoolean("copilot_enabled", checked).apply()
-                    if (checked) requestAccessibilityIfNeeded()
+        val controls = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
+        fun feature(title: String, key: String) {
+            val tile = card()
+            val row = horizontal()
+            row.addView(label(title, 15f, white, true), weight())
+            row.addView(Switch(this).apply {
+                contentDescription = title
+                isChecked = prefs.getBoolean(key, false) && prefs.getBoolean("reader_disclosure_accepted", false)
+                thumbTintList = ColorStateList.valueOf(white)
+                trackTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(gold, Color.rgb(80,80,85)))
+                var adjusting = false
+                setOnCheckedChangeListener { _, enabled ->
+                    if (!adjusting) {
+                        if (enabled) prefs.edit().putString("reader_pending_feature", key).apply()
+                        if (enabled && !ensureRequiredPermissions()) {
+                            adjusting = true
+                            isChecked = false
+                            adjusting = false
+                            prefs.edit().putBoolean(key, false).apply()
+                        } else {
+                            prefs.edit().putBoolean(key, enabled).putBoolean("reader_paused", false).remove("reader_pending_feature").remove("reader_permission_step").apply()
+                        }
+                    }
                 }
-            }
+            })
+            tile.addView(row)
+            controls.addView(tile, if (wide) LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(10); rightMargin = dp(6) } else margin(0, 8))
         }
-        copilotRow.addView(aiSwitch)
-        copilot.addView(copilotRow)
-        copilot.addView(label("O copiloto lê os dados visíveis da oferta e apresenta os cálculos. Não aceita nem recusa corridas.", 11f, muted, false, 0, 5))
-        content.addView(copilot, margin(0, 10))
+        feature("✧ Copiloto", "copilot_enabled")
+        feature("● Semáforo", "traffic_enabled")
+        content.addView(controls)
 
-        // Semáforo
-        val traffic = card()
-        val trafficRow = horizontal()
-        trafficRow.addView(iconTile("🚦"))
-        trafficRow.addView(verticalText("Semáforo de Valores", "Uber • 99 • classificação por faixa"), LinearLayout.LayoutParams(0, -2, 1f))
-        val trafficSwitch = Switch(this).apply {
-            isChecked = prefs.getBoolean("traffic_enabled", false)
-            buttonTintList = ColorStateList.valueOf(gold)
-            setOnCheckedChangeListener { _, checked ->
-                if (checked && !ensureRequiredPermissions()) {
-                    isChecked = false
-                    prefs.edit().putBoolean("traffic_enabled", false).apply()
-                } else {
-                    prefs.edit().putBoolean("traffic_enabled", checked).apply()
-                    if (checked) requestAccessibilityIfNeeded()
-                }
-            }
+        val offerCard = card().apply { background = GoldPanelDrawable(resources.displayMetrics.density,true) }
+        offerCard.addView(label("⚡ ÚLTIMA OFERTA", 22f, gold, true, 0, 18).apply{gravity=Gravity.CENTER})
+        val offer = records.firstOrNull { selectedOfferApp == null || it.optString("app").equals(selectedOfferApp,true) }
+        selectedOfferApp?.let{offerCard.addView(pill(it,gold))}
+        fun number(key: String): String = offer?.let { String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", it.optDouble(key)) } ?: "—"
+        val totals = horizontal()
+        totals.addView(metric("VALOR", if (offer == null) "—" else "R$ " + number("fare")), weight())
+        totals.addView(metric("PERCURSO TOTAL", number("totalKm") + " km"), weight())
+        totals.addView(metric("TEMPO TOTAL", number("minutes") + " min"), weight())
+        offerCard.addView(totals)
+        offerCard.addView(View(this).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(18); bottomMargin = dp(18) })
+        val arrival = offer?.optDouble("pickupMinutes", Double.NaN)
+        offerCard.addView(label("Até o passageiro: " + if (arrival != null && arrival.isFinite()) String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.1f min", arrival) else "não identificado", 13f, white, false, 8, 8))
+        offerCard.addView(label("Nota: " + (offer?.optString("passengerRating")?.takeIf { it.isNotBlank() } ?: "não identificada"), 13f, white, false, 0, 8))
+        val rates = horizontal()
+        rates.addView(metric("R$/KM", if (offer == null) "—" else "R$ " + number("perKm")), weight())
+        rates.addView(metric("R$/HORA", if (offer == null) "—" else "R$ " + number("perHour")), weight())
+        offerCard.addView(rates)
+        val classification = offer?.optString("classification")
+        offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else white, true, 18, 8).apply {
+            gravity = Gravity.CENTER
+            val edge=when(classification){"GOOD"->Color.rgb(54,240,71);"BAD"->Color.rgb(237,78,69);"REVIEW"->gold;else->border}
+            val fill=when(classification){"GOOD"->Color.rgb(0,106,20);"BAD"->Color.rgb(106,19,19);"REVIEW"->Color.rgb(106,73,5);else->panel}
+            background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(edge,fill)).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),edge)}
+        }, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(18) })
+        offerCard.addView(label(if (offer == null) "Ative a leitura e abra o aplicativo de motorista." else "Valores brutos • inclui chegada quando informada na oferta.", 12f, muted, false, 12, 0))
+
+        val filters = card()
+        filters.addView(label("☷ FILTRO DE GANHO", 16f, gold, true, 0, 14))
+        filters.addView(label("Mínimo por km", 13f, muted, false))
+        filters.addView(label(money(prefs.getFloat("min_per_km", 1.8f)), 23f, gold, true, 4, 16))
+        filters.addView(label("Mínimo por hora", 13f, muted, false))
+        filters.addView(label(money(prefs.getFloat("good_per_hour", 60f)), 23f, gold, true, 4, 8))
+        filters.addView(action("AJUSTAR LIMITES  ›", false) { showTab("Semáforo") })
+        val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=GoldPanelDrawable(resources.displayMetrics.density);setPadding(dp(7),dp(8),dp(7),dp(8))}
+        for((app,color) in listOf("Todos" to Color.rgb(33,33,35),"Uber" to Color.BLACK,"99" to Color.rgb(255,214,32),"inDrive" to Color.rgb(151,234,18),"iFood" to Color.rgb(231,27,49))) {
+            rail.addView(label(app,if(app=="Todos")10f else 16f,if(app=="99" || app=="inDrive")Color.BLACK else Color.WHITE,true).apply {
+                gravity=Gravity.CENTER;minHeight=dp(56)
+                background=rounded(color,14,if(selectedOfferApp==app || (app=="Todos" && selectedOfferApp==null))gold else border)
+                isClickable=true;isFocusable=true;contentDescription="Mostrar ofertas: $app"
+                setOnClickListener{selectedOfferApp=if(app=="Todos")null else app;showTab("Início")}
+            },LinearLayout.LayoutParams(-1,dp(58)).apply{topMargin=dp(6)})
         }
-        trafficRow.addView(trafficSwitch)
-        trafficRow.addView(action("⚙", false) { showTab("Semáforo") })
-        traffic.addView(trafficRow)
-        traffic.addView(label(
-            prefs.getString("label_bad", "Vixe não dá") + "    " +
-            prefs.getString("label_review", "Hum, talvez") + "    " +
-            prefs.getString("label_good", "Bora carai"),
-            11f, gold, true, 8, 0
-        ))
-        content.addView(traffic, margin(0, 10))
-
-        // Jornada
-        val journey = card()
-        val jrow = horizontal()
-        jrow.addView(iconTile("◷"))
-        jrow.addView(verticalText("Jornada", "Monitore seu tempo de trabalho."), LinearLayout.LayoutParams(0, -2, 1f))
-        jrow.addView(label("›", 25f, muted, false))
-        journey.addView(jrow)
-        journey.addView(action("VER RELATÓRIO", false) { showTab("Histórico") })
-        content.addView(journey, margin(0, 10))
-
-        // Faixas
-        val bands = card()
-        val bhead = horizontal()
-        bhead.addView(label("Suas Faixas", 17f, white, true), LinearLayout.LayoutParams(0, -2, 1f))
-        bhead.addView(action("⚙ AJUSTAR", false) { showTab("Perfil") })
-        bands.addView(bhead)
-        bands.addView(label("Confira os valores de cada faixa.", 12f, muted, false, 0, 10))
-        val table = horizontal()
-        table.addView(rangeColumn(prefs.getString("label_bad", "Vixe não dá") ?: "Vixe não dá", red, "< " + money(prefs.getFloat("bad_per_km", 1.5f)), "< " + money(prefs.getFloat("min_per_hour", 50f))), weight())
-        table.addView(rangeColumn(prefs.getString("label_review", "Hum, talvez") ?: "Hum, talvez", amber, money(prefs.getFloat("bad_per_km", 1.5f)) + " a " + money(prefs.getFloat("min_per_km", 1.8f)), money(prefs.getFloat("min_per_hour", 50f)) + " a " + money(prefs.getFloat("good_per_hour", 60f))), weight())
-        table.addView(rangeColumn(prefs.getString("label_good", "Bora carai") ?: "Bora carai", green, "≥ " + money(prefs.getFloat("min_per_km", 1.8f)), "≥ " + money(prefs.getFloat("good_per_hour", 60f))), weight())
-        bands.addView(table)
-        bands.addView(label("R$/km          R$/hora", 10f, muted, false, 0, 0))
-        content.addView(bands, margin(0, 10))
-
-        // Permissões
-        val perms = card()
-        val permsRow = horizontal()
-        permsRow.addView(iconTile("🔐"))
-        permsRow.addView(verticalText("Permissões", "Acessibilidade e Sobreposição"), LinearLayout.LayoutParams(0, -2, 1f))
-        perms.addView(permsRow)
-
-        val accOn = isAccessibilityEnabled()
-        val overlayOn = Settings.canDrawOverlays(this)
-
-        perms.addView(permissionRow("Acessibilidade", accOn) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        val target=prefs.getFloat("min_per_hour",50f).toDouble()
+        val actual=offer?.optDouble("perHour") ?: 0.0
+        val goal=card()
+        goal.addView(label("◎ Meta por hora",19f,gold,true,0,10))
+        goal.addView(label((if(offer==null)"—" else money(actual.toFloat()))+" / "+money(target.toFloat()),17f,white,true))
+        goal.addView(ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal).apply{
+            max=100;progress=if(target>0)(actual/target*100).toInt().coerceIn(0,100)else 0
+            progressTintList=ColorStateList.valueOf(gold)
+        },LinearLayout.LayoutParams(-1,dp(18)).apply{topMargin=dp(12)})
+        goal.addView(label("Projeção da oferta atual",11f,muted,false,8,0))
+        if(wide) {
+            val main=horizontal().apply{gravity=Gravity.TOP}
+            main.addView(rail,LinearLayout.LayoutParams(dp(78),-2).apply{topMargin=dp(14);rightMargin=dp(10)})
+            main.addView(offerCard,LinearLayout.LayoutParams(0,-2,2.2f).apply{topMargin=dp(14);rightMargin=dp(10)})
+            val side=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+            side.addView(goal);side.addView(filters,margin(0,12))
+            main.addView(side,LinearLayout.LayoutParams(0,-2,1f).apply{topMargin=dp(14)})
+            content.addView(main)
+        } else {
+            rail.orientation=LinearLayout.HORIZONTAL
+            for(i in 0 until rail.childCount)rail.getChildAt(i).layoutParams=LinearLayout.LayoutParams(0,dp(52),1f).apply{leftMargin=dp(3);rightMargin=dp(3)}
+            content.addView(rail,margin(0,12));content.addView(offerCard,margin(0,12))
+            content.addView(goal,margin(0,12));content.addView(filters,margin(0,12))
+        }
+        val dayStart=java.util.Calendar.getInstance().apply{set(java.util.Calendar.HOUR_OF_DAY,0);set(java.util.Calendar.MINUTE,0);set(java.util.Calendar.SECOND,0);set(java.util.Calendar.MILLISECOND,0)}.timeInMillis
+        val today=records.filter{it.optLong("timestamp")>=dayStart}
+        val values=listOf(
+            Triple("◉","OFERTAS HOJE",today.size.toString()),
+            Triple("▤","VALOR EM OFERTAS",money(today.sumOf{it.optDouble("fare")}.toFloat())),
+            Triple("╱","MÉDIA R$/KM",if(today.isEmpty())"—" else money(today.map{it.optDouble("perKm")}.average().toFloat())),
+            Triple("◷","MÉDIA R$/HORA",if(today.isEmpty())"—" else money(today.map{it.optDouble("perHour")}.average().toFloat()))
+        )
+        val summaries=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        val perRow=if(wide)4 else 2
+        values.chunked(perRow).forEach{group->
+            val row=horizontal()
+            group.forEach{(icon,title,value)->row.addView(card().apply{
+                addView(label(icon,30f,gold,true).apply{gravity=Gravity.CENTER})
+                addView(metric(title,value))
+            },LinearLayout.LayoutParams(0,-2,1f).apply{topMargin=dp(12);leftMargin=dp(3);rightMargin=dp(3)})}
+            summaries.addView(row)
+        }
+        content.addView(summaries)
+        val settings = card()
+        settings.addView(label("PRONTO PARA TRABALHAR?", 14f, white, true))
+        settings.addView(label("Autorize a leitura e a sobreposição nos ajustes. Para usar bancos, desligue a leitura.", 12f, muted, false, 6, 2))
+        settings.addView(action("PERMISSÕES E AJUSTES  ›", false) { showTab("Perfil") })
+        content.addView(settings, margin(0,12))
+        content.addView(action("DETALHES DA LEITURA  ›", false) {
+            diagnostics.visibility = if(diagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         })
-        perms.addView(permissionRow("Sobreposição de tela", overlayOn) {
-            if (!overlayOn) {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            }
-        })
-        content.addView(perms, margin(0, 10))
+        content.addView(diagnostics, margin(0,10))
     }
 
     private fun chooseProfilePhoto() {
@@ -324,19 +435,42 @@ class MainActivity : Activity() {
 
     private fun isOperationalOnline(): Boolean {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        return NetworkGate.isOnline(this) &&
-            prefs.getBoolean("copilot_enabled", false) &&
-            prefs.getBoolean("traffic_enabled", false) &&
+        return !prefs.getBoolean("reader_paused",false) &&
+            (prefs.getBoolean("copilot_enabled", false) || prefs.getBoolean("traffic_enabled", false)) &&
             Settings.canDrawOverlays(this) && isAccessibilityEnabled()
     }
 
     private fun ensureRequiredPermissions(): Boolean {
+        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+        if (!prefs.getBoolean("reader_disclosure_accepted", false)) {
+            AlertDialog.Builder(this).setTitle("Ativar leitura automática de ofertas?")
+                .setMessage("O JHONDRIVER usa acessibilidade para ler texto e imagem das ofertas nos apps de motorista e mostrar os cálculos sobre a oferta. A IA na Supabase recebe somente os indicadores numéricos, não a imagem nem endereços. O app não aceita corridas por você. Alguns bancos podem impedir o uso enquanto esses acessos estiverem ativos. Você pode desligar a leitura nos ajustes.")
+                .setNegativeButton("Agora não", null)
+                .setPositiveButton("Concordo e quero configurar") { _, _ ->
+                    prefs.edit().putBoolean("reader_disclosure_accepted", true).apply()
+                    if (!Settings.canDrawOverlays(this)) {
+                        prefs.edit().putString("reader_permission_step", "overlay").apply()
+                        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                    } else if (!isAccessibilityEnabled()) {
+                        prefs.edit().putString("reader_permission_step", "accessibility").apply()
+                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    } else {
+                        prefs.getString("reader_pending_feature",null)?.let { pending ->
+                            prefs.edit().putBoolean(pending,true).remove("reader_pending_feature").apply()
+                            showTab(selectedTab)
+                        }
+                    }
+                }.show()
+            return false
+        }
         if (!Settings.canDrawOverlays(this)) {
+            prefs.edit().putString("reader_permission_step", "overlay").apply()
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             Toast.makeText(this, "Autorize aparecer sobre outros aplicativos e volte para ativar.", Toast.LENGTH_LONG).show()
             return false
         }
         if (!isAccessibilityEnabled()) {
+            prefs.edit().putString("reader_permission_step", "accessibility").apply()
             Toast.makeText(this, "Ative a acessibilidade do JHONDRIVER para analisar as ofertas.", Toast.LENGTH_LONG).show()
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             return false
@@ -350,7 +484,62 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showRestrictedSettingsHelp() {
+        AlertDialog.Builder(this).setTitle("Ajuda para ativar a acessibilidade")
+            .setMessage("Se o Android mostrar ‘Configuração restrita’ ao ativar o JHONDRIVER:\n\n1. Abra as informações do aplicativo.\n2. Se disponível, abra o menu de três pontos e escolha ‘Permitir configurações restritas’.\n3. Volte à Acessibilidade, selecione JHONDRIVER e confirme a ativação.\n\nO nome e a disponibilidade dessa opção variam conforme o Android e o fabricante. Essa confirmação pertence ao sistema; o JHONDRIVER não pode aprová-la por você.")
+            .setNeutralButton("Informações do app") { _, _ ->
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")))
+            }
+            .setPositiveButton("Abrir acessibilidade") { _, _ -> openReaderAccessibilitySettings() }
+            .setNegativeButton("Fechar",null).show()
+    }
+
+    private fun openReaderAccessibilitySettings() {
+        Toast.makeText(this, "Nos ajustes do Android, selecione JHONDRIVER e ative a acessibilidade.", Toast.LENGTH_LONG).show()
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
+    private fun stopReaderForBank() {
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, "A acessibilidade do JHONDRIVER já está desligada.", Toast.LENGTH_LONG).show()
+            showTab(selectedTab)
+            return
+        }
+        if (OfferAccessibilityService.stopReading()) {
+            Toast.makeText(this, "Leitura desligada. Reative a acessibilidade quando voltar a trabalhar.", Toast.LENGTH_LONG).show()
+            val tab = selectedTab
+            content.postDelayed({ if (!isFinishing && selectedTab == tab) showTab(tab) }, 1000)
+        } else {
+            Toast.makeText(this, "Nos ajustes do Android, desligue a acessibilidade do JHONDRIVER.", Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
+    fun createLabelEditor(title:String,key:String,defaultValue:String):AlertDialog {
+        val prefs=getSharedPreferences("settings",MODE_PRIVATE)
+        val input=EditText(this).apply {
+            setText(prefs.getString(key,defaultValue) ?: defaultValue)
+            setSingleLine(true)
+            filters=arrayOf(android.text.InputFilter.LengthFilter(32))
+            setSelection(text.length)
+        }
+        val dialog=AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar",null)
+            .setPositiveButton("Salvar",null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val value=input.text.toString().trim()
+                if(value.isEmpty()) {input.error="Digite um nome para a faixa";return@setOnClickListener}
+                prefs.edit().putString(key,value).apply()
+                dialog.dismiss()
+                showTab("Semáforo")
+                Toast.makeText(this,"Nome da faixa atualizado",Toast.LENGTH_SHORT).show()
+            }
+        }
+        return dialog
+    }
+
     private fun buildTrafficSettings() {
+        content.addView(action("Estilo do cartão • prévia e campos", true) { startActivity(android.content.Intent(this, CardStyleActivity::class.java)) })
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         content.addView(label("Semáforo de Valores", 24f, white, true, 5, 2))
         content.addView(label("Configure os limites. Cada oferta será classificada automaticamente.", 13f, muted, false, 0, 12))
@@ -361,19 +550,13 @@ class MainActivity : Activity() {
             val row = horizontal()
             row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(action(prefs.getString(key, defaultValue) ?: defaultValue, false) {
-                val input = EditText(this).apply { setText(prefs.getString(key, defaultValue) ?: defaultValue); setSingleLine(true) }
-                AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("Cancelar", null)
-                    .setPositiveButton("Salvar") { _, _ ->
-                        val value = input.text.toString().trim()
-                        if (value.isNotEmpty()) prefs.edit().putString(key, value).apply()
-                        showTab("Semáforo")
-                    }.show()
+                createLabelEditor(title,key,defaultValue).show()
             })
             row.setPadding(0, dp(7), 0, dp(7))
             names.addView(row)
         }
         editLabel("Faixa vermelha", "label_bad", "Vixe não dá")
-        editLabel("Faixa amarela", "label_review", "Hum, talvez")
+        editLabel("Faixa amarela", "label_review", "Será?")
         editLabel("Faixa verde", "label_good", "Bora carai")
         content.addView(names, margin(0, 8))
 
@@ -562,9 +745,57 @@ class MainActivity : Activity() {
         }, margin(0, 10))
     }
 
+    private fun openSupportContact(intent: Intent) {
+        try { startActivity(intent) }
+        catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "Nenhum aplicativo disponível. Você pode copiar o contato abaixo.", Toast.LENGTH_LONG).show()
+            val contact = if (intent.action == Intent.ACTION_DIAL) "+55 41 99597-6826" else "gbrigante71@gmail.com"
+            AlertDialog.Builder(this).setTitle("Contato do suporte").setMessage(contact)
+                .setPositiveButton("Copiar") { _, _ ->
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Suporte JHONDRIVER", contact))
+                }.setNegativeButton("Fechar", null).show()
+        }
+    }
+
     private fun buildProfile() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        content.addView(label("Perfil e ajustes", 24f, white, true, 5, 12))
+        content.addView(label("Do seu jeito", 28f, white, true, 18, 3))
+        content.addView(label("Ajustes, metas e suporte em um só lugar.", 14f, muted, false, 0, 16))
+
+        val privacy = card()
+        privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
+        privacy.addView(label("Desliga a acessibilidade e oculta o CC. Para voltar a ler corridas, você precisa reativá-la nos ajustes do Android. Suas opções serão mantidas.", 13f, muted, false))
+        val serviceOn = isAccessibilityEnabled()
+        privacy.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", true) {
+            if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()
+        })
+        content.addView(privacy, margin(0, 10))
+        val updates = card()
+        updates.addView(label("Atualizações", 18f, gold, true))
+        updates.addView(label("Você será avisado ao abrir o app quando houver uma versão compatível publicada.", 13f, muted, false))
+        updates.addView(action("VERIFICAR ATUALIZAÇÃO", false) { AppUpdates.check(this, manual = true) })
+        content.addView(updates, margin(0, 10))
+
+        val floatingTag = card()
+        floatingTag.addView(label("Etiqueta flutuante",18f,gold,true))
+        floatingTag.addView(label("Escolha o tamanho e a aparência. Durante a leitura, arraste cada etiqueta para onde preferir na tela; sua posição fica salva.",13f,muted,false,4,8))
+        floatingTag.addView(action("TAMANHO E POSIÇÃO DAS ETIQUETAS  ›",true) {
+            startActivity(Intent(this,CardStyleActivity::class.java))
+        })
+        content.addView(floatingTag,margin(0,10))
+
+        val support = card()
+        support.addView(label("Suporte", 18f, gold, true))
+        support.addView(label("Precisa de ajuda com o JHONDRIVER? Entre em contato.", 13f, muted, false))
+        support.addView(action("TELEFONE: (41) 99597-6826", false) {
+            openSupportContact(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+5541995976826")))
+        })
+        support.addView(action("E-MAIL: gbrigante71@gmail.com", false) {
+            openSupportContact(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:gbrigante71@gmail.com"))
+                .putExtra(Intent.EXTRA_SUBJECT, "Suporte JHONDRIVER"))
+        })
+        content.addView(support, margin(0, 10))
 
         // Perfil do motorista: foto selecionável e identificação da conta.
         val userCard = card()
@@ -573,7 +804,7 @@ class MainActivity : Activity() {
             val size = dp(66)
             layoutParams = LinearLayout.LayoutParams(size, size).apply { rightMargin = dp(14) }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = rounded(Color.rgb(230, 237, 255), 36, gold)
+            background = rounded(panel, 36, gold)
             clipToOutline = true
             val savedPhoto = prefs.getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
@@ -590,7 +821,7 @@ class MainActivity : Activity() {
         }
         profileRow.addView(profileInfo, LinearLayout.LayoutParams(0, -2, 1f))
         userCard.addView(profileRow)
-        content.addView(userCard, margin(0, 10))
+        content.addView(userCard, 2, margin(0, 10))
 
         // Metas
         val limits = card()
@@ -619,7 +850,7 @@ class MainActivity : Activity() {
         }
         editableGoal("R$/km mínimo", "min_per_km", 1.8f)
         editableGoal("R$/hora mínimo", "min_per_hour", 50f)
-        editableGoal("Custo R$/km (combustível)", "cost_per_km", 0.65f)
+        editableGoal("Custo estimado por km", "cost_per_km", 0.65f)
 
         limits.addView(label("OPÇÕES DA TAG", 11f, gold, true, 14, 0))
 
@@ -642,7 +873,8 @@ class MainActivity : Activity() {
             buttonTintList = ColorStateList.valueOf(gold)
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("show_profit", checked).apply() }
         }
-        limits.addView(toggleRow("Mostrar lucro %", showProfitSwitch))
+        limits.addView(toggleRow("Mostrar lucro estimado (%)", showProfitSwitch))
+        limits.addView(label("Margem estimada = valor da oferta menos o custo por km do percurso total. Outros custos só entram se você os incluir nesse valor.", 12f, muted, false, 2, 10))
 
         val voiceSwitch = Switch(this).apply {
             isChecked = prefs.getBoolean("voice_enabled", false)
@@ -650,6 +882,8 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("voice_enabled", checked).apply() }
         }
         limits.addView(toggleRow("Voz (falar resultado)", voiceSwitch))
+        limits.addView(label("Quando ativada, anuncia novas ofertas pela voz do Android. Confira o volume de mídia e o idioma português do aparelho.", 12f, muted, false, 2, 8))
+        prefs.getString("voice_status", null)?.let { limits.addView(label(it, 12f, gold, false, 2, 4)) }
 
         content.addView(limits, margin(0, 10))
 
@@ -662,6 +896,7 @@ class MainActivity : Activity() {
         val backgroundCard = card()
         backgroundCard.addView(label("FUNCIONAMENTO EM SEGUNDO PLANO", 11f, gold, true))
         backgroundCard.addView(label("Mantenha a acessibilidade e a permissão de sobreposição ativadas para o leitor e a etiqueta funcionarem sobre Uber e 99.", 12f, muted, false, 5, 8))
+        backgroundCard.addView(action("ACESSIBILIDADE BLOQUEADA? VER AJUDA",false) { showRestrictedSettingsHelp() })
         backgroundCard.addView(permissionRow("Acessibilidade", isAccessibilityEnabled()) {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         })
@@ -704,13 +939,7 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.rgb(255, 255, 255), Color.rgb(247, 250, 255), Color.rgb(235, 244, 255))
-        ).apply {
-            cornerRadius = dp(20).toFloat()
-            setStroke(dp(1), Color.rgb(215, 224, 244))
-        }
+        background = GoldPanelDrawable(resources.displayMetrics.density)
         elevation = dp(6).toFloat()
         layoutParams = margin(0, 10)
     }
@@ -762,7 +991,7 @@ class MainActivity : Activity() {
     private fun metric(title: String, value: String): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         addView(label(title, 10f, muted, true))
-        addView(label(value, 18f, white, true, 4, 0))
+        addView(label(value, 26f, gold, true, 6, 0).apply{maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(14,28,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
     }
 
     private fun financeStat(title: String, value: String): LinearLayout = LinearLayout(this).apply {
@@ -771,13 +1000,20 @@ class MainActivity : Activity() {
         addView(label(value, 15f, white, true, 2, 0))
     }
 
-    private fun action(text: String, _ignored: Boolean, onClick: () -> Unit): TextView = TextView(this).apply {
+    private fun action(text: String, prominent: Boolean, onClick: () -> Unit): TextView = TextView(this).apply {
         this.text = text
-        setTextColor(gold)
+        setTextColor(if(prominent) Color.rgb(30,24,13) else gold)
         textSize = 12f
         typeface = Typeface.DEFAULT_BOLD
-        setPadding(0, dp(8), 0, dp(4))
+        gravity = Gravity.CENTER_VERTICAL
+        minHeight = dp(48)
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+        background = android.graphics.drawable.RippleDrawable(
+            ColorStateList.valueOf(Color.argb(45,255,220,120)),
+            rounded(if(prominent)gold else Color.rgb(36,37,42),14,if(prominent)gold else border),null)
+        layoutParams = LinearLayout.LayoutParams(-2,-2).apply {topMargin=dp(8)}
         isClickable = true
+        isFocusable = true
         setOnClickListener { onClick() }
     }
 
@@ -799,9 +1035,22 @@ class MainActivity : Activity() {
 
     private fun toggleRow(title: String, sw: Switch): LinearLayout {
         val row = horizontal()
-        row.addView(label(title, 14f, white, false), LinearLayout.LayoutParams(0, -2, 1f))
+        val labels = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+        labels.addView(label(title, 14f, white, true))
+        val state = label(if(sw.isChecked)"Ativado" else "Desativado",12f,if(sw.isChecked)green else muted,false,3,0)
+        labels.addView(state)
+        row.addView(labels, LinearLayout.LayoutParams(0,-2,1f))
         row.addView(sw)
-        row.setPadding(0, dp(10), 0, dp(10))
+        row.setPadding(dp(12),dp(12),dp(8),dp(12))
+        row.background = rounded(Color.rgb(32,34,40),16,border)
+        row.layoutParams = LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8);bottomMargin=dp(4)}
+        sw.thumbTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(gold,Color.LTGRAY))
+        sw.trackTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(Color.rgb(133,105,39),Color.rgb(74,76,84)))
+        // Update the visual state without replacing the switch's preference listener.
+        sw.setOnClickListener {
+            state.text=if(sw.isChecked)"Ativado" else "Desativado"
+            state.setTextColor(if(sw.isChecked)green else muted)
+        }
         return row
     }
 

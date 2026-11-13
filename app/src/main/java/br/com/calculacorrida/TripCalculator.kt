@@ -16,6 +16,10 @@ data class TripResult(
 )
 
 object TripCalculator {
+    // Preferences are stored as Float; retain the decimal value displayed in
+    // settings instead of expanding binary Float error into a Double threshold.
+    fun threshold(value:Float):Double = value.toString().toDouble()
+
     fun calculate(
         fare: Double,
         pickupKm: Double,
@@ -29,6 +33,8 @@ object TripCalculator {
         minPassengerRating: Double = 4.80,
         goodPassengerRating: Double = 4.90
     ): TripResult? {
+        if (listOf(fare, pickupKm, tripKm, minutes, badPerKm, goodPerKm, badPerHour, goodPerHour).any { !it.isFinite() }) return null
+        if (passengerRating != null && (!passengerRating.isFinite() || passengerRating !in 0.0..5.0)) return null
         if (fare <= 0 || pickupKm < 0 || tripKm <= 0 || minutes <= 0) return null
         val totalKm = pickupKm + tripKm
 
@@ -47,7 +53,9 @@ object TripCalculator {
         }
 
         val reason = when {
-            lowRating -> "Nota do passageiro abaixo de 4,80."
+            lowRating -> "Nota abaixo de " + String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", minPassengerRating) + "."
+            perKm < badPerKm -> "Ganho por km abaixo do seu limite."
+            perHour < badPerHour -> "Ganho por hora abaixo do seu limite."
             passengerRating != null && passengerRating < goodPassengerRating ->
                 "Nota do passageiro na faixa de atenção."
             passengerRating == null ->

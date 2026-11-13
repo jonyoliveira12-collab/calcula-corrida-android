@@ -41,17 +41,19 @@ object JourneyStore {
             put("id", now.toString() + "-" + records.length())
             put("timestamp", now)
             put("signature", signature)
-            put("app", when {
-                driverPackage.contains("uber", true) -> "Uber"
-                driverPackage.contains("99") -> "99"
-                driverPackage.contains("didi", true) -> "DiDi"
-                else -> "Aplicativo"
+            put("app", when(DriverPackages.name(driverPackage)) {
+                "UBER" -> "Uber"
+                "99" -> "99"
+                "INDRIVE" -> "inDrive"
+                "IFOOD" -> "iFood"
+                else -> if(driverPackage=="manual")"Manual" else "Aplicativo"
             })
             put("fare", result.fare)
             put("pickupKm", result.pickupKm)
             put("tripKm", result.tripKm)
             put("totalKm", result.totalKm)
             put("minutes", result.minutes)
+            put("pickupMinutes", offer.pickupMinutes ?: JSONObject.NULL)
             put("perKm", result.perKm)
             put("perHour", result.perHour)
             put("passengerRating", offer.passengerRating ?: "")

@@ -1,11 +1,21 @@
 <resources>
-    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#596FE8</item>
-        <item name="colorPrimaryVariant">#4055C8</item>
-        <item name="colorSecondary">#19A987</item>
+    <style name="AppTheme" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">#EFBE41</item>
+        <item name="colorPrimaryVariant">#A77713</item>
+        <item name="colorSecondary">#EFBE41</item>
+        <item name="android:colorBackground">#0A0A0C</item>
+        <item name="android:windowBackground">#0A0A0C</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:statusBarColor">#E7F0FF</item>
-        <item name="android:navigationBarColor">#F7FAFF</item>
+        <item name="android:statusBarColor">#0A0A0C</item>
+        <item name="android:navigationBarColor">#0A0A0C</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="CardSettingsTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#008D70</item>
+        <item name="colorSecondary">#008D70</item>
+        <item name="android:colorBackground">#F6F5F3</item>
+        <item name="android:windowBackground">#F6F5F3</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>

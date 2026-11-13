@@ -1,44 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <application
-        android:allowBackup="false"
-        android:label="JHONDRIVER"
-        android:icon="@drawable/jhondriver_logo"
-        android:roundIcon="@drawable/jhondriver_logo"
-        android:theme="@style/AppTheme">
-
-        <!-- Tela de Login (Inicial) -->
-        <activity android:name=".LoginActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
+    <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
+    <application android:allowBackup="false" android:label="@string/app_name" android:icon="@drawable/jhondriver_logo" android:roundIcon="@drawable/jhondriver_logo" android:theme="@style/AppTheme">
+        <activity android:name=".LoginActivity" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
-
-        <!-- Tela Principal -->
-        <activity android:name=".MainActivity"
-            android:exported="false" />
-
-        <!-- Serviço de Acessibilidade -->
-        <service
-            android:name=".OfferAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true"
-            android:label="JHONDRIVER - Leitura de ofertas">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config"/>
+        <activity android:name=".CardStyleActivity" android:theme="@style/CardSettingsTheme" android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
+        <service android:name=".OfferAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true" android:label="@string/reading_service_name">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config"/>
         </service>
     </application>
-
 </manifest>
