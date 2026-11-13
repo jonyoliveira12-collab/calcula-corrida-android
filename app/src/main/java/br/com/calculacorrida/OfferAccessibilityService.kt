@@ -434,7 +434,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private fun looksLikeOffer(pkg:String,text:String):Boolean {
         val n=normalizeActionText(text)
         val hasFare=Regex("""r\s*\$\s*[0-9]""").containsMatchIn(n)
-        val hasAction=Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""").containsMatchIn(n)
+        val hasAction=Regex("""\b(aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b""").containsMatchIn(n)
         val hasRoute=Regex("""\d+\s*min(?:uto)?s?\b""").containsMatchIn(n) &&
             Regex("""\d+(?:[,.]\d+)?\s*(?:km|m)\b""").containsMatchIn(n)
         return hasFare && (hasAction || hasRoute || (driverAppName(pkg)=="99" && IncomingOfferPolicy.hasNinetyNineOfferMarker(text)))
@@ -687,7 +687,7 @@ class OfferAccessibilityService : AccessibilityService() {
             .lowercase(java.util.Locale.ROOT)
 
         // O cartão do Uber pode usar "Tenho interesse" em vez de "Aceitar".
-        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""")
+        val hasAcceptAction = Regex("""\b(aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b""")
             .containsMatchIn(normalized)
         val hasFare = Regex("""r\s*\$\s*[0-9]""").containsMatchIn(normalized)
         val hasOfferMetrics = Regex("""[0-9]+(?:[,.][0-9]+)?\s*(?:min|km)\b""")

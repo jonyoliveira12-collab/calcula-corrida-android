@@ -36,9 +36,11 @@ class ReaderWindowTest {
                 listOf("com.ubercab.driver","55,76","1","normal"),
                 listOf("com.app99.driver","32,45","0","normal"),
                 listOf("com.ubercab.driver","40,08","0","floating"),
-                listOf("sinet.startup.inDriver","60,00","1","normal"))
+                listOf("sinet.startup.inDriver","60,00","1","normal"),
+                listOf("com.ubercab.driver","60,00","0","moto"),
+                listOf("br.com.ifood.driver.app","37,50","0","delivery"))
             for((driver,expected,rotation,layout) in scenarios) {
-            listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
+            listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver","br.com.ifood.driver.app").forEach {shell("am force-stop $it")}
             shell("appops set $driver SYSTEM_ALERT_WINDOW allow")
             shell("wm user-rotation lock $rotation")
             instrumentation.runOnMainSync {focusWindow?.let {wm.removeView(it)};focusWindow=null}
@@ -78,6 +80,14 @@ class ReaderWindowTest {
                 assertTrue("Full synthetic route is recorded",rows.any{kotlin.math.abs(it.optDouble("minutes")-30.0)<0.001 && kotlin.math.abs(it.optDouble("totalKm")-12.0)<0.001})
                 assertFalse("Pickup alone is never recorded as the complete offer",rows.any{kotlin.math.abs(it.optDouble("minutes")-10.0)<0.001 || kotlin.math.abs(it.optDouble("totalKm")-4.0)<0.001})
             }
+            if(layout=="moto" || layout=="delivery") {
+                val expectedKm=if(layout=="moto")7.3 else 5.0
+                val expectedMinutes=if(layout=="moto")18.0 else 20.0
+                assertTrue("Correct complete motorcycle/delivery route was recorded",JourneyStore.getRecords(context).any{
+                    it.optLong("timestamp")>=drawnAt && kotlin.math.abs(it.optDouble("totalKm")-expectedKm)<.001 &&
+                    kotlin.math.abs(it.optDouble("minutes")-expectedMinutes)<.001
+                })
+            }
             val elapsed=detectedAt-drawnAt
             instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream","$driver/$layout DETECTION_MS=$elapsed $diagnostic\n")})
             assertTrue("Fresh detection for $driver/$layout: $elapsed ms",elapsed>=0)
@@ -87,7 +97,7 @@ class ReaderWindowTest {
         } finally {
             instrumentation.runOnMainSync { focusWindow?.let {wm.removeView(it)} }
             context.getSharedPreferences("settings",0).edit().putBoolean("card_details",false).commit()
-            listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver").forEach {shell("am force-stop $it")}
+            listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver","br.com.ifood.driver.app").forEach {shell("am force-stop $it")}
             shell("wm user-rotation free")
             OfferAccessibilityService.stopReading()
             if(oldServices=="null"||oldServices.isBlank())shell("settings delete secure enabled_accessibility_services")else shell("settings put secure enabled_accessibility_services '$oldServices'")

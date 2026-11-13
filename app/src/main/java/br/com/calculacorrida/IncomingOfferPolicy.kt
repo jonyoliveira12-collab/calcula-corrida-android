@@ -25,7 +25,7 @@ object IncomingOfferPolicy {
             .replace(Regex("\\p{Mn}+"),"").lowercase(java.util.Locale.ROOT)
         if(listOf("encerrar viagem","finalizar viagem","em viagem","cheguei").any{n.contains(it)})return false
         if(!Regex("""r\s*\$\s*[0-9]""").containsMatchIn(n))return false
-        if(Regex("""\b(aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b""").containsMatchIn(n))return true
+        if(Regex("""\b(aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b""").containsMatchIn(n))return true
         // 99 displays an offer countdown and route legs, without an 'Aceitar' label.
         val is99=driverName=="99"
         val marker=hasNinetyNineOfferMarker(n)

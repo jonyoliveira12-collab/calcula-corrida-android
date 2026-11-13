@@ -57,3 +57,7 @@ O proprietário confirmou que o projeto Supabase JHONDRIVER é seu ou de confian
 O registro contém o PKCS12 em base64, alias, senhas, pacote e certificado público. A integridade do conteúdo completo e a correspondência do certificado foram verificadas no servidor. Os papéis `anon` e `authenticated` não têm acesso ao schema Vault nem à visão de segredos descriptografados. A chave privada nova não está em arquivos do repositório nem em assets da release.
 
 Esse backup é a identidade persistente para as atualizações da instalação oficial `br.com.calculacorrida` iniciada com a versão 0.5.1. As próximas versões precisam reutilizar essa chave e aumentar o código de versão. A automação de assinatura dentro do GitHub Actions ainda requer cadastrar os quatro Secrets; enquanto isso, a chave pode ser recuperada privadamente do Vault para gerar e publicar um APK assinado compatível.
+
+## Consolidação de moto/iFood (0.5.2)
+
+A alteração separada `fix/moto-ifood-reading-2026` foi criada sobre uma base antiga 0.2.0, com outra assinatura. Suas mudanças úteis foram incorporadas seletivamente à base atual, preservando painel, permissões, etiquetas e assinatura. A 0.5.2 usa código de versão 18 e a mesma chave preservada no Vault. A leitura reconhece o botão Escolher e os totais de distância/tempo explicitamente identificados no iFood; ofertas parciais ou contraditórias continuam rejeitadas. Foram acrescentados testes unitários e cenários de leitura por imagem para Uber Moto e entrega iFood.

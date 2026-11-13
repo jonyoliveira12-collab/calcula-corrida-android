@@ -54,7 +54,7 @@ object OfferTextParser {
             }
             val buttonValues = buttons.map { it.second }.distinct()
             if (buttonValues.size > 1) return null
-            val hasAccept=Regex("""\b(?:aceitar|aceite|accept|aceptar|confirmar)\b""",RegexOption.IGNORE_CASE).containsMatchIn(text)
+            val hasAccept=Regex("""\b(?:aceitar|aceite|accept|aceptar|escolher|confirmar)\b""",RegexOption.IGNORE_CASE).containsMatchIn(text)
             // An unqualified action next to several different prices is
             // ambiguous; do not infer which value the driver would receive.
             if(buttonValues.isEmpty() && hasAccept && matches.map{it.second}.distinct().size>1)return null
@@ -108,13 +108,31 @@ object OfferTextParser {
         // Prefer the Uber total next to its per-km estimate. Accessibility or
         // OCR can expose the pickup as "minutes • km", which looks like a
         // total but is only one leg of the trip.
+        // iFood names the complete route explicitly. These totals are only
+        // trusted for its allowlisted driver app, never for a lone pickup row.
+        val deliveryDistance = Regex("""dist[aâ]ncia\s+total\s*[:\-]?\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE).findAll(text).toList()
+        val deliveryTime = Regex("""tempo\s+aproximado\s+d[ae]\s+rota\s*[:\-]?\s*([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\b""", RegexOption.IGNORE_CASE).findAll(text).toList()
+        val hasDeliveryLabels = DriverPackages.name(sourcePackage.orEmpty()) == "IFOOD" &&
+            (deliveryDistance.isNotEmpty() || deliveryTime.isNotEmpty())
+        val deliverySummary = if(hasDeliveryLabels) {
+            if(deliveryDistance.size != 1 || deliveryTime.size != 1)return null
+            val distance=km(deliveryDistance.single().groupValues[1],deliveryDistance.single().groupValues[2]) ?: return null
+            val minutes=toNumber(deliveryTime.single().groupValues[1]) ?: return null
+            if(distance<=0 || minutes<=0)return null
+            minutes to distance
+        } else null
+
         val estimatedSummary = estimatedSummaryRegex.find(text)
         val summaryMatch = estimatedSummary ?: summaryRegex.find(text)
-        val summary = summaryMatch?.let {
+        val displayedSummary = summaryMatch?.let {
             val mins = toNumber(it.groupValues[1])
             val dist = toNumber(it.groupValues[2])
             if (mins != null && dist != null) mins to dist else null
         }
+        if(deliverySummary!=null && displayedSummary!=null &&
+            (kotlin.math.abs(deliverySummary.first-displayedSummary.first)>1.0 ||
+             kotlin.math.abs(deliverySummary.second-displayedSummary.second)>maxOf(.15,deliverySummary.second*.02)))return null
+        val summary = deliverySummary ?: displayedSummary
         val parenthesizedLegs = legRegex.findAll(text).mapNotNull {
             val mins = toNumber(it.groupValues[1]) ?: return@mapNotNull null
             val dist = km(it.groupValues[3], it.groupValues[4]) ?: return@mapNotNull null
@@ -184,7 +202,7 @@ object OfferTextParser {
     private fun extractAddress(segment: String): String? {
         val start = Regex("""(?i)\b(?:rua|r\.|avenida|av\.|alameda|travessa|praça|praca|rodovia|estrada|largo)\b""").find(segment) ?: return null
         val candidate = segment.substring(start.range.first)
-            .replace(Regex("""(?i)\b(?:aceitar|aceite|accept|aceptar|tenho\s+interesse|confirmar)\b.*$"""), "")
+            .replace(Regex("""(?i)\b(?:aceitar|aceite|accept|aceptar|escolher|tenho\s+interesse|confirmar)\b.*$"""), "")
             .replace(Regex("\\s+"), " ")
             .trim(' ', ',', '·', '•', '-', ':')
         return candidate.takeIf { it.length in 8..140 }

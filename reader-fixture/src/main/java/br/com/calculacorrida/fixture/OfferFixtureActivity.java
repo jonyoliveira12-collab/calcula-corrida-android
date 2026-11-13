@@ -55,6 +55,8 @@ public class OfferFixtureActivity extends Activity {
                 if(floating)lines=new String[]{"R$ 17,37","26 min • 16.4 km","4,98 (303)","12 min (9.3 km)","14 minutos (7.1 km)","Tenho interesse"};
                 if(getPackageName().equals("com.app99.driver"))lines=new String[]{"Não afeta a TA","R$11,90","R$2,95 Tarifa base dinâmica inicial.","4,79 · +999 corridas · Perfil Premium","10min (4,4km)","12min (6km)"};
                 if(getPackageName().equals("sinet.startup.inDriver"))lines=new String[]{"R$ 30,00","30 min • 12.0 km","Nota 4,90","5 min (2.0 km)","25 min (10.0 km)","Aceitar"};
+                if("moto".equals(layout))lines=new String[]{"Uber Moto","R$ 18,00","2 min 600 m","16 min 6,7 km","Escolher"};
+                if(getPackageName().equals("br.com.ifood.driver.app"))lines=new String[]{"Entrega de moto","R$ 12,50","Distância total: 5,0 km","Tempo aproximado de rota: 20 min","Escolher"};
                 if(dual && getPackageName().equals("com.ubercab.driver"))lines=new String[]{"UberX Exclusivo","R$ 12,00","20 min • 8.0 km • Est. de R$1,50/km","4,80 (100)","4 min (1.0 km)","16 minutos (7.0 km)","Aceitar"};
                 if(dual && getPackageName().equals("com.app99.driver"))lines=new String[]{"Negocia · Pgto. no app","R$30,00","4,90 · 110 corridas · Perfil Essencial","5min (3km)","25min (12km)","Aceitar por R$30,00","R$31,00   R$32,00   R$33,00"};
                 if(realistic && getPackageName().equals("com.app99.driver")) {
