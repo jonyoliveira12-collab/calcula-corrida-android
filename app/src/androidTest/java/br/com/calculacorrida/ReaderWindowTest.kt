@@ -51,7 +51,8 @@ class ReaderWindowTest {
                 wm.addView(focusWindow,params);focusWindow!!.requestFocus()
             }
             // Establish another focused window before any offer pixels are displayed.
-            shell("am start -W -n $driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout $layout")
+            val started=shell("am start -W -S -f 0x10008000 -n $driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout $layout")
+            assertFalse("A fresh fixture activity must start for $driver/$layout: $started",started.contains("Activity not started"))
             val windowDeadline=android.os.SystemClock.elapsedRealtime()+5000
             var driverWindow:android.view.accessibility.AccessibilityWindowInfo?=null
             while(driverWindow==null && android.os.SystemClock.elapsedRealtime()<windowDeadline) {
