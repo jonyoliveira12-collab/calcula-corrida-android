@@ -79,4 +79,13 @@ class MotorcycleOfferTest {
         assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\nAté a coleta\n2 min 1.1 km\nAceitar","com.ubercab.driver"))
         assertNull(OfferTextParser.parse("UberX\nR$ 8,91\n2 min 1.1 km\nAceitar","com.ubercab.driver"))
     }
+    @Test fun ocrRsPriceOnlyAppliesToStandaloneMoneyLines() {
+        for(price in listOf("RS 8,91","RS8.91","R S 8,91")) {
+            val text=OfferTextParser.normalizeOcrText("Envios Moto\n$price\n32 min 19.1 km\nAceitar")
+            assertTrue(IncomingOfferPolicy.isIncoming("com.ubercab.driver",text))
+            assertEquals(8.91,OfferTextParser.parse(text,"com.ubercab.driver")!!.fare,.00001)
+        }
+        assertEquals("RS 118",OfferTextParser.normalizeOcrText("RS 118"))
+        assertEquals("RS 8,91 km",OfferTextParser.normalizeOcrText("RS 8,91 km"))
+    }
 }

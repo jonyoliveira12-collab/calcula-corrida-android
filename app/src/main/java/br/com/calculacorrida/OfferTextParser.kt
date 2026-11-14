@@ -18,6 +18,9 @@ object OfferTextParser {
     /** OCR can confuse the currency glyph with S-cedilla; only repair currency at a line start. */
     fun normalizeOcrText(text:String):String = text.replace(
         Regex("""(?im)(^|\n)([ \t]*)r[ŞşŜŝ][ \t]*(?=[0-9])""")
+    ) { it.groupValues[1]+it.groupValues[2]+"R$ " }.replace(
+        // Only a standalone decimal price line, never a road such as RS 118.
+        Regex("""(?im)(^|\n)([ \t]*)r[ \t]*s[ \t]*(?=[0-9]+[,.][0-9]{2}[ \t]*$)""")
     ) { it.groupValues[1]+it.groupValues[2]+"R$ " }
 
     private val compactCategoryRegex=Regex("""(?im)\b(?:envios(?:\s+moto)?|uber\s+moto|entregas?(?:\s+moto)?)\b|^\s*moto\s*$""")

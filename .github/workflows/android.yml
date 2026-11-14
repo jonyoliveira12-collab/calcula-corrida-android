@@ -101,8 +101,6 @@ jobs:
             adb shell wm density 160
             adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
-            adb shell wm size reset
-            adb shell wm density reset
       - uses: actions/upload-artifact@v4
         if: always()
         with:
