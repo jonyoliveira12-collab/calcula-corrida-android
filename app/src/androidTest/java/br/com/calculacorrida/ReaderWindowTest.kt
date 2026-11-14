@@ -76,7 +76,13 @@ class ReaderWindowTest {
                 Thread.sleep(100)
             }
             val diagnostic=listOf("reader_status","reader_capture_status","reader_ocr_status").joinToString(" / "){settings.getString(it,"").orEmpty()}
-            assertTrue("OCR $driver $layout rotation=$rotation: $diagnostic",found)
+            val syntheticOcr = if(layout=="envios" && !found) {
+                val bitmap=ui.takeScreenshot()
+                val recognizer=com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
+                try { com.google.android.gms.tasks.Tasks.await(recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap,0))).text }
+                finally { recognizer.close();bitmap.recycle() }
+            } else ""
+            assertTrue("OCR $driver $layout rotation=$rotation: $diagnostic / synthetic frame: $syntheticOcr",found)
             if(layout=="partial_dot") {
                 val rows=JourneyStore.getRecords(context).filter{it.optLong("timestamp")>=drawnAt && kotlin.math.abs(it.optDouble("fare")-24.0)<0.001}
                 assertTrue("Full synthetic route is recorded",rows.any{kotlin.math.abs(it.optDouble("minutes")-30.0)<0.001 && kotlin.math.abs(it.optDouble("totalKm")-12.0)<0.001})

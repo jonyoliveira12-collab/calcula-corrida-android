@@ -21,7 +21,7 @@ class OfferNotificationTest {
         JourneyStore.record(context,offer,result,"com.ubercab.driver")
         assertEquals(1,JourneyStore.getRecords(context).size)
         val deadline=android.os.SystemClock.elapsedRealtime()+3000
-        while(manager.activeNotifications.none{it.id==OfferNotifications.ID} && android.os.SystemClock.elapsedRealtime()<deadline)Thread.sleep(50)
+        while(manager.activeNotifications.none{it.id==OfferNotifications.ID && it.notification.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT).toString().contains("19,1 km")} && android.os.SystemClock.elapsedRealtime()<deadline)Thread.sleep(50)
         val notice=manager.activeNotifications.first{it.id==OfferNotifications.ID}.notification
         assertEquals("UBER • oferta salva",notice.extras.getString(android.app.Notification.EXTRA_TITLE))
         assertTrue(notice.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT).toString().contains("19,1 km"))
