@@ -638,7 +638,9 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun recognizeCaptured(pkg:String,windowId:Int,bounds:Rect,captured:Bitmap,requestTime:Long,index:Int=0) {
         val angles=intArrayOf(0,0,90,270,180)
-        val image=if(index<=1)prepareOfferRegion(pkg,captured,index==1) else captured
+        val fullApp=bounds.width()>=resources.displayMetrics.widthPixels*.85 && bounds.height()>=resources.displayMetrics.heightPixels*.85
+        val croppedFirst=index==0 && fullApp
+        val image=if(index<=1)prepareOfferRegion(pkg,captured,croppedFirst) else captured
         val ocrStarted=android.os.SystemClock.elapsedRealtime()
         var retry=false
         try {
@@ -653,22 +655,19 @@ class OfferAccessibilityService : AccessibilityService() {
                                 recognitionStatus(pkg,"Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms")
                                 if(offer==null) {
                                     discardPreviousOfferIfFareChanged(pkg,windowId,recognized)
-                                    val fullUpright=index==0
+                                    val fullUpright=index==1 || (index==0 && !croppedFirst)
                                     // Once a readable full frame shows no offer,
                                     // release OCR for the other app immediately.
                                     // A later independent frame must confirm it.
                                     if(fullUpright && observeFullFrame(pkg,windowId,recognized))return@addOnSuccessListener
                                 }
-                                // A full app window can include wallet/header text. If it
-                                // contains an offer but parsing fails, retry its lower body once.
-                                // Floating delivery cards never lose their top category/fare.
-                                val bodyFallback=index==0 && bounds.width()>=resources.displayMetrics.widthPixels*.85 &&
-                                    bounds.height()>=resources.displayMetrics.heightPixels*.85 &&
-                                    Regex("""r\s*\$\s*\d""",RegexOption.IGNORE_CASE).containsMatchIn(recognized) &&
-                                    Regex("""\d+\s*min""",RegexOption.IGNORE_CASE).containsMatchIn(recognized)
-                                if(offer==null && index<angles.lastIndex && (bodyFallback || index>1 || OfferCapturePolicy.needsRotationRetry(recognized))) {
+                                // Full apps start with the offer body, then the whole frame;
+                                // floating cards start whole so their top fare is never removed.
+                                val fullFallback=index==0 && croppedFirst &&
+                                    (Regex("""(?i)\d+\s*(?:min|km)\b|aceitar|escolher|confirmar|interesse""").containsMatchIn(recognized))
+                                if(offer==null && index<angles.lastIndex && (fullFallback || index>1 || OfferCapturePolicy.needsRotationRetry(recognized))) {
                                     retry=true
-                                    recognizeCaptured(pkg,windowId,bounds,captured,requestTime,if(index==0 && !bodyFallback)2 else index+1)
+                                    recognizeCaptured(pkg,windowId,bounds,captured,requestTime,if(index==0 && !croppedFirst)2 else index+1)
                                     return@addOnSuccessListener
                                 }
                                 if (offer == null) {

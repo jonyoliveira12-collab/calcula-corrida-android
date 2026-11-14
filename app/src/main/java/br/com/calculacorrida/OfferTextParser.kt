@@ -131,8 +131,13 @@ object OfferTextParser {
         } else null
 
         val estimatedSummary = estimatedSummaryRegex.find(text)
+        // A header total may lose its bullet in OCR. When two detailed legs
+        // exist, retain the separate header so mismatched digits cannot inflate earnings.
+        val detailedRows=legRegex.findAll(text).toList()
+        val plainHeaderTotal=if(detailedRows.size==2)compactSummaryRegex.findAll(text)
+            .filter{candidate->detailedRows.none{candidate.range.first in it.range}}.singleOrNull() else null
         val compactCategory=DriverPackages.name(sourcePackage.orEmpty())=="UBER" && compactCategoryRegex.containsMatchIn(text)
-        val summaryMatch = estimatedSummary ?: summaryRegex.find(text) ?: if(compactCategory && minuteRegex.findAll(text).count()==1 && distanceRegex.findAll(text).count()==1)compactSummaryRegex.find(text) else null
+        val summaryMatch = estimatedSummary ?: summaryRegex.find(text) ?: plainHeaderTotal ?: if(compactCategory && minuteRegex.findAll(text).count()==1 && distanceRegex.findAll(text).count()==1)compactSummaryRegex.find(text) else null
         val displayedSummary = summaryMatch?.let {
             val mins = toNumber(it.groupValues[1])
             val dist = toNumber(it.groupValues[2])

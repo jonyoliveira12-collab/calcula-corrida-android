@@ -38,4 +38,11 @@ class OfferCompletenessTest {
         assertEquals(30.0,offer.minutes,0.000001)
         assertEquals(12.0,offer.pickupKm+offer.tripKm,0.000001)
     }
+    @Test fun missingBulletMustNotHideAContradictionInTheTotal() {
+        val pkg="sinet.startup.inDriver"
+        assertNull(OfferTextParser.parse("R$ 30,00\n30 min 12.0 km\n5 min (2 km)\n5 min (10 km)\nAceitar",pkg))
+        val offer=OfferTextParser.parse("R$ 30,00\n30 min 12.0 km\n5 min (2 km)\n25 min (10 km)\nAceitar",pkg)!!
+        assertEquals(30.0,offer.minutes,.000001)
+        assertEquals(12.0,offer.pickupKm+offer.tripKm,.000001)
+    }
 }
