@@ -6,7 +6,9 @@ class OfferCapturePolicyTest {
         assertFalse(OfferCapturePolicy.needsRotationRetry("Moto R$ 8,91 32 min 19.1 km Aceitar"))
         assertFalse(OfferCapturePolicy.needsRotationRetry("R$ 24,00 2 min (1 km)"))
         assertTrue(OfferCapturePolicy.needsRotationRetry("8,91"))
-        assertTrue(OfferCapturePolicy.needsRotationRetry("Texto invertido sem métricas"))
+        assertTrue(OfferCapturePolicy.needsRotationRetry("x1 / 8 -"))
+        assertFalse(OfferCapturePolicy.needsRotationRetry("Mapa aberto sem chamada ativa"))
+        assertFalse(OfferCapturePolicy.needsRotationRetry("Você está disponível procurando novas rotas"))
     }
     @Test fun ninetyNineMotoAndDeliveryWithoutTextButtonNeedBothLegs() {
         for(category in listOf("99Moto","99 Moto","99Entrega")) {
