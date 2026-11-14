@@ -625,7 +625,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                 if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) return@addOnSuccessListener
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
-                                val recognized = visionText.text
+                                val recognized = OfferTextParser.normalizeOcrText(visionText.text)
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized,pkg) else null
                                 recognitionStatus(pkg,"Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms")

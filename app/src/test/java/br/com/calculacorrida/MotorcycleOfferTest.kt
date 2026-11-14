@@ -69,4 +69,14 @@ class MotorcycleOfferTest {
         assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\n32 min · 19.1 km\nEm viagem",pkg))
         assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\n32 min · 19.1 km\n2 min 1 km\nAceitar",pkg))
     }
+    @Test fun compactOcrCanLoseTheSeparatorAndConfuseCurrency() {
+        val text=OfferTextParser.normalizeOcrText("Envios Moto\nRŞ 8,91\n32 min 19.1 km\n5,00 (98)\nVerificado\nRua de coleta\nRua de entrega\nAceitar")
+        assertTrue(IncomingOfferPolicy.isIncoming("com.ubercab.driver",text))
+        val offer=OfferTextParser.parse(text,"com.ubercab.driver")!!
+        assertEquals(8.91,offer.fare,.00001)
+        assertEquals(19.1,offer.tripKm,.00001)
+        assertEquals(32.0,offer.minutes,.00001)
+        assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\nAté a coleta\n2 min 1.1 km\nAceitar","com.ubercab.driver"))
+        assertNull(OfferTextParser.parse("UberX\nR$ 8,91\n2 min 1.1 km\nAceitar","com.ubercab.driver"))
+    }
 }

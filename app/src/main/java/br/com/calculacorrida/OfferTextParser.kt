@@ -15,6 +15,14 @@ object OfferTextParser {
         val pickupMinutes: Double? = null
     )
 
+    /** OCR can confuse the currency glyph with S-cedilla; only repair currency at a line start. */
+    fun normalizeOcrText(text:String):String = text.replace(
+        Regex("""(?im)(^|\n)([ \t]*)r[ŞşŜŝ][ \t]*(?=[0-9])""")
+    ) { it.groupValues[1]+it.groupValues[2]+"R$ " }
+
+    private val compactCategoryRegex=Regex("""(?im)\b(?:envios(?:\s+moto)?|uber\s+moto|entregas?(?:\s+moto)?)\b|^\s*moto\s*$""")
+    private val compactSummaryRegex=Regex("""([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*([0-9]+(?:[,.][0-9]+)?)\s*km\b""",RegexOption.IGNORE_CASE)
+
     private val moneyRegex = Regex("""R\s*\$\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:,[0-9]{1,2})?|[0-9]+\.[0-9]{1,2})(?![0-9.,])""", RegexOption.IGNORE_CASE)
     private val distanceRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE)
     private val minuteRegex = Regex("""([0-9]+(?:[,.][0-9]+)?)\s*(?:min(?:uto)?s?)\b""", RegexOption.IGNORE_CASE)
@@ -123,7 +131,8 @@ object OfferTextParser {
         } else null
 
         val estimatedSummary = estimatedSummaryRegex.find(text)
-        val summaryMatch = estimatedSummary ?: summaryRegex.find(text)
+        val compactCategory=DriverPackages.name(sourcePackage.orEmpty())=="UBER" && compactCategoryRegex.containsMatchIn(text)
+        val summaryMatch = estimatedSummary ?: summaryRegex.find(text) ?: if(compactCategory)compactSummaryRegex.find(text) else null
         val displayedSummary = summaryMatch?.let {
             val mins = toNumber(it.groupValues[1])
             val dist = toNumber(it.groupValues[2])
@@ -144,8 +153,9 @@ object OfferTextParser {
         val compactUberSummary = DriverPackages.name(sourcePackage.orEmpty()) == "UBER" &&
             summaryMatch != null && parenthesizedLegs.isEmpty() &&
             IncomingOfferPolicy.isIncoming(sourcePackage.orEmpty(), text) &&
-            Regex("""(?im)\b(?:envios(?:\s+moto)?|uber\s+moto|entregas?(?:\s+moto)?)\b|^\s*moto\s*$""").containsMatchIn(text.substring(0, summaryMatch.range.first)) &&
-            summaryRegex.findAll(text).count() == 1 &&
+            compactCategoryRegex.containsMatchIn(text.substring(0, summaryMatch.range.first)) &&
+            !Regex("""(?i)(?:at[eé]|para)\s+(?:a\s+)?(?:coleta|retirada|embarque)|buscar|chegada""").containsMatchIn(text.substring(0,summaryMatch.range.first)) &&
+            compactSummaryRegex.findAll(text).count() == 1 &&
             minuteRegex.findAll(text).count() == 1 && distanceRegex.findAll(text).count() == 1
 
         if (DriverPackages.name(sourcePackage.orEmpty()) == "UBER" && summaryMatch != null && estimatedSummary == null && parenthesizedLegs.size < 2) {
