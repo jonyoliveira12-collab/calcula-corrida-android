@@ -132,7 +132,7 @@ object OfferTextParser {
 
         val estimatedSummary = estimatedSummaryRegex.find(text)
         val compactCategory=DriverPackages.name(sourcePackage.orEmpty())=="UBER" && compactCategoryRegex.containsMatchIn(text)
-        val summaryMatch = estimatedSummary ?: summaryRegex.find(text) ?: if(compactCategory)compactSummaryRegex.find(text) else null
+        val summaryMatch = estimatedSummary ?: summaryRegex.find(text) ?: if(compactCategory && minuteRegex.findAll(text).count()==1 && distanceRegex.findAll(text).count()==1)compactSummaryRegex.find(text) else null
         val displayedSummary = summaryMatch?.let {
             val mins = toNumber(it.groupValues[1])
             val dist = toNumber(it.groupValues[2])
