@@ -88,4 +88,12 @@ class MotorcycleOfferTest {
         assertEquals("RS 118",OfferTextParser.normalizeOcrText("RS 118"))
         assertEquals("RS 8,91 km",OfferTextParser.normalizeOcrText("RS 8,91 km"))
     }
+    @Test fun ocrExtraStrokeOnKilometreUnitDoesNotChangeNumbers() {
+        val text=OfferTextParser.normalizeOcrText("Envios Moto\nR$ 8,91\n32 min 19.1 kmn\nAceitar")
+        val offer=OfferTextParser.parse(text,"com.ubercab.driver")!!
+        assertEquals(19.1,offer.tripKm,.00001)
+        assertEquals(32.0,offer.minutes,.00001)
+        assertEquals("Rua KMN",OfferTextParser.normalizeOcrText("Rua KMN"))
+        assertEquals("19 kmnovo",OfferTextParser.normalizeOcrText("19 kmnovo"))
+    }
 }

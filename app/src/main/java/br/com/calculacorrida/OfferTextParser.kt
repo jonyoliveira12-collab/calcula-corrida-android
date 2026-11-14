@@ -21,7 +21,9 @@ object OfferTextParser {
     ) { it.groupValues[1]+it.groupValues[2]+"R$ " }.replace(
         // Only a standalone decimal price line, never a road such as RS 118.
         Regex("""(?im)(^|\n)([ \t]*)r[ \t]*s[ \t]*(?=[0-9]+[,.][0-9]{2}[ \t]*$)""")
-    ) { it.groupValues[1]+it.groupValues[2]+"R$ " }
+    ) { it.groupValues[1]+it.groupValues[2]+"R$ " }.replace(
+        Regex("""(?i)([0-9]+(?:[,.][0-9]+)?)\s*kmn\b""")
+    ) { it.groupValues[1]+" km" }
 
     private val compactCategoryRegex=Regex("""(?im)\b(?:envios(?:\s+moto)?|uber\s+moto|entregas?(?:\s+moto)?)\b|^\s*moto\s*$""")
     private val compactSummaryRegex=Regex("""([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*([0-9]+(?:[,.][0-9]+)?)\s*km\b""",RegexOption.IGNORE_CASE)
