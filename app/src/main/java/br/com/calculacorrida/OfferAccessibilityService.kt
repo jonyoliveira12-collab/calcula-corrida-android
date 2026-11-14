@@ -533,13 +533,6 @@ class OfferAccessibilityService : AccessibilityService() {
             readerStatus("${driverAppName(pkg)}: aguardando cartão da oferta; apenas a bolinha está visível")
             return
         }
-        if (Build.VERSION.SDK_INT < 34 && (foregroundPackage != pkg ||
-            bounds.width() < resources.displayMetrics.widthPixels * 0.9 ||
-            bounds.height() < resources.displayMetrics.heightPixels * 0.85 ||
-            applicationSnapshots.any { it!=pkg })) {
-            readerStatus("Abra o app de motorista em tela cheia para usar OCR neste Android")
-            return
-        }
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenshotAt < 700L) return
         lastScreenshotAt = now
@@ -548,16 +541,22 @@ class OfferAccessibilityService : AccessibilityService() {
         getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_last_app",driverAppName(pkg)).putLong("reader_last_capture",System.currentTimeMillis()).apply()
         screenshotInProgress = true
         val requestTime=now
+        val captureViews=if(Build.VERSION.SDK_INT<34)(listOfNotNull(bubble)+overlays.values).distinct().map{it to it.alpha} else emptyList()
+        fun restoreCaptureViews() {
+            if(captureViews.isNotEmpty())readerHandler.post {captureViews.forEach{(view,alpha)->view.alpha=alpha}}
+        }
         captureStatus(pkg,"Solicitando imagem da janela ${bounds.width()}×${bounds.height()}")
         readerHandler.postDelayed({
             if(screenshotInProgress && lastScreenshotAt==requestTime) {
                 screenshotInProgress=false
+                restoreCaptureViews()
                 readerStatus("Captura demorou; repetindo automaticamente")
             }
         },12000L)
         try {
             val callback = object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+                        restoreCaptureViews()
                         if(lastScreenshotAt==requestTime)captureStatus(pkg,"Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms")
                         var bitmap: Bitmap? = null
                         try {
@@ -578,32 +577,51 @@ class OfferAccessibilityService : AccessibilityService() {
                             if(lastScreenshotAt==requestTime) screenshotInProgress = false
                             return
                         }
-                        readerHandler.post { recognizeCaptured(pkg,windowId,bounds,captured,requestTime) }
+                        // Android 11–13 only provides a display screenshot. Discard everything
+                        // outside the current, allowlisted driver window before invoking OCR.
+                        val offerImage = if(Build.VERSION.SDK_INT<34) {
+                            val region=Rect(bounds)
+                            if(!region.intersect(0,0,captured.width,captured.height) || !isOfferSized(region)) {
+                                captured.recycle()
+                                if(lastScreenshotAt==requestTime)screenshotInProgress=false
+                                return
+                            }
+                            val cropped=Bitmap.createBitmap(captured,region.left,region.top,region.width(),region.height())
+                            if(cropped!==captured)captured.recycle()
+                            cropped
+                        } else captured
+                        readerHandler.post { recognizeCaptured(pkg,windowId,bounds,offerImage,requestTime) }
                     }
 
                     override fun onFailure(errorCode: Int) {
+                        restoreCaptureViews()
                         if(lastScreenshotAt==requestTime)captureStatus(pkg,"Falha da captura: código $errorCode")
                         if(lastScreenshotAt==requestTime) screenshotInProgress = false
                         readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
                     }
                 }
             if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotCallbackExecutor, callback)
-            else takeScreenshot(Display.DEFAULT_DISPLAY, screenshotCallbackExecutor, callback)
+            else {
+                captureViews.forEach{(view,_)->view.alpha=0f}
+                readerHandler.postDelayed({
+                    if(lastScreenshotAt!=requestTime || !captureStillValid(pkg,windowId,bounds)) {
+                        restoreCaptureViews()
+                        if(lastScreenshotAt==requestTime)screenshotInProgress=false
+                    } else try { takeScreenshot(Display.DEFAULT_DISPLAY,screenshotCallbackExecutor,callback) }
+                    catch(_:Exception) {restoreCaptureViews();if(lastScreenshotAt==requestTime)screenshotInProgress=false}
+                },100L)
+            }
         } catch (_: Exception) {
             if(lastScreenshotAt==requestTime) screenshotInProgress = false
+            restoreCaptureViews()
             readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
         }
     }
 
     private fun prepareOfferRegion(pkg:String,bitmap:Bitmap):Bitmap {
-        // Offer panels are normally below the map. Isolated floating cards stay whole.
+        // Start with the entire driver card. Compact delivery cards put fare and
+        // category at the top; blindly cutting that area loses valid offers.
         var image=bitmap
-        if(bitmap.height>=dp(320)) {
-            // Keep the 99 negotiation heading as well as both route legs.
-            val fraction=if(driverAppName(pkg)=="99")0.75f else 0.72f
-            val top=(bitmap.height*(1f-fraction)).toInt()
-            image=Bitmap.createBitmap(bitmap,0,top,bitmap.width,bitmap.height-top)
-        }
         // Keep more detail in dense tablet / floating-window offer cards.
         val factor=kotlin.math.sqrt(2_000_000.0/(image.width.toDouble()*image.height)).coerceAtMost(1.0)
         if(factor<1.0) {
@@ -637,7 +655,7 @@ class OfferAccessibilityService : AccessibilityService() {
                                     // A later independent frame must confirm it.
                                     if(fullUpright && observeFullFrame(pkg,windowId,recognized))return@addOnSuccessListener
                                 }
-                                if(offer==null && index<angles.lastIndex) {
+                                if(offer==null && index<angles.lastIndex && (index>1 || OfferCapturePolicy.needsRotationRetry(recognized))) {
                                     retry=true
                                     recognizeCaptured(pkg,windowId,bounds,captured,requestTime,if(index==0 && image===captured)2 else index+1)
                                     return@addOnSuccessListener

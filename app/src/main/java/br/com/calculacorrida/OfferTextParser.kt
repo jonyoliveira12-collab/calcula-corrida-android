@@ -118,8 +118,8 @@ object OfferTextParser {
         // total but is only one leg of the trip.
         // iFood names the complete route explicitly. These totals are only
         // trusted for its allowlisted driver app, never for a lone pickup row.
-        val deliveryDistance = Regex("""dist[aâ]ncia\s+total\s*[:\-]?\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE).findAll(text).toList()
-        val deliveryTime = Regex("""tempo\s+aproximado\s+d[ae]\s+rota\s*[:\-]?\s*([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\b""", RegexOption.IGNORE_CASE).findAll(text).toList()
+        val deliveryDistance = Regex("""(?:dist[aâ]ncia|percurso)\s+total\s*[:\-]?\s*([0-9]+(?:[,.][0-9]+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE).findAll(text).toList()
+        val deliveryTime = Regex("""tempo\s+(?:aproximado|estimado)\s+d[ae]\s+rota\s*[:\-]?\s*([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\b""", RegexOption.IGNORE_CASE).findAll(text).toList()
         val hasDeliveryLabels = DriverPackages.name(sourcePackage.orEmpty()) == "IFOOD" &&
             (deliveryDistance.isNotEmpty() || deliveryTime.isNotEmpty())
         val deliverySummary = if(hasDeliveryLabels) {

@@ -39,6 +39,8 @@ class ReaderWindowTest {
                 listOf("sinet.startup.inDriver","60,00","1","normal"),
                 listOf("com.ubercab.driver","60,00","0","moto"),
                 listOf("com.ubercab.driver","16,71","0","envios"),
+                listOf("com.ubercab.driver","16,71","0","envios_tall"),
+                listOf("com.app99.driver","60,00","0","moto99"),
                 listOf("br.com.ifood.driver.app","37,50","0","delivery"))
             for((driver,expected,rotation,layout) in scenarios) {
             listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver","br.com.ifood.driver.app").forEach {shell("am force-stop $it")}
@@ -76,7 +78,7 @@ class ReaderWindowTest {
                 Thread.sleep(100)
             }
             val diagnostic=listOf("reader_status","reader_capture_status","reader_ocr_status").joinToString(" / "){settings.getString(it,"").orEmpty()}
-            val syntheticOcr = if(layout=="envios" && !found) {
+            val syntheticOcr = if(layout.startsWith("envios") && !found) {
                 val bitmap=ui.takeScreenshot()
                 val recognizer=com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
                 try { com.google.android.gms.tasks.Tasks.await(recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap,0))).text }
@@ -88,9 +90,9 @@ class ReaderWindowTest {
                 assertTrue("Full synthetic route is recorded",rows.any{kotlin.math.abs(it.optDouble("minutes")-30.0)<0.001 && kotlin.math.abs(it.optDouble("totalKm")-12.0)<0.001})
                 assertFalse("Pickup alone is never recorded as the complete offer",rows.any{kotlin.math.abs(it.optDouble("minutes")-10.0)<0.001 || kotlin.math.abs(it.optDouble("totalKm")-4.0)<0.001})
             }
-            if(layout=="moto" || layout=="delivery" || layout=="envios") {
-                val expectedKm=if(layout=="moto")7.3 else if(layout=="envios")19.1 else 5.0
-                val expectedMinutes=if(layout=="moto")18.0 else if(layout=="envios")32.0 else 20.0
+            if(layout=="moto" || layout=="moto99" || layout=="delivery" || layout.startsWith("envios")) {
+                val expectedKm=if(layout=="moto" || layout=="moto99")7.3 else if(layout.startsWith("envios"))19.1 else 5.0
+                val expectedMinutes=if(layout=="moto" || layout=="moto99")18.0 else if(layout.startsWith("envios"))32.0 else 20.0
                 assertTrue("Correct complete motorcycle/delivery route was recorded",JourneyStore.getRecords(context).any{
                     it.optLong("timestamp")>=drawnAt && kotlin.math.abs(it.optDouble("totalKm")-expectedKm)<.001 &&
                     kotlin.math.abs(it.optDouble("minutes")-expectedMinutes)<.001
