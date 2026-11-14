@@ -15,7 +15,7 @@ object IncomingOfferPolicy {
     fun hasNinetyNineOfferMarker(text:String):Boolean {
         val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{Mn}+"),"").lowercase(java.util.Locale.ROOT)
-        return listOf("nao afeta a ta","tarifa base dinamica","negocia","pgto. no app",
+        return Regex("""\b99\s*(?:moto|entrega(?:s)?)\b""").containsMatchIn(n) || listOf("nao afeta a ta","tarifa base dinamica","negocia","pgto. no app",
             "pgto no app","pagamento no app","cartao verif","perfil essencial","perfil premium").any{n.contains(it)}
     }
 
@@ -32,7 +32,7 @@ object IncomingOfferPolicy {
             Regex("""tempo\s+(?:aproximado|estimado)\s+d[ae]\s+rota""").containsMatchIn(n))return true
         // 99 displays an offer countdown and route legs, without an 'Aceitar' label.
         val is99=driverName=="99"
-        val marker=hasNinetyNineOfferMarker(n) || Regex("""\b99\s*(?:moto|entrega(?:s)?)\b""").containsMatchIn(n)
+        val marker=hasNinetyNineOfferMarker(n)
         val legs=Regex("""\d+\s*min(?:uto)?s?\s*\(\s*\d+(?:[,.]\d+)?\s*km""").findAll(n).count()
         val times=Regex("""\d+\s*min(?:uto)?s?\b""").findAll(n).count()
         val distances=Regex("""\d+(?:[,.]\d+)?\s*(?:km|m)\b""").findAll(n).count()

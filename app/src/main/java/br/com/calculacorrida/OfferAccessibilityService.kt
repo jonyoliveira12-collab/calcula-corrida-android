@@ -59,7 +59,7 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var screenshotInProgress = false
     @Volatile private var lastScreenshotAt = 0L
     private val readerHandler = Handler(Looper.getMainLooper())
-    private data class DriverFrame(val id:Int,val bounds:Rect,val text:String,val fareBounds:Rect?,val score:Long)
+    private data class DriverFrame(val id:Int,val bounds:Rect,val text:String,val fareBounds:Rect?,val score:Long,val layer:Int=0)
     private val windowExecutor=Executors.newSingleThreadExecutor()
     private val windowRefreshPending=java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var driverFrames:Map<String,DriverFrame> = emptyMap()
@@ -389,7 +389,7 @@ class OfferAccessibilityService : AccessibilityService() {
                             val content=text.toString()
                             val complete=IncomingOfferPolicy.isIncoming(pkg,content) && OfferTextParser.parse(content,pkg)!=null
                             val score=(if(complete)5_000_000_000L else 0L)+(if(offerOverlay)1_000_000_000L else 0L)+bounds.width().toLong()*bounds.height()
-                            candidates.getOrPut(pkg){mutableListOf()}.add(DriverFrame(window.id,bounds,content,if(text.isNotEmpty())findFareBounds(root)else null,score))
+                            candidates.getOrPut(pkg){mutableListOf()}.add(DriverFrame(window.id,bounds,content,if(text.isNotEmpty())findFareBounds(root)else null,score,window.layer))
                         } finally {root.recycle()}
                     }
                     val pkg=activeRoot?.packageName?.toString()
@@ -524,7 +524,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (screenshotInProgress || pkg !in visibleDriverPackages() || !readingEnabled()) return
         // Try eligible windows in turn. A large map/utility overlay from one
         // driver must not permanently hide a smaller offer window from OCR.
-        val target=driverCandidates[pkg].orEmpty().filter{isOfferSized(it.bounds)}
+        val target=driverCandidates[pkg].orEmpty().filter{isOfferSized(it.bounds) && (Build.VERSION.SDK_INT>=34 || !isOccludedByDriverWindow(it))}
             .minByOrNull{lastCaptureByWindow[pkg to it.id]?:Long.MIN_VALUE}
             ?: run { readerStatus("${driverAppName(pkg)}: aguardando janela da oferta"); return }
         val windowId = target.id
@@ -791,12 +791,17 @@ class OfferAccessibilityService : AccessibilityService() {
         }.thenBy { lastCaptureByPackage[it] ?: 0L })
     private val lastCaptureByPackage=mutableMapOf<String,Long>()
     private val lastCaptureByWindow=mutableMapOf<Pair<String,Int>,Long>()
+    private fun isOccludedByDriverWindow(frame:DriverFrame):Boolean = driverCandidates.values.any { frames ->
+        frames.any { other -> other.id!=frame.id && other.layer>frame.layer &&
+            isOfferSized(other.bounds) && Rect.intersects(frame.bounds,other.bounds) }
+    }
+
     private fun captureStillValid(pkg:String,id:Int,bounds:Rect):Boolean {
         if(android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L)return false
         // A per-window capture remains tied to this package and window even
         // if the driver resizes it while OCR is running. Full-display captures
         // on older Android versions still require the original bounds.
-        return readingEnabled() && driverCandidates[pkg].orEmpty().any{it.id==id && (Build.VERSION.SDK_INT>=34 || it.bounds==bounds)}
+        return readingEnabled() && driverCandidates[pkg].orEmpty().any{it.id==id && (Build.VERSION.SDK_INT>=34 || (it.bounds==bounds && !isOccludedByDriverWindow(it)))}
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth:Int=0) {
