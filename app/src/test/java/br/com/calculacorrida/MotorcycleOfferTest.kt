@@ -52,4 +52,21 @@ class MotorcycleOfferTest {
         assertNull(OfferTextParser.parse("Uber Moto R$ 18,00 2 min 600 m Escolher","com.ubercab.driver"))
     }
 
+    @Test fun realUberEnviosMotoCompactSummaryIsTheCompleteRoute() {
+        for(category in listOf("Envios Moto","Envios","Uber Moto","Moto","Entregas")) {
+            val text="$category\nR$ 8,91\n32 min · 19.1 km\n5,00 (98)\nVerificado\nRua de coleta\nRua de entrega\nAceitar"
+            val offer=OfferTextParser.parse(text,"com.ubercab.driver")!!
+            assertEquals(8.91,offer.fare,.00001)
+            assertEquals(32.0,offer.minutes,.00001)
+            assertEquals(19.1,offer.pickupKm+offer.tripKm,.00001)
+            assertNull(offer.pickupMinutes)
+        }
+    }
+    @Test fun compactCategoryNeverPromotesPartialOrAmbiguousRoutes() {
+        val pkg="com.ubercab.driver"
+        assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\n2 min (1.1 km)\nAceitar",pkg))
+        assertNull(OfferTextParser.parse("UberX\nR$ 8,91\n2 min · 1.1 km\nAceitar",pkg))
+        assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\n32 min · 19.1 km\nEm viagem",pkg))
+        assertNull(OfferTextParser.parse("Envios Moto\nR$ 8,91\n32 min · 19.1 km\n2 min 1 km\nAceitar",pkg))
+    }
 }

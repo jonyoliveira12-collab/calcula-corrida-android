@@ -66,7 +66,9 @@ object JourneyStore {
         val trimmed = JSONArray()
         val start = (records.length() - MAX_RECORDS).coerceAtLeast(0)
         for (i in start until records.length()) trimmed.put(records.getJSONObject(i))
-        prefs.edit().putString(KEY_RECORDS, trimmed.toString()).apply()
+        if(prefs.edit().putString(KEY_RECORDS, trimmed.toString()).commit()) {
+            OfferNotifications.show(context, result, driverPackage)
+        }
     }
 
     fun getRecords(context: Context): List<JSONObject> {

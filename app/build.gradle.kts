@@ -11,8 +11,8 @@ android {
         applicationId = "br.com.calculacorrida"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.5.2"
+        versionCode = 19
+        versionName = "0.5.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

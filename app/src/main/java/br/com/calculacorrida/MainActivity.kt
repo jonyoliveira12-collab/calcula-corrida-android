@@ -168,6 +168,12 @@ class MainActivity : Activity() {
         }
         setContentView(root)
         AppUpdates.check(this)
+        if(android.os.Build.VERSION.SDK_INT>=33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            !getSharedPreferences("settings",0).getBoolean("notification_permission_asked",false)) {
+            getSharedPreferences("settings",0).edit().putBoolean("notification_permission_asked",true).apply()
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),501)
+        }
         showTab("Início")
     }
 
@@ -257,6 +263,11 @@ class MainActivity : Activity() {
         diagnostics.addView(action(if(prefs.getBoolean("reader_paused",false))"RETOMAR LEITURA" else "PAUSAR LEITURA",false) {
             prefs.edit().putBoolean("reader_paused",!prefs.getBoolean("reader_paused",false)).apply();showTab("Início")
         })
+        if(!getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()) {
+            diagnostics.addView(action("ATIVAR NOTIFICAÇÕES DE OFERTAS",false) {
+                startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName))
+            })
+        }
         diagnostics.addView(action("COPIAR DIAGNÓSTICO", false) {
             val report=listOf("JHONDRIVER ${packageManager.getPackageInfo(packageName,0).versionName}","Android ${android.os.Build.VERSION.RELEASE} • ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
                 "Acessibilidade: $serviceOn • Serviço respondendo: $alive • Sobreposição: ${Settings.canDrawOverlays(this)}",

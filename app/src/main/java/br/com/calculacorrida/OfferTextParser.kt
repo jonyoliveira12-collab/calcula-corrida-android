@@ -139,9 +139,18 @@ object OfferTextParser {
             if (mins > 0 && dist > 0) mins to dist else null
         }.toList()
 
+        // Uber Envios/Moto floating cards show a single complete route, without pickup legs.
+        // Trust only a named category, an incoming action and exactly one route pair.
+        val compactUberSummary = DriverPackages.name(sourcePackage.orEmpty()) == "UBER" &&
+            summaryMatch != null && parenthesizedLegs.isEmpty() &&
+            IncomingOfferPolicy.isIncoming(sourcePackage.orEmpty(), text) &&
+            Regex("""(?im)\b(?:envios(?:\s+moto)?|uber\s+moto|entregas?(?:\s+moto)?)\b|^\s*moto\s*$""").containsMatchIn(text.substring(0, summaryMatch.range.first)) &&
+            summaryRegex.findAll(text).count() == 1 &&
+            minuteRegex.findAll(text).count() == 1 && distanceRegex.findAll(text).count() == 1
+
         if (DriverPackages.name(sourcePackage.orEmpty()) == "UBER" && summaryMatch != null && estimatedSummary == null && parenthesizedLegs.size < 2) {
             val prefix=text.substring(0,summaryMatch.range.first).takeLast(64)
-            if(!explicitTotalPrefixRegex.containsMatchIn(prefix)) return null
+            if(!explicitTotalPrefixRegex.containsMatchIn(prefix) && !compactUberSummary) return null
         }
 
         val pickupKm: Double
