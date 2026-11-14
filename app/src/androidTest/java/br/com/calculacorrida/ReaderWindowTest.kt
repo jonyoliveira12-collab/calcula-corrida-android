@@ -79,7 +79,21 @@ class ReaderWindowTest {
             }
             val diagnostic=listOf("reader_status","reader_capture_status","reader_ocr_status").joinToString(" / "){settings.getString(it,"").orEmpty()}
             val syntheticOcr = if(!found) {
-                val bitmap=ui.takeScreenshot()
+                // Capture a clean synthetic card after removing our own controls.
+                OfferAccessibilityService.stopReading()
+                instrumentation.waitForIdleSync()
+                Thread.sleep(250)
+                val region=ui.windows.mapNotNull { w ->
+                    val root=w.root ?: return@mapNotNull null
+                    try {
+                        val rect=android.graphics.Rect().also{w.getBoundsInScreen(it)}
+                        if(root.packageName?.toString()==driver && rect.width()>=120 && rect.height()>=80) w.layer to rect else null
+                    } finally { root.recycle() }
+                }.maxByOrNull{it.first}?.second
+                val screen=ui.takeScreenshot()
+                val bitmap=if(region!=null && region.intersect(0,0,screen.width,screen.height))
+                    android.graphics.Bitmap.createBitmap(screen,region.left,region.top,region.width(),region.height()) else screen
+                if(bitmap!==screen)screen.recycle()
                 val recognizer=com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
                 try { com.google.android.gms.tasks.Tasks.await(recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap,0))).text }
                 finally { recognizer.close();bitmap.recycle() }
