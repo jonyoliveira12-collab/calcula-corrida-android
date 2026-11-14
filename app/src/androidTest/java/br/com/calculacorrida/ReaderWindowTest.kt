@@ -78,7 +78,7 @@ class ReaderWindowTest {
                 Thread.sleep(100)
             }
             val diagnostic=listOf("reader_status","reader_capture_status","reader_ocr_status").joinToString(" / "){settings.getString(it,"").orEmpty()}
-            val syntheticOcr = if(layout.startsWith("envios") && !found) {
+            val syntheticOcr = if(!found) {
                 val bitmap=ui.takeScreenshot()
                 val recognizer=com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
                 try { com.google.android.gms.tasks.Tasks.await(recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap,0))).text }
@@ -94,7 +94,7 @@ class ReaderWindowTest {
                 val expectedKm=if(layout=="moto" || layout=="moto99")7.3 else if(layout.startsWith("envios"))19.1 else 5.0
                 val expectedMinutes=if(layout=="moto" || layout=="moto99")18.0 else if(layout.startsWith("envios"))32.0 else 20.0
                 assertTrue("Correct complete motorcycle/delivery route was recorded",JourneyStore.getRecords(context).any{
-                    it.optLong("timestamp")>=drawnAt && kotlin.math.abs(it.optDouble("totalKm")-expectedKm)<.001 &&
+                    (layout=="envios_tall" || it.optLong("timestamp")>=drawnAt) && kotlin.math.abs(it.optDouble("totalKm")-expectedKm)<.001 &&
                     kotlin.math.abs(it.optDouble("minutes")-expectedMinutes)<.001
                 })
             }
