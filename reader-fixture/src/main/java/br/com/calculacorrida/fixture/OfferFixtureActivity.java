@@ -65,7 +65,7 @@ public class OfferFixtureActivity extends Activity {
                 }
                 float first=floating?35*d:("small".equals(layout)?getHeight()*0.42f:Math.max(35*d,getHeight()-210*d));
                 if(realistic && getPackageName().equals("com.app99.driver"))first=getHeight()*0.40f;
-                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*32*d,paint);
+                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*("envios".equals(layout)?24:32)*d,paint);
             }
         };
         offer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
