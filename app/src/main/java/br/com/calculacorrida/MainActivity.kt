@@ -195,6 +195,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if(BankModeReminder.isPending(this))BankModeReminder.show(this)
         if (AppAppearance.theme(this) != colors.theme) { recreate(); return }
         if (!isFinishing) AppUpdates.check(this)
         if (!NetworkGate.isOnline(this)) {
@@ -509,8 +510,12 @@ class MainActivity : Activity() {
     }
 
     private fun openReaderAccessibilitySettings() {
-        Toast.makeText(this, "Nos ajustes do Android, selecione JHONDRIVER e ative a acessibilidade.", Toast.LENGTH_LONG).show()
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        BankModeReminder.openReaderSettings(this)
+    }
+
+    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray) {
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults)
+        if(requestCode==BankModeReminder.ID && BankModeReminder.isPending(this))BankModeReminder.show(this)
     }
 
     private fun stopReaderForBank() {
@@ -519,8 +524,10 @@ class MainActivity : Activity() {
             showTab(selectedTab)
             return
         }
+        val reminder=BankModeReminder.begin(this)
+        if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),BankModeReminder.ID)
         if (OfferAccessibilityService.stopReading()) {
-            Toast.makeText(this, "Leitura desligada. Reative a acessibilidade quando voltar a trabalhar.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, if(reminder)"Leitura desligada. Use Retomar leitura na notificação quando terminar." else "Leitura desligada. Ative as notificações para receber o lembrete de retomada.", Toast.LENGTH_LONG).show()
             val tab = selectedTab
             content.postDelayed({ if (!isFinishing && selectedTab == tab) showTab(tab) }, 1000)
         } else {
@@ -805,7 +812,7 @@ class MainActivity : Activity() {
 
         val privacy = card()
         privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
-        privacy.addView(label("Desliga a acessibilidade e oculta o JD. Para voltar a ler corridas, você precisa reativá-la nos ajustes do Android. Suas opções serão mantidas.", 13f, muted, false))
+        privacy.addView(label("Desliga realmente a acessibilidade e oculta o JD. A notificação Retomar leitura abre o ajuste do Android quando terminar. Você confirma a reativação; suas opções ficam salvas.", 13f, muted, false))
         val serviceOn = isAccessibilityEnabled()
         privacy.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", true) {
             if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()

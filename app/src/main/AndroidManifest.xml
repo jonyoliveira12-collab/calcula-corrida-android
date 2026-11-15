@@ -16,6 +16,7 @@
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
         <activity android:name=".CardStyleActivity" android:theme="@style/CardSettingsTheme" android:exported="false" />
+        <activity android:name=".BankResumeActivity" android:exported="false" android:excludeFromRecents="true" android:noHistory="true" />
         <activity android:name=".HelpSupportActivity" android:exported="false" />
         <activity android:name=".FriendsActivity" android:exported="false" />
         <service android:name=".FriendsService" android:exported="false" android:foregroundServiceType="remoteMessaging|location" />

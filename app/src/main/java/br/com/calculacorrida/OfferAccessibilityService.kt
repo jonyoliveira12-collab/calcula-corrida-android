@@ -247,7 +247,11 @@ class OfferAccessibilityService : AccessibilityService() {
                     1 -> packageManager.getLaunchIntentForPackage(packageName)?.let { it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(it) }
                     // This explicit user action turns off the Android service, not
                     // only the in-app pause. Keep the driver's feature choices.
-                    2 -> { stopReading() }
+                    2 -> {
+                        val reminder=BankModeReminder.begin(this)
+                        stopReading()
+                        if(!reminder)Toast.makeText(this,"Leitura desligada. Ative as notificações para receber o atalho de retomada.",Toast.LENGTH_LONG).show()
+                    }
                 }
             }.setNegativeButton("Fechar",null).create()
         dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
@@ -268,6 +272,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        BankModeReminder.clear(this)
         active = this
         serviceInfo=serviceInfo.apply {
             flags=flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
