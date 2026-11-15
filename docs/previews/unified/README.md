@@ -24,6 +24,8 @@ O acabamento da tela de Amigos foi estendido ao painel, configurações, histór
 
 ## Histórico de ofertas
 
+Atualizado na versão **0.8.1**: data completa e horário de registro em destaque, incluindo ofertas antigas com horário salvo.
+
 | Claro | Escuro |
 | --- | --- |
 | ![Claro](history-light.png) | ![Escuro](history-dark.png) |
