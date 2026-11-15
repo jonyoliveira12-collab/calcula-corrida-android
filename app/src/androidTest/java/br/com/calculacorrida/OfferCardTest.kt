@@ -289,11 +289,10 @@ class OfferCardTest {
                 containsAll("Será?","R$ 1,67/km","R$ 50,00/h","4,85")
                 select("Boa")
                 containsAll("Bora carai","R$ 2,00/km","R$ 72,00/h","4,96")
-                val toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Chamas realistas"}
-                assertTrue(toggle.isChecked)
-                toggle.performClick()
+                assertTrue(prefs.getBoolean("card_neon_flames",false))
+                select("Padrão verde")
                 assertNull((preview.getChildAt(0) as android.widget.TextView).compoundDrawables[0])
-                toggle.performClick()
+                select("Fogo realista")
                 select("Recusar")
             }
             instrumentation.waitForIdleSync()

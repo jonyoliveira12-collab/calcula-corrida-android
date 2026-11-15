@@ -56,6 +56,7 @@ class FriendsActivity : AppCompatActivity() {
     private var recorder:android.media.MediaRecorder?=null
     private var audioFile:java.io.File?=null
     private var recordingStarted=0L
+    private var pendingRecording=false
     private var audioDuration=0L
     @Volatile private var uploadedAudio:String?=null
     private var audioNonce=UUID.randomUUID().toString()
@@ -223,6 +224,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         super.onResume(); foreground = true
         if(AppAppearance.theme(this)!=colors.theme) {recreate();return}
         if (::client.isInitialized) { main.removeCallbacks(refresh); main.post(refresh) }
+        if(pendingRecording && ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED) {pendingRecording=false;main.post{startRecording()}}
     }
     override fun onPause() { stopPlayback();if(recorder!=null)discardAudio();updateMap(null); foreground = false; main.removeCallbacks(refresh); super.onPause() }
     private fun validAccount() = !isFinishing && !isDestroyed && SessionManager(this).isLoggedIn() && SessionManager(this).getEmail() == authAtStart
@@ -405,7 +407,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, results)
-        if(requestCode==73 && results.any{it==PackageManager.PERMISSION_GRANTED}){startRecording();return}
+        if(requestCode==73){pendingRecording=results.any{it==PackageManager.PERMISSION_GRANTED};if(pendingRecording && foreground){pendingRecording=false;main.post{startRecording()}};return}
         if (requestCode == 72 && results.any { it == PackageManager.PERMISSION_GRANTED }) chooseShare()
         else if (::status.isInitialized) status.text = "Permissão atualizada. Toque na opção novamente para continuar."
     }
@@ -444,7 +446,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
     private fun requestRecording() {
         if(peer==null)return
         if(audioFile!=null){Toast.makeText(this,"Envie ou descarte o áudio gravado antes de gravar outro.",Toast.LENGTH_SHORT).show();return}
-        if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),73);return}
+        if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){pendingRecording=true;requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),73);return}
         startRecording()
     }
     @Suppress("DEPRECATION") private fun startRecording() {

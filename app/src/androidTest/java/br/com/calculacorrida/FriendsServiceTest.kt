@@ -25,11 +25,13 @@ class FriendsServiceTest {
         val originalFactory = FriendsDependencies.gateway
         val prefs = context.getSharedPreferences("user_session",0); val original = prefs.all.toMap()
         val calls = Collections.synchronizedList(mutableListOf<String>())
+        val modes=Collections.synchronizedList(mutableListOf<String>())
         val peer = UUID.randomUUID().toString()
         val fake = object : FriendsGateway {
             @Volatile var granted = false
             override fun call(action: String, data: JSONObject): JSONObject {
                 calls.add(action)
+                if(action=="heartbeat")modes.add(data.optString("mode"))
                 if (action == "share") granted = data.optBoolean("enabled")
                 if (action == "offline") granted = false
                 val shares = JSONArray()
@@ -58,6 +60,9 @@ class FriendsServiceTest {
             inst.waitForIdleSync()
             inst.runOnMainSync { ContextCompat.startForegroundService(context,Intent(context,FriendsService::class.java)) }
             await("Foreground messaging service connects",{ FriendsService.connected })
+            inst.runOnMainSync{context.startService(Intent(context,FriendsService::class.java).setAction(FriendsService.MODE).putExtra("mode","away"))}
+            await("Away presence is transmitted",{FriendsService.mode=="away" && modes.contains("away")})
+            assertFalse("Being away never starts location",FriendsService.sharing)
             assertFalse("Being online never starts location",FriendsService.sharing)
             assertFalse(calls.contains("location"))
             manager.addTestProvider(LocationManager.GPS_PROVIDER,false,false,false,false,true,true,true,android.location.Criteria.POWER_LOW,android.location.Criteria.ACCURACY_FINE)

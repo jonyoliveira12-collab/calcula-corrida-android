@@ -30,9 +30,10 @@ internal class FriendMediaStore(context:Context) {
         require(PATH.matches(path)){"Arquivo inválido."}
         repeat(2){attempt->
             val token=check()
-            val url=BASE+if(bytes==null)"object/authenticated/$BUCKET/$path" else "object/$BUCKET/$path"
+            val url=if(bytes==null)"https://hyoaomusfpeccdchgoik.supabase.co/functions/v1/jd-friend-media" else BASE+"object/$BUCKET/$path"
             val builder=Request.Builder().url(url).header("apikey",KEY).header("Authorization","Bearer $token")
             if(bytes!=null) {require(bytes.size in 1..MAX);builder.header("x-upsert","false").post(bytes.toRequestBody(mime!!.toMediaType()))}
+            else builder.post(JSONObject().put("path",path).toString().toRequestBody("application/json".toMediaType()))
             http.newCall(builder.build()).execute().use {response->
                 if(response.code==401 && attempt==0) {session.refreshAccessToken() ?: error("Entre novamente para acessar o arquivo.")}
                 else {
