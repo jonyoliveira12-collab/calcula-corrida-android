@@ -60,7 +60,15 @@ class UnifiedDesignTest {
             shell("wm size 1280x800");shell("wm density 160")
             for(theme in listOf("light","dark")) {
                 AppAppearance.setTheme(context,theme);SessionManager(context).saveUser("motorista.exemplo@teste.invalid","synthetic-token",null)
-                launch(MainActivity::class.java);screen("app-tablet-$theme.png");close()
+                launch(MainActivity::class.java)
+                inst.runOnMainSync {
+                    for(label in listOf("AJUSTAR LIMITES", "✓ BOA CORRIDA")) {
+                        val view=labels().first{it.text.toString().startsWith(label)}
+                        val rect=android.graphics.Rect()
+                        assertTrue("Tablet keeps $label fully visible above navigation",view.getGlobalVisibleRect(rect) && rect.height()==view.height)
+                    }
+                }
+                screen("app-tablet-$theme.png");close()
             }
         } finally {
             close();shell("wm size reset");shell("wm density reset")
