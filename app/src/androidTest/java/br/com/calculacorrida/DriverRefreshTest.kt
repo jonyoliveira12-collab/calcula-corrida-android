@@ -54,7 +54,11 @@ class DriverRefreshTest {
             Thread.sleep(1000);click("PARAR GRAVAÇÃO");await{has("Áudio pronto")}
             assertEquals("No upload/send before explicit send",0,sent.get())
             screen("chat-audio-review.png")
-            click("DESCARTAR");assertTrue(has("GRAVAR ÁUDIO"));assertEquals(0,sent.get())
+            click("OUVIR")
+            await{var playing=false;inst.runOnMainSync{val field=FriendsActivity::class.java.getDeclaredField("player").apply{isAccessible=true};playing=(field.get(activity) as? android.media.MediaPlayer)?.isPlaying==true};playing}
+            click("DESCARTAR");
+            inst.runOnMainSync{val field=FriendsActivity::class.java.getDeclaredField("player").apply{isAccessible=true};assertNull("Discard stops playback",field.get(activity))}
+            assertTrue(has("GRAVAR ÁUDIO"));assertEquals(0,sent.get())
             click("GRAVAR ÁUDIO");await{has("PARAR GRAVAÇÃO")}
             // Finishing the visible activity cancels microphone capture, never sends.
             inst.runOnMainSync{activity!!.finish()};inst.waitForIdleSync()

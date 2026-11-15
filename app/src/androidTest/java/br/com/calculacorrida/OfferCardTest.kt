@@ -238,15 +238,16 @@ class OfferCardTest {
                                 for(x in (body.left+(8*density).toInt()).coerceAtLeast(0) until (body.right-(8*density).toInt()).coerceAtMost(bitmap.width)) {
                                     val p=bitmap.getPixel(x,y)
                                     val red=Color.red(p);val green=Color.green(p);val blue=Color.blue(p)
-                                    val isFire=when(name) {
-                                        "red" -> red>160 && red>green*1.35 && red>blue*1.35
-                                        "amber" -> red>170 && green>75 && blue<120
-                                        else -> green>110 && green>red*1.3 && green>blue*1.1
-                                    }
+                                    // Natural flames stay amber/red; verdict color belongs to the badge and indicators.
+                                    val isFire=red>160 && green>45 && blue<140 && red>blue*1.4
                                     if(isFire)visibleFirePixels++
                                 }
                             }
-                            assertTrue("Visible $name flames against a light map",visibleFirePixels>50)
+                            assertTrue("Visible natural flames for $name verdict against a light map",visibleFirePixels>50)
+                            if(name=="green") {
+                                val badgeColors=(badge.background as android.graphics.drawable.GradientDrawable).colors!!
+                                assertTrue("A good-offer badge remains green",Color.green(badgeColors[0])>Color.red(badgeColors[0]))
+                            }
                         }
                         bitmap.recycle()
                     }

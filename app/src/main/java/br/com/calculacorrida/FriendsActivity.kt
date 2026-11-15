@@ -63,6 +63,8 @@ class FriendsActivity : AppCompatActivity() {
     private var player:android.media.MediaPlayer?=null
     private var playbackFile:java.io.File?=null
     private var playbackGeneration=0
+    private var playbackKey:String?=null
+    private var playbackLoading=false
     private val avatars=android.util.LruCache<String,android.graphics.Bitmap>(100)
     private val loadingAvatars=mutableSetOf<String>()
     private var lastMessageIds=""
@@ -139,7 +141,7 @@ class FriendsActivity : AppCompatActivity() {
         details.addView(messageScroll,LinearLayout.LayoutParams(-1,0,1f))
         audioState=text("",12f,gold).apply{visibility=View.GONE};details.addView(audioState)
         val audioActions=row()
-        previewAudioButton=button("OUVIR"){audioFile?.let{playLocal(it)}}.apply{visibility=View.GONE}
+        previewAudioButton=button("OUVIR / PARAR"){audioFile?.let{playLocal(it)}}.apply{visibility=View.GONE}
         sendAudioButton=button("ENVIAR ÁUDIO",true){sendAudio()}.apply{visibility=View.GONE}
         discardAudioButton=button("DESCARTAR"){if(!busy)discardAudio()}.apply{visibility=View.GONE}
         audioActions.addView(previewAudioButton,LinearLayout.LayoutParams(0,-2,1f));audioActions.addView(sendAudioButton,LinearLayout.LayoutParams(0,-2,1f));audioActions.addView(discardAudioButton,LinearLayout.LayoutParams(0,-2,1f));details.addView(audioActions)
@@ -347,7 +349,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             val bubble=column(12)
             bubble.background=rounded(if(mine)colors.input else colors.background,14,colors.border)
             bubble.addView(text(if(mine)"Você" else friend(peer)?.optString("name") ?: "Amigo",11f,gold))
-            if(m.optString("kind")=="audio") bubble.addView(button("▶ ÁUDIO • "+(m.optLong("duration_ms")/1000)+" s"){playRemote(m.optString("audio_path"))})
+            if(m.optString("kind")=="audio") bubble.addView(button("▶ OUVIR / PARAR • "+(m.optLong("duration_ms")/1000)+" s"){playRemote(m.optString("audio_path"))})
             else bubble.addView(text(m.optString("body"),15f,colors.text))
             bubble.addView(text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(m.optLong("time_ms"))),10f,colors.muted))
             messages.addView(bubble,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(7);leftMargin=if(mine)dp(24) else 0;rightMargin=if(mine)0 else dp(24)})
@@ -498,12 +500,13 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         } then {result->if(result!=null && peer==id){discardAudio();renderMessages(result)}}
     }
     private fun stopPlayback() {
-        playbackGeneration++
+        playbackGeneration++;playbackKey=null;playbackLoading=false
         player?.let{runCatching{it.stop()};it.release()};player=null
         playbackFile?.delete();playbackFile=null
     }
-    private fun playLocal(file:java.io.File) {
-        stopPlayback()
+    private fun playLocal(file:java.io.File,key:String=file.absolutePath) {
+        if(playbackKey==key && player!=null){stopPlayback();return}
+        stopPlayback();playbackKey=key
         val playback=android.media.MediaPlayer();player=playback
         try {
             playback.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
@@ -516,14 +519,15 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
     }
     private fun playRemote(path:String) {
         if(path.isBlank() || path=="null")return
-        stopPlayback();val generation=playbackGeneration;val id=peer
+        if(playbackKey==path && (player!=null || playbackLoading)){stopPlayback();return}
+        stopPlayback();playbackKey=path;playbackLoading=true;val generation=playbackGeneration;val id=peer
         status.text="Carregando áudio…"
         mediaIo.execute {
             val file=runCatching{val bytes=FriendMediaStore(this).download(path);java.io.File.createTempFile("jd-play-",".m4a",cacheDir).apply{writeBytes(bytes)}}.getOrNull()
             main.post {
                 if(!validAccount() || !foreground || peer!=id || generation!=playbackGeneration){file?.delete();return@post}
-                if(file==null){status.text="Áudio indisponível. Confira a conexão e a amizade.";return@post}
-                playLocal(file);playbackFile=file
+                if(file==null){playbackLoading=false;playbackKey=null;status.text="Áudio indisponível. Confira a conexão e a amizade.";return@post}
+                playLocal(file,path);playbackFile=file
             }
         }
     }
