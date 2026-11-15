@@ -439,9 +439,9 @@ class MainActivity : Activity() {
             getSharedPreferences("settings", MODE_PRIVATE).edit()
                 .putString("profile_photo_uri", uri.toString()).apply()
             showTab(selectedTab)
-            val app=applicationContext
+            val media=FriendMediaStore(applicationContext)
             Thread {
-                val result=runCatching{FriendMediaStore(app).uploadPhoto(uri)}
+                val result=runCatching{media.uploadPhoto(uri)}
                 runOnUiThread {if(!isFinishing)Toast.makeText(this,if(result.isSuccess)"Foto atualizada para seus amigos." else "Foto salva no aparelho. Não foi possível compartilhar agora; tente novamente com internet.",Toast.LENGTH_LONG).show()}
             }.start()
         }

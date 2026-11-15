@@ -18,6 +18,29 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DriverRefreshTest {
+    @Test fun accountSwitchCannotUploadOrReadAnotherDriversMedia() {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs=context.getSharedPreferences("user_session",0);val previous=prefs.all.toMap()
+        fun token(user:String):String {
+            val claims=JSONObject().put("sub",user).put("session_id",java.util.UUID.randomUUID().toString()).toString()
+            return "test."+android.util.Base64.encodeToString(claims.toByteArray(),android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)+".invalid"
+        }
+        try {
+            val a=java.util.UUID.randomUUID().toString();val b=java.util.UUID.randomUUID().toString()
+            SessionManager(context).saveUser("media-owner-a@example.invalid",token(a),null)
+            val store=FriendMediaStore(context)
+            SessionManager(context).saveUser("media-owner-b@example.invalid",token(b),null)
+            var refused=false
+            try {store.uploadPhoto(android.net.Uri.EMPTY)}catch(error:IllegalStateException){refused=error.message?.contains("conta foi alterada")==true}
+            assertTrue("Queued photo work is bound to its original account before reading/uploading",refused)
+            refused=false
+            try {store.download(a+"/avatars/"+java.util.UUID.randomUUID()+".jpg")}catch(error:IllegalStateException){refused=error.message?.contains("conta foi alterada")==true}
+            assertTrue("Queued downloads cannot use a later account session",refused)
+        } finally {
+            val edit=prefs.edit().clear();for((key,value)in previous)when(value){is String->edit.putString(key,value);is Boolean->edit.putBoolean(key,value);is Long->edit.putLong(key,value);is Int->edit.putInt(key,value);is Float->edit.putFloat(key,value)};edit.commit()
+        }
+    }
+
     @Test fun optionalAudioIsRecordedReviewedAndDiscardedWithoutSending() {
         val inst=InstrumentationRegistry.getInstrumentation();val context=inst.targetContext
         val oldFactory=FriendsDependencies.gateway;val previousTheme=AppAppearance.theme(context)

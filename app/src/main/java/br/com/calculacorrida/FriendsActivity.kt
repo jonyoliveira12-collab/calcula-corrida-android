@@ -31,6 +31,7 @@ class FriendsActivity : AppCompatActivity() {
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
     private lateinit var client: FriendsGateway
+    private lateinit var mediaStore:FriendMediaStore
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var list: LinearLayout
@@ -90,6 +91,7 @@ class FriendsActivity : AppCompatActivity() {
                 .setNegativeButton("Voltar"){_,_->finish()}.setOnCancelListener{finish()}.show();return
         }
         client=FriendsDependencies.gateway(this,null)
+        mediaStore=FriendMediaStore(applicationContext)
         peer=state?.getString("peer");messageNonce=state?.getString("message_nonce") ?: messageNonce;nonceBody=state?.getString("nonce_body").orEmpty()
         val page=column().apply{setBackgroundColor(colors.background)}
         val body=row()
@@ -420,7 +422,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         picture.tag=path
         mediaIo.execute {
             val bitmap=runCatching {
-                val bytes=FriendMediaStore(this).download(path)
+                val bytes=mediaStore.download(path)
                 val bounds=android.graphics.BitmapFactory.Options().apply{inJustDecodeBounds=true}
                 android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size,bounds)
                 require(bounds.outWidth>0 && bounds.outHeight>0)
@@ -442,7 +444,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             val uri=data?.data ?: return
             runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}
             getSharedPreferences("settings",MODE_PRIVATE).edit().putString("profile_photo_uri",uri.toString()).apply()
-            execute{val path=FriendMediaStore(this).uploadPhoto(uri);client.call("profile",JSONObject().put("avatar_path",path))} then {if(it!=null){snapshot=it;renderFriends();status.text="Foto compartilhada com seus amigos aceitos."}}
+            execute{val path=mediaStore.uploadPhoto(uri);client.call("profile",JSONObject().put("avatar_path",path))} then {if(it!=null){snapshot=it;renderFriends();status.text="Foto compartilhada com seus amigos aceitos."}}
         }
     }
     private fun requestRecording() {
@@ -495,7 +497,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         stopPlayback()
         val duration=audioDuration;val nonce=audioNonce
         execute {
-            val path=uploadedAudio ?: FriendMediaStore(this).uploadAudio(file).also{uploadedAudio=it}
+            val path=uploadedAudio ?: mediaStore.uploadAudio(file).also{uploadedAudio=it}
             client.call("send",JSONObject().put("peer",id).put("kind","audio").put("audio_path",path).put("duration_ms",duration).put("nonce",nonce))
         } then {result->if(result!=null && peer==id){discardAudio();renderMessages(result)}}
     }
@@ -523,7 +525,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         stopPlayback();playbackKey=path;playbackLoading=true;val generation=playbackGeneration;val id=peer
         status.text="Carregando áudio…"
         mediaIo.execute {
-            val file=runCatching{val bytes=FriendMediaStore(this).download(path);java.io.File.createTempFile("jd-play-",".m4a",cacheDir).apply{writeBytes(bytes)}}.getOrNull()
+            val file=runCatching{val bytes=mediaStore.download(path);java.io.File.createTempFile("jd-play-",".m4a",cacheDir).apply{writeBytes(bytes)}}.getOrNull()
             main.post {
                 if(!validAccount() || !foreground || peer!=id || generation!=playbackGeneration){file?.delete();return@post}
                 if(file==null){playbackLoading=false;playbackKey=null;status.text="Áudio indisponível. Confira a conexão e a amizade.";return@post}
