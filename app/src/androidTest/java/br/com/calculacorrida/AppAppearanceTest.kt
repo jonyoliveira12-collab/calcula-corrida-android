@@ -74,8 +74,10 @@ class AppAppearanceTest {
             inst.runOnMainSync {
                 val labels=texts(activity!!.window.decorView)
                 assertTrue(labels.any{it.text.toString()=="Um tema para cada momento"})
-                assertTrue(labels.any{it.text.toString().contains("Mensal  •  Trimestral  •  Anual")})
-                assertTrue(labels.any{it.text.toString()=="EM BREVE"})
+                assertTrue(labels.any{it.text.toString()=="R$ 10,00"})
+                assertTrue(labels.any{it.text.toString()=="R$ 25,00"})
+                assertTrue(labels.any{it.text.toString()=="R$ 90,00"})
+                assertTrue(labels.any{it.text.toString().contains("EM BREVE")})
                 assertTrue("Light text is dark enough on white panels",labels.first{it.text.toString()=="Do seu jeito"}.currentTextColor==AppAppearance.palette(context).text)
             }
             screen("settings-light.png")

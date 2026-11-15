@@ -20,7 +20,7 @@ class ReaderPrivacyTest {
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand(command)).bufferedReader().use { it.readText().trim() }
         fun hasCc(): Boolean = ui.windows.any { window ->
             val root = window.root ?: return@any false
-            try { root.findAccessibilityNodeInfosByText("CC").any { it.text?.toString() == "CC" } }
+            try { root.findAccessibilityNodeInfosByText("JD").any { it.text?.toString() == "JD" } }
             finally { root.recycle() }
         }
         fun await(label: String, timeout: Long = 15000, predicate: () -> Boolean) {

@@ -137,7 +137,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         if(prefs.getBoolean("card_details",false))body.addView(details)
         ai.setTextColor(muted);ai.maxLines=2
         if(prefs.getBoolean("card_ai",false))body.addView(ai)
-        body.background=rounded(fill,if(neonEnabled)neonColor else color)
+        body.background=rounded(fill,if(neonEnabled)neonColor else Color.rgb(0,146,99))
         fun addBanner(){if(hasBanner)addView(banner,LayoutParams(-2,-2).apply{gravity=Gravity.START;bottomMargin=if(neonEnabled && above)-dp(7) else dp(4);topMargin=dp(4)})}
         if(above)addBanner();addView(body,LayoutParams(-1,-2));if(!above)addBanner()
         contentDescription="$source • $shownLabel. R$ ${fareValue?.let(::amount)}. Até passageiro: ${pickupMinutes?.let(::duration)}. Total: ${duration(minutes)} • ${amount(totalKm)} km. Nota ${rating?.replace('.',',')?:"não identificada"}. R$ ${amount(valuePerKm)}/km. R$ ${amount(valuePerHour)}/h"

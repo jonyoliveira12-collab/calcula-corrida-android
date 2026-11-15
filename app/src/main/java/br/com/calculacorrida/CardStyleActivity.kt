@@ -53,7 +53,9 @@ class CardStyleActivity : Activity() {
         toggle("Detalhes do embarque","card_details",false)
         toggle("Comentário da IA","card_ai",false)
         title("APARÊNCIA",13)
-        toggle("Chamas realistas","card_neon_flames",true)
+        title("Estilo da etiqueta",16)
+        title("Padrão verde ou chamas realistas, como você preferir. As cores dos indicadores continuam mostrando a avaliação da oferta.",13)
+        choices(listOf("Padrão verde","Fogo realista"),if(prefs.getBoolean("card_neon_flames",true))1 else 0){prefs.edit().putBoolean("card_neon_flames",it==1).apply();refresh()}
         toggle("Animar chamas","card_neon_animated",true)
         toggle("Aviso em destaque","card_banner",true)
         toggle("Exibir o motivo","card_compact_reason",false)

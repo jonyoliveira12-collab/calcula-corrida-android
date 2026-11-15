@@ -238,15 +238,16 @@ class OfferCardTest {
                                 for(x in (body.left+(8*density).toInt()).coerceAtLeast(0) until (body.right-(8*density).toInt()).coerceAtMost(bitmap.width)) {
                                     val p=bitmap.getPixel(x,y)
                                     val red=Color.red(p);val green=Color.green(p);val blue=Color.blue(p)
-                                    val isFire=when(name) {
-                                        "red" -> red>160 && red>green*1.35 && red>blue*1.35
-                                        "amber" -> red>170 && green>75 && blue<120
-                                        else -> green>110 && green>red*1.3 && green>blue*1.1
-                                    }
+                                    // Natural flames stay amber/red; verdict color belongs to the badge and indicators.
+                                    val isFire=red>160 && green>45 && blue<140 && red>blue*1.4
                                     if(isFire)visibleFirePixels++
                                 }
                             }
-                            assertTrue("Visible $name flames against a light map",visibleFirePixels>50)
+                            assertTrue("Visible natural flames for $name verdict against a light map",visibleFirePixels>50)
+                            if(name=="green") {
+                                val badgeColors=(badge.background as android.graphics.drawable.GradientDrawable).colors!!
+                                assertTrue("A good-offer badge remains green",Color.green(badgeColors[0])>Color.red(badgeColors[0]))
+                            }
                         }
                         bitmap.recycle()
                     }
@@ -289,11 +290,10 @@ class OfferCardTest {
                 containsAll("Será?","R$ 1,67/km","R$ 50,00/h","4,85")
                 select("Boa")
                 containsAll("Bora carai","R$ 2,00/km","R$ 72,00/h","4,96")
-                val toggle=all.filterIsInstance<android.widget.Switch>().single{it.text.toString()=="Chamas realistas"}
-                assertTrue(toggle.isChecked)
-                toggle.performClick()
+                assertTrue(prefs.getBoolean("card_neon_flames",false))
+                select("Padrão verde")
                 assertNull((preview.getChildAt(0) as android.widget.TextView).compoundDrawables[0])
-                toggle.performClick()
+                select("Fogo realista")
                 select("Recusar")
             }
             instrumentation.waitForIdleSync()
