@@ -68,8 +68,14 @@ class FriendsActivity : AppCompatActivity() {
         messageNonce=state?.getString("message_nonce") ?: messageNonce
         nonceBody=state?.getString("nonce_body").orEmpty()
         val scroll = ScrollView(this).apply { isFillViewport=true; setBackgroundColor(colors.background) }
-        root = column(20); scroll.addView(root); setContentView(scroll)
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll) { view,insets ->
+        root = column(20); scroll.addView(root)
+        val page=column().apply {setBackgroundColor(colors.background)}
+        page.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        val navigation=row()
+        DriverNavigation.fill(this,navigation,"Amigos")
+        page.addView(navigation,LinearLayout.LayoutParams(-1,dp(80)).apply {leftMargin=dp(12);rightMargin=dp(12);bottomMargin=dp(4)})
+        setContentView(page)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(page) { view,insets ->
             val bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             view.setPadding(bars.left,bars.top,bars.right,bars.bottom); insets
         }

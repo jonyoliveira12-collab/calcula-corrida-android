@@ -175,7 +175,13 @@ class MainActivity : Activity() {
             getSharedPreferences("settings",0).edit().putBoolean("notification_permission_asked",true).apply()
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),501)
         }
-        showTab(savedInstanceState?.getString("selected_tab") ?: "Início")
+        showTab(savedInstanceState?.getString("selected_tab") ?: intent.getStringExtra(DriverNavigation.DESTINATION) ?: "Início")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if(::content.isInitialized) showTab(intent.getStringExtra(DriverNavigation.DESTINATION) ?: "Início")
     }
 
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("selected_tab",selectedTab); super.onSaveInstanceState(outState) }
@@ -221,34 +227,10 @@ class MainActivity : Activity() {
             "Semáforo" -> buildTrafficSettings()
             else -> buildProfile()
         }
-        bottom.removeAllViews()
-        val tabs = listOf(
-            Triple("Início", "⌂", "Início"),
-            Triple("Finanças", "▥", "Relatórios"),
-            Triple("Semáforo", "◎", "Metas"),
-            Triple("Histórico", "↶", "Histórico"),
-            Triple("Perfil", "⚙", "Configurações")
-        )
-        tabs.forEach { item ->
-            val active = item.first == selectedTab
-            val cell = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(dp(4), dp(4), dp(4), dp(4))
-                if(active) background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(255,232,139),brandGold,Color.rgb(213,151,18))).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),Color.rgb(255,239,169))}
-                isClickable = true
-                setOnClickListener { showTab(item.first) }
-            }
-            cell.addView(label(item.second, 26f, if (active) Color.BLACK else gold, true))
-            cell.addView(label(item.third, if(resources.configuration.screenWidthDp>=600)12f else 9f, if (active) Color.BLACK else white, active))
-            bottom.addView(cell, LinearLayout.LayoutParams(0, -1, 1f))
-        }
+        DriverNavigation.fill(this,bottom,selectedTab) { showTab(it) }
     }
 
     private fun buildHome() {
-        content.addView(action("AMIGOS • CONVERSA E LOCALIZAÇÃO  ›", false) {
-            startActivity(Intent(this, FriendsActivity::class.java))
-        })
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val records = JourneyStore.getRecords(this)
         val wide = resources.configuration.screenWidthDp >= 600
