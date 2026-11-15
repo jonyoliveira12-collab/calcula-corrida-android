@@ -73,7 +73,7 @@ class CardStyleActivity : Activity() {
         title("Arraste o cartão para ajustar a posição durante a leitura. Os cálculos aparecem antes da resposta da IA.",13)
         refresh()
     }
-    private fun title(text:String,size:Int){page.addView(TextView(this).apply{this.text=text;textSize=size.toFloat();setTextColor(colors.gold);typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(14),0,dp(10))})}
+    private fun title(text:String,size:Int){page.addView(TextView(this).apply{this.text=text;textSize=size.toFloat();setTextColor(if(size<=13)colors.muted else colors.text);typeface=if(size<=13)Typeface.DEFAULT else Typeface.DEFAULT_BOLD;setPadding(0,dp(14),0,dp(10))})}
     private fun styleButton(button:Button,selected:Boolean=false) {
         button.setTextColor(if(selected)Color.BLACK else gold)
         button.typeface=Typeface.DEFAULT_BOLD

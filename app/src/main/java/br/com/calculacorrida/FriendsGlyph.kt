@@ -23,6 +23,22 @@ class FriendsGlyph(context:Context,private val kind:String,private val tint:Int,
             canvas.translate(24f,24f);canvas.scale(.52f,.52f)
         }
         when(kind) {
+            "home" -> {
+                stroke(5f);canvas.drawPath(Path().apply{moveTo(14f,45f);lineTo(50f,14f);lineTo(86f,45f);moveTo(24f,39f);lineTo(24f,83f);lineTo(76f,83f);lineTo(76f,39f);moveTo(42f,83f);lineTo(42f,58f);lineTo(58f,58f);lineTo(58f,83f)},paint)
+            }
+            "target" -> {
+                stroke(5f);for(r in listOf(34f,22f,9f))canvas.drawCircle(47f,53f,r,paint)
+                canvas.drawLine(48f,52f,84f,16f,paint);canvas.drawLine(72f,16f,84f,16f,paint);canvas.drawLine(84f,16f,84f,29f,paint)
+            }
+            "history","clock" -> {
+                stroke(5f);canvas.drawArc(16f,16f,84f,84f,if(kind=="history")205f else 0f,if(kind=="history")300f else 360f,false,paint)
+                canvas.drawLine(50f,29f,50f,50f,paint);canvas.drawLine(50f,50f,65f,59f,paint)
+                if(kind=="history"){canvas.drawLine(13f,22f,13f,43f,paint);canvas.drawLine(13f,43f,32f,43f,paint)}
+            }
+            "settings" -> {
+                stroke(5f);canvas.drawCircle(50f,50f,25f,paint);canvas.drawCircle(50f,50f,9f,paint)
+                for(i in 0..7){val rad=i*Math.PI/4;canvas.drawLine(50f+25*kotlin.math.cos(rad).toFloat(),50f+25*kotlin.math.sin(rad).toFloat(),50f+36*kotlin.math.cos(rad).toFloat(),50f+36*kotlin.math.sin(rad).toFloat(),paint)}
+            }
             "people","add" -> {
                 fill();canvas.drawCircle(38f,29f,12f,paint);canvas.drawCircle(67f,34f,10f,paint)
                 canvas.drawRoundRect(17f,47f,59f,77f,14f,14f,paint)

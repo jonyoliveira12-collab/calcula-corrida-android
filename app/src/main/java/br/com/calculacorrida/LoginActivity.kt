@@ -103,7 +103,7 @@ class LoginActivity : AppCompatActivity() {
 
         loginButton.setOnClickListener { authenticate(isRegistration = false) }
         registerButton.setOnClickListener { authenticate(isRegistration = true) }
-        if (AppAppearance.theme(this)!="dark") {
+        run {
             val colors=AppAppearance.palette(this)
             val page=findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0)
             page.setBackgroundColor(colors.background)
@@ -120,6 +120,13 @@ class LoginActivity : AppCompatActivity() {
             }
             forgotPasswordText.setTextColor(colors.gold)
             rememberEmailCheck.buttonTintList=android.content.res.ColorStateList.valueOf(colors.gold)
+            findViewById<android.widget.ImageView>(R.id.loginBrandLogo).apply {
+                background=android.graphics.drawable.GradientDrawable().apply{setColor(android.graphics.Color.BLACK);cornerRadius=32*resources.displayMetrics.density}
+                clipToOutline=true
+            }
+            (passwordInput.parent as? View)?.background=android.graphics.drawable.GradientDrawable().apply{setColor(colors.input);cornerRadius=10*resources.displayMetrics.density}
+            loginButton.backgroundTintList=null
+            loginButton.background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(android.graphics.Color.rgb(255,225,133),android.graphics.Color.rgb(239,190,65))).apply{cornerRadius=14*resources.displayMetrics.density}
             loginButton.setTextColor(android.graphics.Color.rgb(29,23,11))
             registerButton.setTextColor(colors.gold)
             registerButton.background=android.graphics.drawable.GradientDrawable().apply {setColor(colors.input);cornerRadius=12*resources.displayMetrics.density;setStroke((resources.displayMetrics.density).toInt().coerceAtLeast(1),colors.border)}

@@ -89,7 +89,7 @@ class LoginControlsTest {
             eye.performClick()
             assertTrue(password.transformationMethod is PasswordTransformationMethod)
             val register=activity.findViewById<Button>(R.id.registerButton)
-            assertEquals(Color.rgb(255,224,125),register.currentTextColor)
+            assertEquals(AppAppearance.palette(context).gold,register.currentTextColor)
             assertEquals(1f,register.alpha)
             assertEquals("CRIAR CONTA",register.text.toString())
             activity.finish()
