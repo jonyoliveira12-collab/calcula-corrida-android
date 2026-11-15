@@ -18,16 +18,18 @@ import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
 
-    private val bg = Color.rgb(10, 10, 12)
-    private val panel = Color.rgb(15, 16, 18)
-    private val gold = Color.rgb(239, 190, 65)
-    private val white = Color.rgb(247, 244, 232)
-    private val muted = Color.rgb(176, 172, 158)
-    private val green = Color.rgb(20, 166, 123)
-    private val red = Color.rgb(226, 75, 100)
-    private val amber = Color.rgb(242, 157, 45)
-    private val border = Color.rgb(141, 112, 44)
-    private val bgInput = Color.rgb(35, 35, 39)
+    private val colors by lazy { AppAppearance.palette(this) }
+    private val bg get() = colors.background
+    private val panel get() = colors.panel
+    private val gold get() = colors.gold
+    private val white get() = colors.text
+    private val muted get() = colors.muted
+    private val green get() = colors.green
+    private val red get() = colors.red
+    private val amber get() = if(colors.light) Color.rgb(146,88,0) else Color.rgb(242,157,45)
+    private val border get() = colors.border
+    private val bgInput get() = colors.input
+    private val brandGold = Color.rgb(239,190,65)
 
     private lateinit var content: LinearLayout
     private lateinit var bottom: LinearLayout
@@ -62,6 +64,7 @@ class MainActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppAppearance.apply(this)
         super.onCreate(savedInstanceState)
 
         // O aplicativo exige internet validada para abrir e operar.
@@ -79,13 +82,11 @@ class MainActivity : Activity() {
             return
         }
 
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
-        window.decorView.systemUiVisibility = 0
+        AppAppearance.styleWindow(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = getDrawable(R.drawable.home_background)
+            background = if(colors.light) rounded(bg,0,bg) else getDrawable(R.drawable.home_background)
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
@@ -109,10 +110,10 @@ class MainActivity : Activity() {
             setPadding(dp(10), 0, 0, 0)
             addView(label("JHONDRIVER", if(resources.configuration.screenWidthDp>=600)32f else 22f, Color.WHITE, true).apply {
                 typeface=Typeface.create("sans-serif-condensed",Typeface.BOLD_ITALIC)
-                text=android.text.SpannableString("JHONDRIVER").apply{setSpan(android.text.style.ForegroundColorSpan(gold),0,4,0)}
+                text=android.text.SpannableString("JHONDRIVER").apply{setSpan(android.text.style.ForegroundColorSpan(brandGold),0,4,0)}
             })
-            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, gold, true))
-            addView(label("Versão ${packageManager.getPackageInfo(packageName,0).versionName}", 9f, gold, false))
+            addView(label("INTELIGÊNCIA PARA CADA PERCURSO", 9f, brandGold, true))
+            addView(label("Versão ${packageManager.getPackageInfo(packageName,0).versionName}", 9f, brandGold, false))
         }
         brandRow.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         val avatar = ImageView(this).apply {
@@ -151,10 +152,10 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(23, 23, 26), Color.rgb(18, 18, 21))
+                intArrayOf(panel, panel)
             ).apply {
                 cornerRadius = dp(19).toFloat()
-                setStroke(dp(1), Color.rgb(132, 103, 42))
+                setStroke(dp(1), border)
             }
             elevation = dp(8).toFloat()
             setPadding(dp(3), dp(5), dp(3), dp(5))
@@ -174,11 +175,20 @@ class MainActivity : Activity() {
             getSharedPreferences("settings",0).edit().putBoolean("notification_permission_asked",true).apply()
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),501)
         }
-        showTab("Início")
+        showTab(savedInstanceState?.getString("selected_tab") ?: intent.getStringExtra(DriverNavigation.DESTINATION) ?: "Início")
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if(::content.isInitialized) showTab(intent.getStringExtra(DriverNavigation.DESTINATION) ?: "Início")
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) { outState.putString("selected_tab",selectedTab); super.onSaveInstanceState(outState) }
 
     override fun onResume() {
         super.onResume()
+        if (AppAppearance.isLight(this) != colors.light) { recreate(); return }
         if (!isFinishing) AppUpdates.check(this)
         if (!NetworkGate.isOnline(this)) {
             startActivity(Intent(this, LoginActivity::class.java))
@@ -217,28 +227,7 @@ class MainActivity : Activity() {
             "Semáforo" -> buildTrafficSettings()
             else -> buildProfile()
         }
-        bottom.removeAllViews()
-        val tabs = listOf(
-            Triple("Início", "⌂", "Início"),
-            Triple("Finanças", "▥", "Relatórios"),
-            Triple("Semáforo", "◎", "Metas"),
-            Triple("Histórico", "↶", "Histórico"),
-            Triple("Perfil", "⚙", "Configurações")
-        )
-        tabs.forEach { item ->
-            val active = item.first == selectedTab
-            val cell = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(dp(4), dp(4), dp(4), dp(4))
-                if(active) background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(255,232,139),gold,Color.rgb(213,151,18))).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),Color.rgb(255,239,169))}
-                isClickable = true
-                setOnClickListener { showTab(item.first) }
-            }
-            cell.addView(label(item.second, 26f, if (active) Color.BLACK else gold, true))
-            cell.addView(label(item.third, if(resources.configuration.screenWidthDp>=600)12f else 9f, if (active) Color.BLACK else white, active))
-            bottom.addView(cell, LinearLayout.LayoutParams(0, -1, 1f))
-        }
+        DriverNavigation.fill(this,bottom,selectedTab) { showTab(it) }
     }
 
     private fun buildHome() {
@@ -325,7 +314,7 @@ class MainActivity : Activity() {
         feature("● Semáforo", "traffic_enabled")
         content.addView(controls)
 
-        val offerCard = card().apply { background = GoldPanelDrawable(resources.displayMetrics.density,true) }
+        val offerCard = card().apply { background = if(colors.light) rounded(panel,22,border) else GoldPanelDrawable(resources.displayMetrics.density,true) }
         offerCard.addView(label("⚡ ÚLTIMA OFERTA", 22f, gold, true, 0, 18).apply{gravity=Gravity.CENTER})
         val offer = records.firstOrNull { selectedOfferApp == null || it.optString("app").equals(selectedOfferApp,true) }
         selectedOfferApp?.let{offerCard.addView(pill(it,gold))}
@@ -344,7 +333,7 @@ class MainActivity : Activity() {
         rates.addView(metric("R$/HORA", if (offer == null) "—" else "R$ " + number("perHour")), weight())
         offerCard.addView(rates)
         val classification = offer?.optString("classification")
-        offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else white, true, 18, 8).apply {
+        offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else Color.WHITE, true, 18, 8).apply {
             gravity = Gravity.CENTER
             val edge=when(classification){"GOOD"->Color.rgb(54,240,71);"BAD"->Color.rgb(237,78,69);"REVIEW"->gold;else->border}
             val fill=when(classification){"GOOD"->Color.rgb(0,106,20);"BAD"->Color.rgb(106,19,19);"REVIEW"->Color.rgb(106,73,5);else->panel}
@@ -359,7 +348,7 @@ class MainActivity : Activity() {
         filters.addView(label("Mínimo por hora", 13f, muted, false))
         filters.addView(label(money(prefs.getFloat("good_per_hour", 60f)), 23f, gold, true, 4, 8))
         filters.addView(action("AJUSTAR LIMITES  ›", false) { showTab("Semáforo") })
-        val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=GoldPanelDrawable(resources.displayMetrics.density);setPadding(dp(7),dp(8),dp(7),dp(8))}
+        val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=if(colors.light)rounded(panel,20,border) else GoldPanelDrawable(resources.displayMetrics.density);setPadding(dp(7),dp(8),dp(7),dp(8))}
         for((app,color) in listOf("Todos" to Color.rgb(33,33,35),"Uber" to Color.BLACK,"99" to Color.rgb(255,214,32),"inDrive" to Color.rgb(151,234,18),"iFood" to Color.rgb(231,27,49))) {
             rail.addView(label(app,if(app=="Todos")10f else 16f,if(app=="99" || app=="inDrive")Color.BLACK else Color.WHITE,true).apply {
                 gravity=Gravity.CENTER;minHeight=dp(56)
@@ -420,6 +409,7 @@ class MainActivity : Activity() {
             diagnostics.visibility = if(diagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         })
         content.addView(diagnostics, margin(0,10))
+        content.addView(subscriptionCard(),margin(0,12))
     }
 
     private fun chooseProfilePhoto() {
@@ -769,10 +759,29 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun subscriptionCard(): LinearLayout = card().apply {
+        addView(label("EM BREVE",11f,gold,true))
+        addView(label("Assinaturas JHONDRIVER",20f,white,true,4,6))
+        addView(label("Mensal  •  Trimestral  •  Anual",15f,gold,true,2,5))
+        addView(label("Novos planos em preparação. Valores e condições serão divulgados no lançamento.",13f,muted,false))
+    }
+
     private fun buildProfile() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         content.addView(label("Do seu jeito", 28f, white, true, 18, 3))
         content.addView(label("Ajustes, metas e suporte em um só lugar.", 14f, muted, false, 0, 16))
+
+        val appearance = card()
+        appearance.addView(label("APARÊNCIA",11f,gold,true))
+        appearance.addView(label("Um tema para cada momento",20f,white,true,4,5))
+        appearance.addView(label("Escolha fundo escuro ou branco. Sua escolha fica salva neste aparelho.",13f,muted,false,0,8))
+        val choices=horizontal()
+        for ((title,light) in listOf("◐  Escuro" to false,"☀  Claro" to true)) choices.addView(action((if(colors.light==light)"✓  " else "")+title,colors.light==light) {
+            if(colors.light!=light) { AppAppearance.setLight(this,light); recreate() }
+        },LinearLayout.LayoutParams(0,-2,1f).apply {rightMargin=dp(6)})
+        appearance.addView(choices)
+        content.addView(appearance,margin(0,10))
+        content.addView(subscriptionCard(),margin(0,10))
 
         val privacy = card()
         privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
@@ -950,7 +959,7 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = GoldPanelDrawable(resources.displayMetrics.density)
+        background = if(colors.light) rounded(panel,20,border) else GoldPanelDrawable(resources.displayMetrics.density)
         elevation = dp(6).toFloat()
         layoutParams = margin(0, 10)
     }
@@ -1021,7 +1030,7 @@ class MainActivity : Activity() {
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = android.graphics.drawable.RippleDrawable(
             ColorStateList.valueOf(Color.argb(45,255,220,120)),
-            rounded(if(prominent)gold else Color.rgb(36,37,42),14,if(prominent)gold else border),null)
+            rounded(if(prominent)brandGold else bgInput,14,if(prominent)brandGold else border),null)
         layoutParams = LinearLayout.LayoutParams(-2,-2).apply {topMargin=dp(8)}
         isClickable = true
         isFocusable = true
@@ -1053,7 +1062,7 @@ class MainActivity : Activity() {
         row.addView(labels, LinearLayout.LayoutParams(0,-2,1f))
         row.addView(sw)
         row.setPadding(dp(12),dp(12),dp(8),dp(12))
-        row.background = rounded(Color.rgb(32,34,40),16,border)
+        row.background = rounded(bgInput,16,border)
         row.layoutParams = LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(8);bottomMargin=dp(4)}
         sw.thumbTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(gold,Color.LTGRAY))
         sw.trackTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(Color.rgb(133,105,39),Color.rgb(74,76,84)))
@@ -1074,7 +1083,7 @@ class MainActivity : Activity() {
         gravity = Gravity.CENTER
         setTextColor(if (isSelected) Color.BLACK else gold)
         setPadding(dp(12), dp(10), dp(12), dp(10))
-        background = rounded(if (isSelected) gold else panel, 10, if (isSelected) gold else border)
+        background = rounded(if (isSelected) brandGold else panel, 10, if (isSelected) brandGold else border)
         isClickable = true
         setOnClickListener {
             prefs.edit().putString("overlay_position", key).apply()

@@ -9,7 +9,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-class SessionManager(context:Context) {
+class SessionManager(private val context:Context) {
     private val prefs:SharedPreferences=context.getSharedPreferences("user_session",Context.MODE_PRIVATE)
     fun saveUser(email:String,accessToken:String?=null,refreshToken:String?=null) {
         prefs.edit().putBoolean("logged_in",true).putString("email",email)
@@ -18,7 +18,7 @@ class SessionManager(context:Context) {
     fun getAccessToken():String?=prefs.getString("access_token",null)
     fun isLoggedIn():Boolean=prefs.getBoolean("logged_in",false)
     fun getEmail():String?=prefs.getString("email",null)
-    fun logout() { synchronized(refreshLock) { prefs.edit().clear().apply() } }
+    fun logout() { synchronized(refreshLock) { FriendsService.signOut(context, getAccessToken()); prefs.edit().clear().apply() } }
     /** Called only on an IO thread, after a 401. Refresh rotation is serialized process-wide. */
     fun refreshAccessToken():String? = synchronized(refreshLock) {
         val refresh=prefs.getString("refresh_token",null)?.takeIf { it.isNotBlank() } ?: return@synchronized null
