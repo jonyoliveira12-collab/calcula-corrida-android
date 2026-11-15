@@ -26,7 +26,7 @@ class FriendsActivity : AppCompatActivity() {
     private val gold = Color.rgb(235, 191, 77)
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
-    private lateinit var client: FriendsClient
+    private lateinit var client: FriendsGateway
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var list: LinearLayout
@@ -56,7 +56,7 @@ class FriendsActivity : AppCompatActivity() {
                 .setPositiveButton("Voltar") { _, _ -> finish() }.setOnCancelListener { finish() }.show()
             return
         }
-        client = FriendsClient(this)
+        client = FriendsDependencies.gateway(this, null)
         val scroll = ScrollView(this); root = column(); scroll.addView(root); setContentView(scroll)
         root.addView(text("AMIGOS", 26f, gold))
         root.addView(text("Convites, conversa e localização compartilhada por você.", 14f))
@@ -84,7 +84,7 @@ class FriendsActivity : AppCompatActivity() {
             settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?) = true
-                override fun onPageFinished(view: WebView?, url: String?) { mapReady = true; updateMap(pendingLocation) }
+                override fun onPageFinished(view: WebView?, url: String?) { if (isFinishing || isDestroyed) return; mapReady = true; updateMap(pendingLocation) }
             }
         }
         details.addView(map, LinearLayout.LayoutParams(-1, dp(260)))

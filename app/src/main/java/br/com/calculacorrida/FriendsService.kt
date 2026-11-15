@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
 class FriendsService : Service(), LocationListener {
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
-    private lateinit var client: FriendsClient
+    private lateinit var client: FriendsGateway
     private lateinit var locations: LocationManager
     private val sid = UUID.randomUUID().toString()
     private val deadlines = mutableMapOf<String, Long>()
@@ -52,7 +52,7 @@ class FriendsService : Service(), LocationListener {
         super.onCreate()
         logoutToken = null
         token = SessionManager(this).getAccessToken()
-        client = FriendsClient(this)
+        client = FriendsDependencies.gateway(this, null)
         locations = getSystemService(LocationManager::class.java)
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Amigos em atividade", NotificationManager.IMPORTANCE_LOW))
@@ -176,7 +176,7 @@ class FriendsService : Service(), LocationListener {
         main.removeCallbacksAndMessages(null)
         locations.removeUpdates(this)
         val captured = logoutToken ?: SessionManager(this).getAccessToken() ?: token
-        if (captured != null) io.execute { runCatching { FriendsClient(this, captured).call("offline", JSONObject().put("session", sid)) } }
+        if (captured != null) io.execute { runCatching { FriendsDependencies.gateway(this, captured).call("offline", JSONObject().put("session", sid)) } }
         io.shutdown()
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()

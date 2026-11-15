@@ -8,8 +8,17 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+internal interface FriendsGateway {
+    fun call(action: String, data: JSONObject = JSONObject()): JSONObject
+}
+
+/** In-process dependency boundary; not exported to other apps. */
+internal object FriendsDependencies {
+    @Volatile var gateway: (Context, String?) -> FriendsGateway = { context, token -> FriendsClient(context, token) }
+}
+
 /** Uses the signed-in driver's session only. No administrator key is distributed. */
-class FriendsClient(context: Context, private val capturedToken: String? = null) {
+internal class FriendsClient(context: Context, private val capturedToken: String? = null) : FriendsGateway {
     private val session = SessionManager(context.applicationContext)
     private val identity = identityOf(session.getAccessToken())
     private fun identityOf(token: String?): String? = runCatching {
@@ -19,7 +28,7 @@ class FriendsClient(context: Context, private val capturedToken: String? = null)
     private fun checkAccount(token: String) {
         if (capturedToken == null && (identity == null || identityOf(token) != identity)) error("Entre novamente para usar Amigos.")
     }
-    fun call(action: String, data: JSONObject = JSONObject()): JSONObject {
+    override fun call(action: String, data: JSONObject): JSONObject {
         var token = capturedToken ?: session.getAccessToken() ?: error("Entre novamente para usar Amigos.")
         repeat(2) { attempt ->
             checkAccount(token)
