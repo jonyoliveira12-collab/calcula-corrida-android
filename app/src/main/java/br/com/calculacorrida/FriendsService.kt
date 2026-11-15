@@ -21,9 +21,11 @@ class FriendsService : Service(), LocationListener {
     private val sid = UUID.randomUUID().toString()
     private val deadlines = mutableMapOf<String, Long>()
     private val stoppingPeers = mutableSetOf<String>()
-    private var active = true
+    @Volatile private var active = true
     private var listening = false
     private var busy = false
+    private var locationMode = false
+    private var postingLocation = false
     private var token: String? = null
     private var lastSent = 0L
     private var lastMessage: String? = null
@@ -85,7 +87,15 @@ class FriendsService : Service(), LocationListener {
     }
     private fun request(action: String, data: JSONObject, done: (JSONObject?) -> Unit) {
         io.execute {
-            val response = runCatching { client.call(action, data) }.getOrNull()
+            val started = SystemClock.elapsedRealtime()
+            val response = if (action == "location" && (!active || !sharing)) null else runCatching {
+                if (action == "location") {
+                    val age = data.optLong("age_ms") + (SystemClock.elapsedRealtime() - data.optLong("_queued_at", SystemClock.elapsedRealtime()))
+                    require(age in 0..45000) { "Posição antiga" }
+                    data.put("age_ms", age).remove("_queued_at")
+                }
+                client.call(action, data).put("_elapsed_ms", SystemClock.elapsedRealtime() - started)
+            }.getOrNull()
             main.post { if (active) done(response) }
         }
     }
@@ -95,7 +105,7 @@ class FriendsService : Service(), LocationListener {
         val now = json.optLong("now_ms")
         if (shares != null) for (i in 0 until shares.length()) {
             val share = shares.getJSONObject(i); val peer = share.optString("peer")
-            val remaining = FriendLocationPolicy.remaining(share.optLong("until_ms"), now)
+            val remaining = (FriendLocationPolicy.remaining(share.optLong("until_ms"), now) - json.optLong("_elapsed_ms")).coerceAtLeast(0)
             if (remaining > 0 && peer !in stoppingPeers) deadlines[peer] = SystemClock.elapsedRealtime() + remaining
         }
         reconcileLocation()
@@ -136,9 +146,12 @@ class FriendsService : Service(), LocationListener {
         if (!active || !sharing || !connected || SystemClock.elapsedRealtime() - lastSent < 9000) return
         val age = (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1000000
         if (!location.hasAccuracy() || !FriendLocationPolicy.valid(location.latitude, location.longitude, location.accuracy, age)) return
+        if (postingLocation) return
+        postingLocation = true
         lastSent = SystemClock.elapsedRealtime()
         request("location", JSONObject().put("session", sid).put("lat", location.latitude).put("lng", location.longitude)
-            .put("accuracy", location.accuracy.toDouble()).put("age_ms", age)) { json ->
+            .put("accuracy", location.accuracy.toDouble()).put("age_ms", age).put("_queued_at", SystemClock.elapsedRealtime())) { json ->
+            postingLocation = false
             if (json?.optBoolean("no_shares") == true) { deadlines.clear(); reconcileLocation() }
         }
     }
@@ -146,6 +159,7 @@ class FriendsService : Service(), LocationListener {
     override fun onProviderEnabled(provider: String) { if (listening) locations.removeUpdates(this); listening = false; reconcileLocation() }
     @Deprecated("Legacy Android callback") override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
     private fun notice(text: String, prepareLocation: Boolean = false) {
+        if (prepareLocation) locationMode = true
         val open = PendingIntent.getActivity(this, 700, Intent(this, FriendsActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val stop = PendingIntent.getService(this, 703, Intent(this, FriendsService::class.java).setAction(STOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val notification = Notification.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.ic_menu_mylocation)
@@ -153,7 +167,7 @@ class FriendsService : Service(), LocationListener {
             .setContentIntent(open).addAction(Notification.Action.Builder(null, "Ficar offline", stop).build()).build()
         if (Build.VERSION.SDK_INT >= 29) {
             var type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING else 0
-            if ((listening || prepareLocation) && permitted()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            if (locationMode && permitted()) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             startForeground(700, notification, type)
         } else startForeground(700, notification)
     }

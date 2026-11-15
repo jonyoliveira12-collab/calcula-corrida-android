@@ -95,6 +95,9 @@ var map=L.map('map').setView([-15.8,-47.9],4);L.tileLayer('https://tile.openstre
 function clearPoint(){if(point){map.removeLayer(point);point=null;}if(area){map.removeLayer(area);area=null;}}
 function showPoint(lat,lng,accuracy){clearPoint();point=L.circleMarker([lat,lng],{radius:9,color:'#ebbf4d',fillOpacity:1}).addTo(map);area=L.circle([lat,lng],{radius:accuracy,color:'#ebbf4d'}).addTo(map);map.invalidateSize();map.setView([lat,lng],15);}
 </script></body></html>""", "text/html", "UTF-8", null)
+        details.addView(button("CRÉDITOS DO MAPA • OPENSTREETMAP") {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.openstreetmap.org/copyright")))
+        })
         details.addView(button("COMPARTILHAR MINHA LOCALIZAÇÃO COM ESTE AMIGO") { chooseShare() })
         details.addView(button("PARAR DE COMPARTILHAR COM ESTE AMIGO") { share(false, 15) })
         details.addView(button("REMOVER AMIGO") { relationship("remove") })
@@ -178,6 +181,7 @@ function showPoint(lat,lng,accuracy){clearPoint();point=L.circleMarker([lat,lng]
                 "blocked" -> card.addView(button("DESBLOQUEAR") { changeRelationship("unblock", id) })
                 else -> {
                     card.addView(text(if (f.optBoolean("online")) "● Online" else "○ Offline", 15f, if (f.optBoolean("online")) Color.GREEN else Color.LTGRAY))
+                    if (f.optLong("i_share_until") > snapshot.optLong("now_ms")) card.addView(text("Você compartilha até " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(f.optLong("i_share_until"))), 13f, gold))
                     card.addView(button("ABRIR CONVERSA E MAPA • ${f.optInt("unread")} NÃO LIDAS") {
                         if (peer != id) { draft.text.clear(); messageNonce = UUID.randomUUID().toString(); messages.text = "" }
                         peer = id; details.visibility = View.VISIBLE; renderLocation(f); loadMessages(id)

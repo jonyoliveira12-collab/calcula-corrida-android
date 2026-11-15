@@ -11,9 +11,18 @@ import java.util.concurrent.TimeUnit
 /** Uses the signed-in driver's session only. No administrator key is distributed. */
 class FriendsClient(context: Context, private val capturedToken: String? = null) {
     private val session = SessionManager(context.applicationContext)
+    private val identity = identityOf(session.getAccessToken())
+    private fun identityOf(token: String?): String? = runCatching {
+        val claims = JSONObject(String(android.util.Base64.decode(token!!.split('.')[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)))
+        claims.getString("sub") + ":" + claims.getString("session_id")
+    }.getOrNull()
+    private fun checkAccount(token: String) {
+        if (capturedToken == null && (identity == null || identityOf(token) != identity)) error("Entre novamente para usar Amigos.")
+    }
     fun call(action: String, data: JSONObject = JSONObject()): JSONObject {
         var token = capturedToken ?: session.getAccessToken() ?: error("Entre novamente para usar Amigos.")
         repeat(2) { attempt ->
+            checkAccount(token)
             val request = Request.Builder().url("https://hyoaomusfpeccdchgoik.supabase.co/rest/v1/rpc/jd_friends")
                 .header("apikey", "sb_publishable_pLJTLctnmN2Z1DVNIoqyBA_DmQZv-EX")
                 .header("Authorization", "Bearer $token")

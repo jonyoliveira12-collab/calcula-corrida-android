@@ -42,6 +42,26 @@ begin
  if jsonb_array_length(r->'messages')<>1 then raise exception 'Duplicate chat message';end if;
  perform set_config('request.jwt.claims',jsonb_build_object('sub',c,'session_id',sc,'role','authenticated')::text,true);
  r:=public.jd_friends('snapshot','{}');if jsonb_array_length(r->'friends')<>0 then raise exception 'Stranger saw friends';end if;
+ -- Expired grants and stale presence never expose a cached point.
+ execute 'reset role';
+ update jd_social.grants set expires_at=now()-interval '1 second' where owner_id=a;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',b,'session_id',sb,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ r:=public.jd_friends('snapshot','{}');if (r#>'{friends,0,location}')<>'null'::jsonb then raise exception 'Expired consent exposed location';end if;
+ execute 'reset role';
+ update jd_social.grants set expires_at=now()+interval '15 minutes' where owner_id=a;
+ update jd_social.presence set last_seen=now()-interval '76 seconds' where user_id=a;
+ execute 'set local role authenticated';
+ r:=public.jd_friends('snapshot','{}');
+ if (r#>'{friends,0,location}')<>'null'::jsonb or (r#>>'{friends,0,online}')::boolean then raise exception 'Stale presence exposed location';end if;
+ execute 'reset role';
+ update jd_social.presence set last_seen=now() where user_id=a;
+ update jd_social.locations set measured_at=now()-interval '121 seconds' where user_id=a;
+ execute 'set local role authenticated';
+ r:=public.jd_friends('snapshot','{}');if (r#>'{friends,0,location}')<>'null'::jsonb then raise exception 'Old position exposed';end if;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',a,'session_id',sa,'role','authenticated')::text,true);
+ failed:=false;begin perform public.jd_friends('location',jsonb_build_object('session',live,'lat',-25.0,'lng',-49.0,'accuracy',15,'age_ms',45001));exception when invalid_parameter_value then failed:=true;end;
+ if not failed then raise exception 'Stale sensor point accepted';end if;
  perform set_config('request.jwt.claims',jsonb_build_object('sub',a,'session_id',sa,'role','authenticated')::text,true);
  perform public.jd_friends('share',jsonb_build_object('peer',b,'enabled',false));
  perform set_config('request.jwt.claims',jsonb_build_object('sub',b,'session_id',sb,'role','authenticated')::text,true);
