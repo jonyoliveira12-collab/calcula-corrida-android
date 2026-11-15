@@ -26,6 +26,7 @@ class FriendsActivity : AppCompatActivity() {
     private val colors by lazy { AppAppearance.palette(this) }
     private val gold get()=colors.gold
     private val accent = Color.rgb(239,190,65)
+    private lateinit var connectionTitle: TextView
     private lateinit var stats: TextView
     private lateinit var conversationTitle: TextView
     private val main = Handler(Looper.getMainLooper())
@@ -108,15 +109,38 @@ class FriendsActivity : AppCompatActivity() {
         val nav=row()
         nav.addView(text("‹ Voltar",14f,gold).apply{minHeight=dp(44);gravity=android.view.Gravity.CENTER_VERTICAL;setOnClickListener{finish()}},LinearLayout.LayoutParams(0,-2,1f))
         nav.addView(button("◐ TEMA"){chooseTheme()},LinearLayout.LayoutParams(-2,-2));root.addView(nav)
-        root.addView(text("JHONDRIVER / AMIGOS",11f,gold))
-        root.addView(text("Conversas e contatos",24f).apply{typeface=Typeface.DEFAULT_BOLD})
-        stats=text("Seus amigos na estrada",12f,colors.muted);root.addView(stats)
-        status=text("Conectando…",13f,colors.muted);root.addView(status)
-        online=button("FICAR ONLINE • ESCOLHER STATUS",true){choosePresence()};root.addView(online)
-        val actions=row()
-        actions.addView(button("MEU CÓDIGO"){showProfile()},LinearLayout.LayoutParams(0,-2,1f).apply{rightMargin=dp(6)})
-        actions.addView(button("+ ADICIONAR AMIGO"){addFriend()},LinearLayout.LayoutParams(0,-2,1f));root.addView(actions)
-        root.addView(text("Localização privada até você autorizar um amigo.",12f,colors.muted))
+        val heading=column().apply{gravity=android.view.Gravity.CENTER;setPadding(0,dp(4),0,dp(8))}
+        heading.addView(FriendsGlyph(this,"people",gold),LinearLayout.LayoutParams(dp(46),dp(46)))
+        heading.addView(text("Amigos",30f).apply{typeface=Typeface.DEFAULT_BOLD;gravity=android.view.Gravity.CENTER})
+        heading.addView(text("Conecte-se com quem está na estrada",12f,colors.muted).apply{gravity=android.view.Gravity.CENTER})
+        root.addView(heading)
+        val connection=card().apply{setPadding(dp(16),dp(14),dp(16),dp(14))}
+        val connectionRow=row()
+        connectionRow.addView(FriendsGlyph(this,"people",gold,true),LinearLayout.LayoutParams(dp(66),dp(66)).apply{rightMargin=dp(14)})
+        val connectionCopy=column()
+        connectionTitle=text("Preparando conexão",20f).apply{typeface=Typeface.DEFAULT_BOLD};connectionCopy.addView(connectionTitle)
+        status=text("Aguarde, consultando seu status.",13f,colors.muted);connectionCopy.addView(status)
+        connectionRow.addView(connectionCopy,LinearLayout.LayoutParams(0,-2,1f));connection.addView(connectionRow)
+        online=button("FICAR ONLINE • ESCOLHER STATUS",true){choosePresence()};connection.addView(online)
+        root.addView(connection)
+        val privacy=row().apply{background=rounded(colors.panel,18,colors.border);setPadding(dp(12),dp(10),dp(12),dp(10))}
+        privacy.addView(FriendsGlyph(this,"shield",gold),LinearLayout.LayoutParams(dp(32),dp(38)).apply{rightMargin=dp(10)})
+        privacy.addView(text("Sua localização é compartilhada apenas com amigos autorizados, com o seu consentimento.",12f,colors.muted),LinearLayout.LayoutParams(0,-2,1f))
+        root.addView(privacy,section())
+        root.addView(text("Sua conexão",21f).apply{typeface=Typeface.DEFAULT_BOLD;setPadding(dp(3),dp(14),0,dp(10))})
+        root.addView(connectionAction("code","Meu nome e código","Veja seu código para compartilhar"){showProfile()},section())
+        root.addView(connectionAction("add","Adicionar amigo por código","Conecte-se usando o código de um amigo"){addFriend()},section())
+        val shortcuts=row().apply{background=rounded(colors.panel,20,colors.border);setPadding(dp(4),dp(12),dp(4),dp(12))}
+        for((glyph,title,subtitle) in listOf(Triple("add","Convidar","Adicione um motorista"),Triple("chat","Conversar","Abra uma conversa"),Triple("pin","Localização","Veja seus amigos"))) {
+            val item=column(4).apply{gravity=android.view.Gravity.CENTER;isClickable=true;isFocusable=true;contentDescription="$title. $subtitle";setOnClickListener{when(glyph){"add"->addFriend();"chat"->selectFriend(false);else->selectFriend(true)}}}
+            item.addView(FriendsGlyph(this,glyph,gold),LinearLayout.LayoutParams(dp(34),dp(34)))
+            item.addView(text(title,13f).apply{typeface=Typeface.DEFAULT_BOLD;gravity=android.view.Gravity.CENTER})
+            item.addView(text(subtitle,10f,colors.muted).apply{gravity=android.view.Gravity.CENTER})
+            shortcuts.addView(item,LinearLayout.LayoutParams(0,-2,1f))
+        }
+        root.addView(shortcuts,section())
+        root.addView(text("Seus amigos",21f).apply{typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(16),0,dp(3))})
+        stats=text("Sua rede de confiança na estrada",12f,colors.muted);root.addView(stats)
         val search=input("Buscar amigo…",40)
         search.addTextChangedListener(object:android.text.TextWatcher{
             override fun beforeTextChanged(v:CharSequence?,start:Int,count:Int,after:Int){}
@@ -154,6 +178,29 @@ class FriendsActivity : AppCompatActivity() {
         details.addView(composer)
         recordButton=button("GRAVAR ÁUDIO"){if(recorder!=null)finishRecording() else requestRecording()};details.addView(recordButton)
         showConversation()
+    }
+    private fun connectionAction(glyph:String,title:String,subtitle:String,action:()->Unit):View {
+        val item=row().apply{
+            background=rounded(colors.panel,20,colors.border);setPadding(dp(12),dp(12),dp(12),dp(12))
+            isClickable=true;isFocusable=true;contentDescription="$title. $subtitle";setOnClickListener{action()}
+        }
+        val icon=FriendsGlyph(this,glyph,gold).apply{background=rounded(colors.input,14,colors.border);setPadding(dp(6),dp(6),dp(6),dp(6))}
+        item.addView(icon,LinearLayout.LayoutParams(dp(44),dp(48)).apply{rightMargin=dp(12)})
+        val copy=column();copy.addView(text(title,16f).apply{typeface=Typeface.DEFAULT_BOLD});copy.addView(text(subtitle,12f,colors.muted))
+        item.addView(copy,LinearLayout.LayoutParams(0,-2,1f))
+        item.addView(text("›",30f,gold).apply{gravity=android.view.Gravity.CENTER},LinearLayout.LayoutParams(dp(24),-2))
+        return item
+    }
+    private fun selectFriend(showMap:Boolean) {
+        val friends=snapshot.optJSONArray("friends")
+        val accepted=if(friends==null)emptyList() else (0 until friends.length()).map{friends.getJSONObject(it)}.filter{it.optString("state")=="accepted"}
+        if(accepted.isEmpty()) {Toast.makeText(this,"Adicione um amigo e aguarde ele aceitar o convite.",Toast.LENGTH_LONG).show();return}
+        AlertDialog.Builder(this).setTitle(if(showMap)"Localização de um amigo" else "Conversar com um amigo")
+            .setItems(accepted.map{it.optString("name")}.toTypedArray()){_,index->
+                if(busy){Toast.makeText(this,"Aguarde a operação atual.",Toast.LENGTH_SHORT).show();return@setItems}
+                openConversation(accepted[index])
+                if(showMap){mapGroup.visibility=View.VISIBLE;updateMap(accepted[index].optJSONObject("location"))}
+            }.setNegativeButton("Cancelar",null).show()
     }
     private fun choosePresence() {
         AlertDialog.Builder(this).setTitle("Como você quer aparecer?").setItems(arrayOf("● Online","◐ Ausente","○ Offline")){_,index->
@@ -263,15 +310,22 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
     }
     private infix fun (((JSONObject?) -> Unit) -> Unit).then(done: (JSONObject?) -> Unit) = this(done)
     private fun renderFriends() {
-        online.text = if(FriendsService.running)(if(FriendsService.mode=="away")"◐ AUSENTE" else "● ONLINE")+" • ALTERAR STATUS" else "FICAR ONLINE • ESCOLHER STATUS"
-        status.text = when {
-            FriendsService.mode=="away" -> "◐ Ausente • disponível no chat"
-            FriendsService.sharing -> "● Online • compartilhando"
-            FriendsService.connected -> "● Online • posição privada"
-            FriendsService.running -> "Conectando ou sem sinal…"
-            else -> "○ Você está offline"
+        val running=FriendsService.running
+        connectionTitle.text=when {
+            !running -> "Você está offline"
+            FriendsService.mode=="away" -> "Você está ausente"
+            FriendsService.connected -> "Conectado à sua rede"
+            else -> "Conectando…"
         }
-        status.setTextColor(if(FriendsService.mode=="away")gold else if(FriendsService.connected)colors.green else colors.text)
+        online.text = if(running)(if(FriendsService.mode=="away")"◐ AUSENTE" else "● ONLINE")+" • ALTERAR STATUS" else "FICAR ONLINE • ESCOLHER STATUS"
+        status.text = when {
+            !running -> "Fique online quando quiser se conectar."
+            FriendsService.mode=="away" -> "Você aparece ausente para seus amigos."
+            FriendsService.sharing -> "Sua posição está compartilhada com autorização."
+            FriendsService.connected -> "Online no chat. Sua posição está privada."
+            else -> "Aguardando conexão com o serviço."
+        }
+        connectionTitle.setTextColor(if(running && FriendsService.connected)colors.green else colors.text)
         list.removeAllViews()
         val friends=snapshot.optJSONArray("friends") ?: return
         val all=(0 until friends.length()).map {friends.getJSONObject(it)}
