@@ -52,7 +52,7 @@ class OfferTagView(context: Context) : LinearLayout(context) {
         neonEnabled=prefs.getBoolean("card_neon_flames",true)
         neonColor=when(label) {
             "ACEITAR","BOA CORRIDA","BOA" -> Color.rgb(0,200,88)
-            "ATENÇÃO","ANALISAR" -> Color.rgb(255,170,0)
+            "ATENÇÃO","ANALISAR" -> Color.rgb(255,210,0)
             else -> Color.rgb(245,38,55)
         }
         // Reserve real space for the glow so it is not clipped by the overlay window.
@@ -172,12 +172,12 @@ class OfferTagView(context: Context) : LinearLayout(context) {
 
     private fun drawBottomFlames(canvas: Canvas) = drawRealisticFire(canvas, bottomOnly = true)
 
-    /** Nine patches leave the card center clear and keep the fire in its reserved border. */
+    /** Keep the continuous fire texture in the reserved border. */
     private fun drawRealisticFire(canvas: Canvas, bottomOnly: Boolean) {
         fireBorder.draw(canvas,
             RectF(body.left.toFloat(), body.top.toFloat(), body.right.toFloat(), body.bottom - dp(20).toFloat()),
             dp(14).toFloat(), dp(32).toFloat(), dp(32).toFloat(), flameFrame,
-            green = neonColor == Color.rgb(0, 200, 88), bottomOnly = bottomOnly)
+            color = neonColor, bottomOnly = bottomOnly)
     }
 
     fun isCloseHit(x:Float,y:Float):Boolean = x >= body.right-dp(40) && x <= body.right+dp(4) && y >= body.top && y <= body.top+dp(35)
