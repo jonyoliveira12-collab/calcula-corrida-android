@@ -78,7 +78,7 @@ class AppAppearanceTest {
                 assertTrue(labels.any{it.text.toString()=="R$ 25,00"})
                 assertTrue(labels.any{it.text.toString()=="R$ 90,00"})
                 assertTrue(labels.any{it.text.toString().contains("EM BREVE")})
-                assertTrue("Light text is dark enough on white panels",labels.first{it.text.toString()=="Do seu jeito"}.currentTextColor==AppAppearance.palette(context).text)
+                assertTrue("Light text is dark enough on white panels",labels.first{it.text.toString()=="Configurações" && it.textSize>20*context.resources.displayMetrics.scaledDensity}.currentTextColor==AppAppearance.palette(context).text)
             }
             screen("settings-light.png")
             assertEquals(cardTheme,reader.getString("card_theme",null));assertEquals(scale,reader.getInt("overlay_scale",100))

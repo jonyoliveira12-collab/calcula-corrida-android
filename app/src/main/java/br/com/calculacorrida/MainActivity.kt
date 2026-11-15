@@ -86,21 +86,21 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = if(colors.theme!="dark") rounded(bg,0,bg) else getDrawable(R.drawable.home_background)
+            background = rounded(bg,0,bg)
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(11), dp(12), dp(11))
-            background = getDrawable(R.drawable.dashboard_city)
+            background = rounded(panel,22,border)
             gravity = Gravity.CENTER_VERTICAL
-            elevation = dp(5).toFloat()
+            elevation = dp(1).toFloat()
         }
         val brandRow = horizontal()
         brandRow.addView(action("☰", false) { showTab("Perfil") }.apply{textSize=24f;contentDescription="Abrir configurações"})
         brandRow.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(if(resources.configuration.screenWidthDp>=600)64 else 40), dp(if(resources.configuration.screenWidthDp>=600)64 else 40))
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
             setImageResource(R.drawable.jhondriver_logo)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Logo JHONDRIVER"
@@ -108,7 +108,7 @@ class MainActivity : Activity() {
         val brandText = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
-            addView(label("JHONDRIVER", if(resources.configuration.screenWidthDp>=600)32f else 22f, Color.WHITE, true).apply {
+            addView(label("JHONDRIVER", if(resources.configuration.screenWidthDp>=600)26f else 22f, white, true).apply {
                 typeface=Typeface.create("sans-serif-condensed",Typeface.BOLD_ITALIC)
                 text=android.text.SpannableString("JHONDRIVER").apply{setSpan(android.text.style.ForegroundColorSpan(brandGold),0,4,0)}
             })
@@ -124,7 +124,7 @@ class MainActivity : Activity() {
             clipToOutline = true
             val savedPhoto = getSharedPreferences("settings", MODE_PRIVATE).getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
-            if (drawable == null) setImageResource(android.R.drawable.ic_menu_camera)
+            if (drawable == null) setImageResource(R.drawable.ic_driver_profile)
             contentDescription = "Foto do motorista. Toque para alterar."
             setOnClickListener { chooseProfilePhoto() }
         }
@@ -134,7 +134,7 @@ class MainActivity : Activity() {
             brandRow.addView(action("⚙", false) { showTab("Perfil") }.apply { textSize = 20f; setPadding(dp(12), dp(8), dp(4), dp(8)) })
         }
         header.addView(brandRow)
-        root.addView(header,LinearLayout.LayoutParams(-1,dp(if(resources.configuration.screenWidthDp>=600)180 else 124)))
+        root.addView(header,LinearLayout.LayoutParams(-1,dp(if(resources.configuration.screenWidthDp>=600)84 else 76)))
         if(colors.theme=="holiday") root.addView(SeasonalHeaderView(this),LinearLayout.LayoutParams(-1,dp(28)))
         root.addView(TextView(this).apply {
             text="EM BREVE • Mensal R$ 10,00 • Trimestral R$ 25,00 • Anual R$ 90,00     ✦     SUPORTE: (41) 99597-6826 • gbrigante71@gmail.com     ✦     Novidades e próximas atualizações do JHONDRIVER     ✦     "
@@ -238,7 +238,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildHome() {
-        content.addView(subscriptionCard(),margin(0,8))
+        content.addView(subscriptionCard(compact=true),margin(0,8))
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val records = JourneyStore.getRecords(this)
         val wide = resources.configuration.screenWidthDp >= 600
@@ -290,9 +290,9 @@ class MainActivity : Activity() {
         status.addView(pill(if (online) "● LEITURA ATIVA" else "● LEITURA PAUSADA", if (online) green else muted))
         content.addView(status)
 
-        val controls = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         fun feature(title: String, key: String) {
-            val tile = card()
+            val tile = card().apply{setPadding(dp(12),dp(8),dp(12),dp(8))}
             val row = horizontal()
             row.addView(label(title, 15f, white, true), weight())
             row.addView(Switch(this).apply {
@@ -316,14 +316,14 @@ class MainActivity : Activity() {
                 }
             })
             tile.addView(row)
-            controls.addView(tile, if (wide) LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(10); rightMargin = dp(6) } else margin(0, 8))
+            controls.addView(tile, LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(8); rightMargin = dp(4);leftMargin=dp(2) })
         }
         feature("✧ Copiloto", "copilot_enabled")
         feature("● Semáforo", "traffic_enabled")
         content.addView(controls)
 
-        val offerCard = card().apply { background = if(colors.theme!="dark") rounded(panel,22,border) else GoldPanelDrawable(resources.displayMetrics.density,true) }
-        offerCard.addView(label("⚡ ÚLTIMA OFERTA", 22f, gold, true, 0, 18).apply{gravity=Gravity.CENTER})
+        val offerCard = card()
+        offerCard.addView(label("ÚLTIMA OFERTA", 17f, white, true, 0, 12).apply{gravity=Gravity.CENTER})
         val offer = records.firstOrNull { selectedOfferApp == null || it.optString("app").equals(selectedOfferApp,true) }
         selectedOfferApp?.let{offerCard.addView(pill(it,gold))}
         fun number(key: String): String = offer?.let { String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", it.optDouble(key)) } ?: "—"
@@ -332,10 +332,10 @@ class MainActivity : Activity() {
         totals.addView(metric("PERCURSO TOTAL", number("totalKm") + " km"), weight())
         totals.addView(metric("TEMPO TOTAL", number("minutes") + " min"), weight())
         offerCard.addView(totals)
-        offerCard.addView(View(this).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(18); bottomMargin = dp(18) })
+        offerCard.addView(View(this).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(12); bottomMargin = dp(12) })
         val arrival = offer?.optDouble("pickupMinutes", Double.NaN)
-        offerCard.addView(label("Até o passageiro: " + if (arrival != null && arrival.isFinite()) String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.1f min", arrival) else "não identificado", 13f, white, false, 8, 8))
-        offerCard.addView(label("Nota: " + (offer?.optString("passengerRating")?.takeIf { it.isNotBlank() } ?: "não identificada"), 13f, white, false, 0, 8))
+        offerCard.addView(label("Até o passageiro: " + if (arrival != null && arrival.isFinite()) String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.1f min", arrival) else "não identificado", 12f, muted, false, 0, 4))
+        offerCard.addView(label("Nota: " + (offer?.optString("passengerRating")?.takeIf { it.isNotBlank() } ?: "não identificada"), 12f, muted, false, 0, 6))
         val rates = horizontal()
         rates.addView(metric("R$/KM", if (offer == null) "—" else "R$ " + number("perKm")), weight())
         rates.addView(metric("R$/HORA", if (offer == null) "—" else "R$ " + number("perHour")), weight())
@@ -356,14 +356,14 @@ class MainActivity : Activity() {
         filters.addView(label("Mínimo por hora", 13f, muted, false))
         filters.addView(label(money(prefs.getFloat("good_per_hour", 60f)), 23f, gold, true, 4, 8))
         filters.addView(action("AJUSTAR LIMITES  ›", false) { showTab("Semáforo") })
-        val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=if(colors.light)rounded(panel,20,border) else GoldPanelDrawable(resources.displayMetrics.density);setPadding(dp(7),dp(8),dp(7),dp(8))}
+        val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=rounded(panel,20,border);setPadding(dp(7),dp(8),dp(7),dp(8))}
         for((app,color) in listOf("Todos" to Color.rgb(33,33,35),"Uber" to Color.BLACK,"99" to Color.rgb(255,214,32),"inDrive" to Color.rgb(151,234,18),"iFood" to Color.rgb(231,27,49))) {
             rail.addView(label(app,if(app=="Todos")10f else 16f,if(app=="99" || app=="inDrive")Color.BLACK else Color.WHITE,true).apply {
-                gravity=Gravity.CENTER;minHeight=dp(56)
+                gravity=Gravity.CENTER;minHeight=dp(46)
                 background=rounded(color,14,if(selectedOfferApp==app || (app=="Todos" && selectedOfferApp==null))gold else border)
                 isClickable=true;isFocusable=true;contentDescription="Mostrar ofertas: $app"
                 setOnClickListener{selectedOfferApp=if(app=="Todos")null else app;showTab("Início")}
-            },LinearLayout.LayoutParams(-1,dp(58)).apply{topMargin=dp(6)})
+            },LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(6)})
         }
         val target=prefs.getFloat("min_per_hour",50f).toDouble()
         val actual=offer?.optDouble("perHour") ?: 0.0
@@ -385,7 +385,7 @@ class MainActivity : Activity() {
             content.addView(main)
         } else {
             rail.orientation=LinearLayout.HORIZONTAL
-            for(i in 0 until rail.childCount)rail.getChildAt(i).layoutParams=LinearLayout.LayoutParams(0,dp(52),1f).apply{leftMargin=dp(3);rightMargin=dp(3)}
+            for(i in 0 until rail.childCount)rail.getChildAt(i).layoutParams=LinearLayout.LayoutParams(0,dp(44),1f).apply{leftMargin=dp(3);rightMargin=dp(3)}
             content.addView(rail,margin(0,12));content.addView(offerCard,margin(0,12))
             content.addView(goal,margin(0,12));content.addView(filters,margin(0,12))
         }
@@ -673,7 +673,7 @@ class MainActivity : Activity() {
 
     private fun buildHistory() {
         val records = JourneyStore.getRecords(this)
-        content.addView(label("Jornada • Relatório", 24f, white, true, 5, 2))
+        content.addView(label("Histórico de ofertas", 26f, white, true, 5, 2))
         content.addView(label("Cada oferta identificada pelo leitor fica salva automaticamente aqui.", 13f, muted, false, 0, 14))
 
         val todayStart = java.util.Calendar.getInstance().apply {
@@ -779,22 +779,22 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun subscriptionCard(): LinearLayout = card().apply {
+    private fun subscriptionCard(compact:Boolean=false): LinearLayout = card().apply {
         background=GradientDrawable(GradientDrawable.Orientation.TL_BR,if(colors.light)intArrayOf(Color.rgb(255,248,227),Color.WHITE)else intArrayOf(Color.rgb(67,39,46),panel)).apply {cornerRadius=dp(22).toFloat();setStroke(dp(1),brandGold)}
         addView(label("✦  ASSINATURAS • EM BREVE",12f,gold,true))
-        addView(label("Um plano para o seu ritmo",22f,white,true,6,8))
+        if(!compact)addView(label("Um plano para o seu ritmo",22f,white,true,6,8))
         val plans=horizontal()
         for((name,price) in listOf("Mensal" to "R$ 10,00","Trimestral" to "R$ 25,00","Anual" to "R$ 90,00")) plans.addView(LinearLayout(this@MainActivity).apply {
-            orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(12),dp(8),dp(12));background=rounded(bgInput,14,border)
+            orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(if(compact)6 else 12),dp(8),dp(if(compact)6 else 12));background=rounded(bgInput,14,border)
             addView(label(name,12f,muted,true));addView(label(price,21f,gold,true,6,0).apply {maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,23,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
         },LinearLayout.LayoutParams(0,-2,1f).apply {leftMargin=dp(3);rightMargin=dp(3)})
         addView(plans)
-        addView(label("Planos em preparação. A contratação será disponibilizada em uma próxima atualização.",12f,muted,false,10,0))
+        if(!compact)addView(label("Planos em preparação. A contratação será disponibilizada em uma próxima atualização.",12f,muted,false,10,0))
     }
 
     private fun buildProfile() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        content.addView(label("Do seu jeito", 28f, white, true, 18, 3))
+        content.addView(label("Configurações", 28f, white, true, 18, 3))
         content.addView(label("Ajustes, metas e suporte em um só lugar.", 14f, muted, false, 0, 16))
 
         val appearance = card()
@@ -808,8 +808,6 @@ class MainActivity : Activity() {
             }.setNegativeButton("Fechar",null).show()
         })
         content.addView(appearance,margin(0,10))
-        content.addView(subscriptionCard(),margin(0,10))
-
         val privacy = card()
         privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
         privacy.addView(label("Desliga realmente a acessibilidade e oculta o JD. A notificação Retomar leitura abre o ajuste do Android quando terminar. Você confirma a reativação; suas opções ficam salvas.", 13f, muted, false))
@@ -843,7 +841,7 @@ class MainActivity : Activity() {
             clipToOutline = true
             val savedPhoto = prefs.getString("profile_photo_uri", null)
             if (!savedPhoto.isNullOrBlank()) try { setImageURI(Uri.parse(savedPhoto)) } catch (_: Exception) {}
-            if (drawable == null) setImageResource(android.R.drawable.ic_menu_camera)
+            if (drawable == null) setImageResource(R.drawable.ic_driver_profile)
             setOnClickListener { chooseProfilePhoto() }
             contentDescription = "Alterar foto do motorista"
         }
@@ -949,6 +947,7 @@ class MainActivity : Activity() {
         posCard.addView(posRow)
         content.addView(posCard, margin(0, 10))
 
+        content.addView(subscriptionCard(),margin(0,10))
         val support = card()
         support.addView(label("AJUDA E SUPORTE",18f,gold,true))
         support.addView(label("Escolha o motivo para falar com o suporte.",13f,muted,false,3,5))
@@ -980,8 +979,8 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = if(colors.theme!="dark") rounded(panel,20,border) else GoldPanelDrawable(resources.displayMetrics.density)
-        elevation = dp(6).toFloat()
+        background = rounded(panel,22,border)
+        elevation = dp(1).toFloat()
         layoutParams = margin(0, 10)
     }
 
@@ -1008,11 +1007,11 @@ class MainActivity : Activity() {
 
     private fun pill(text: String, color: Int): TextView = TextView(this).apply {
         this.text = text
-        setTextColor(Color.WHITE)
+        setTextColor(color)
         textSize = 10f
         typeface = Typeface.DEFAULT_BOLD
         setPadding(dp(10), dp(4), dp(10), dp(4))
-        background = rounded(color, 12, color)
+        background = rounded(Color.argb(22,Color.red(color),Color.green(color),Color.blue(color)), 12, color)
     }
 
     private fun iconTile(icon: String): TextView = TextView(this).apply {
@@ -1051,7 +1050,7 @@ class MainActivity : Activity() {
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = android.graphics.drawable.RippleDrawable(
             ColorStateList.valueOf(Color.argb(45,255,220,120)),
-            rounded(if(prominent)brandGold else bgInput,14,if(prominent)brandGold else border),null)
+            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,if(prominent)intArrayOf(Color.rgb(255,225,133),brandGold)else intArrayOf(bgInput,panel)).apply{cornerRadius=dp(14).toFloat();setStroke(dp(1),if(prominent)brandGold else border)},null)
         layoutParams = LinearLayout.LayoutParams(-2,-2).apply {topMargin=dp(8)}
         isClickable = true
         isFocusable = true

@@ -103,7 +103,7 @@ class LoginActivity : AppCompatActivity() {
 
         loginButton.setOnClickListener { authenticate(isRegistration = false) }
         registerButton.setOnClickListener { authenticate(isRegistration = true) }
-        if (AppAppearance.theme(this)!="dark") {
+        run {
             val colors=AppAppearance.palette(this)
             val page=findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0)
             page.setBackgroundColor(colors.background)
