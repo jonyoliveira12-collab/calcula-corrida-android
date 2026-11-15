@@ -43,6 +43,7 @@ class FriendsActivity : AppCompatActivity() {
     private var mapReady = false
     private var pendingLocation: JSONObject? = null
     private var messageNonce = UUID.randomUUID().toString()
+    private var nonceBody = ""
     private var selfId = ""
     private var authAtStart: String? = null
     private val refresh = object : Runnable {
@@ -91,9 +92,9 @@ class FriendsActivity : AppCompatActivity() {
         val js = assets.open("friends/leaflet.js").bufferedReader().use { it.readText() }
         val css = assets.open("friends/leaflet.css").bufferedReader().use { it.readText() }
         map.loadDataWithBaseURL("https://jhondriver-map.invalid/", """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>$css html,body,#map{height:100%;margin:0;background:#171717}</style></head><body><div id="map"></div><script>$js
-var map=L.map('map').setView([-15.8,-47.9],4);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);var point=null,area=null;
+var map=L.map('map').setView([-15.8,-47.9],4);var tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});var point=null,area=null;
 function clearPoint(){if(point){map.removeLayer(point);point=null;}if(area){map.removeLayer(area);area=null;}}
-function showPoint(lat,lng,accuracy){clearPoint();point=L.circleMarker([lat,lng],{radius:9,color:'#ebbf4d',fillOpacity:1}).addTo(map);area=L.circle([lat,lng],{radius:accuracy,color:'#ebbf4d'}).addTo(map);map.invalidateSize();map.setView([lat,lng],15);}
+function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles.addTo(map);}point=L.circleMarker([lat,lng],{radius:9,color:'#ebbf4d',fillOpacity:1}).addTo(map);area=L.circle([lat,lng],{radius:accuracy,color:'#ebbf4d'}).addTo(map);map.invalidateSize();map.setView([lat,lng],15);}
 </script></body></html>""", "text/html", "UTF-8", null)
         details.addView(button("CRÉDITOS DO MAPA • OPENSTREETMAP") {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.openstreetmap.org/copyright")))
@@ -107,13 +108,14 @@ function showPoint(lat,lng,accuracy){clearPoint();point=L.circleMarker([lat,lng]
         details.addView(button("ENVIAR MENSAGEM") {
             val id = peer ?: return@button
             val body = draft.text.toString().trim(); if (body.isBlank()) return@button
+            if (nonceBody != body) { messageNonce = UUID.randomUUID().toString(); nonceBody = body }
             val nonce = messageNonce
             execute {
                 client.call("send", JSONObject().put("peer", id).put("body", body).put("nonce", nonce))
             } then callback@{ result ->
                 if (peer == id && result != null) {
                     if (draft.text.toString().trim() == body) draft.text.clear()
-                    messageNonce = UUID.randomUUID().toString(); renderMessages(result)
+                    messageNonce = UUID.randomUUID().toString(); nonceBody = ""; renderMessages(result)
                 }
             }
         })
@@ -286,6 +288,14 @@ function showPoint(lat,lng,accuracy){clearPoint();point=L.circleMarker([lat,lng]
     private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(16), dp(12)); setBackgroundColor(Color.rgb(12,12,12)) }
     private fun text(value: String,size: Float,color: Int = Color.WHITE) = TextView(this).apply { text = value; textSize = size; setTextColor(color); setPadding(0,dp(6),0,dp(6)) }
     private fun input(hint: String,max: Int) = EditText(this).apply { this.hint = hint; setTextColor(Color.WHITE); setHintTextColor(Color.LTGRAY); filters = arrayOf(InputFilter.LengthFilter(max)); setPadding(dp(8),dp(10),dp(8),dp(10)) }
-    private fun button(title: String,action: () -> Unit) = Button(this).apply { text = title; setTextColor(gold); setTypeface(null,Typeface.BOLD); setOnClickListener { action() } }
+    private fun button(title: String,action: () -> Unit) = Button(this).apply {
+        text = title; setTextColor(gold); setTypeface(null,Typeface.BOLD); minHeight = dp(48)
+        background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33EBC04D),
+            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(35,32,24),Color.rgb(15,15,15))).apply {
+                cornerRadius = dp(12).toFloat(); setStroke(dp(1),gold)
+            },null)
+        layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,dp(5),0,dp(5)) }
+        setPadding(dp(12),dp(10),dp(12),dp(10)); setOnClickListener { action() }
+    }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

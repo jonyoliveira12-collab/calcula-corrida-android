@@ -126,7 +126,7 @@ class FriendsService : Service(), LocationListener {
         deadlines.entries.removeAll { it.value <= SystemClock.elapsedRealtime() }
         sharing = deadlines.isNotEmpty() && permitted() && connected
         if (!sharing) {
-            if (listening) locations.removeUpdates(this)
+            if (listening) runCatching { locations.removeUpdates(this) }
             listening = false
             return
         }
@@ -156,7 +156,7 @@ class FriendsService : Service(), LocationListener {
         }
     }
     override fun onProviderDisabled(provider: String) { notice("Localização desligada no aparelho") }
-    override fun onProviderEnabled(provider: String) { if (listening) locations.removeUpdates(this); listening = false; reconcileLocation() }
+    override fun onProviderEnabled(provider: String) { if (listening) runCatching { locations.removeUpdates(this) }; listening = false; reconcileLocation() }
     @Deprecated("Legacy Android callback") override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
     private fun notice(text: String, prepareLocation: Boolean = false) {
         if (prepareLocation) locationMode = true
@@ -174,7 +174,7 @@ class FriendsService : Service(), LocationListener {
     override fun onDestroy() {
         active = false; running = false; connected = false; sharing = false; sessionId = null
         main.removeCallbacksAndMessages(null)
-        locations.removeUpdates(this)
+        runCatching { locations.removeUpdates(this) }
         val captured = logoutToken ?: SessionManager(this).getAccessToken() ?: token
         if (captured != null) io.execute { runCatching { FriendsDependencies.gateway(this, captured).call("offline", JSONObject().put("session", sid)) } }
         io.shutdown()
