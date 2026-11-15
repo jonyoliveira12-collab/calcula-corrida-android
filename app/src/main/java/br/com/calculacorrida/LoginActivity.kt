@@ -49,6 +49,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppAppearance.apply(this)
         super.onCreate(savedInstanceState)
         // Reaproveita a sessão local ao voltar ou abrir novamente o aplicativo.
         if (sessionManager.isLoggedIn() && NetworkGate.isOnline(this)) {
@@ -56,6 +57,7 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         setContentView(R.layout.activity_login)
+        AppAppearance.styleWindow(this)
         findViewById<android.widget.TextView>(R.id.appVersionLabel).text="Versão ${packageManager.getPackageInfo(packageName,0).versionName}"
         AppUpdates.check(this)
         val auth = findViewById<android.widget.LinearLayout>(R.id.authContent)
@@ -101,6 +103,27 @@ class LoginActivity : AppCompatActivity() {
 
         loginButton.setOnClickListener { authenticate(isRegistration = false) }
         registerButton.setOnClickListener { authenticate(isRegistration = true) }
+        if (AppAppearance.isLight(this)) {
+            val colors=AppAppearance.palette(this)
+            val page=findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0)
+            page.setBackgroundColor(colors.background)
+            fun recolor(view: View) {
+                if(view is android.widget.TextView) view.setTextColor(colors.text)
+                if(view is android.view.ViewGroup) for(i in 0 until view.childCount) recolor(view.getChildAt(i))
+            }
+            recolor(page)
+            val frame=findViewById<FlameBorderLayout>(R.id.loginFlameFrame)
+            frame.getChildAt(0).background=android.graphics.drawable.GradientDrawable().apply { setColor(colors.panel);cornerRadius=18*resources.displayMetrics.density;setStroke((resources.displayMetrics.density).toInt().coerceAtLeast(1),colors.border) }
+            for(field in listOf(emailInput,passwordInput)) {
+                field.setTextColor(colors.text);field.setHintTextColor(colors.muted)
+                field.background=android.graphics.drawable.GradientDrawable().apply {setColor(colors.input);cornerRadius=10*resources.displayMetrics.density}
+            }
+            forgotPasswordText.setTextColor(colors.gold)
+            rememberEmailCheck.buttonTintList=android.content.res.ColorStateList.valueOf(colors.gold)
+            registerButton.setTextColor(colors.gold)
+            registerButton.background=android.graphics.drawable.GradientDrawable().apply {setColor(colors.input);cornerRadius=12*resources.displayMetrics.density;setStroke((resources.displayMetrics.density).toInt().coerceAtLeast(1),colors.border)}
+            eye.imageTintList=android.content.res.ColorStateList.valueOf(colors.gold)
+        }
     }
 
     private fun authenticate(isRegistration: Boolean) {

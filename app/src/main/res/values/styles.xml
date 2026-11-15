@@ -11,6 +11,18 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
+    <style name="AppLightTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#7E580C</item>
+        <item name="colorPrimaryVariant">#5C4008</item>
+        <item name="colorSecondary">#7E580C</item>
+        <item name="android:colorBackground">#F5F6F9</item>
+        <item name="android:windowBackground">#F5F6F9</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:statusBarColor">#F5F6F9</item>
+        <item name="android:navigationBarColor">#F5F6F9</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
     <style name="CardSettingsTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">#008D70</item>
         <item name="colorSecondary">#008D70</item>

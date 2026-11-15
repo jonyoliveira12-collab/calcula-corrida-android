@@ -39,7 +39,7 @@ class FriendsServiceTest {
                     .put("friends",JSONArray())
             }
         }
-        fun shell(command: String) { inst.uiAutomation.executeShellCommand(command).use { fd -> java.io.FileInputStream(fd.fileDescriptor).use { it.readBytes() } } }
+        fun shell(command: String) { android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(command)).use { it.readBytes() } }
         fun await(message: String, condition: () -> Boolean) {
             val end = SystemClock.elapsedRealtime()+10000
             while (!condition() && SystemClock.elapsedRealtime()<end) Thread.sleep(100)

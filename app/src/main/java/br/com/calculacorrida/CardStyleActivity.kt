@@ -12,11 +12,13 @@ class CardStyleActivity : Activity() {
     private lateinit var page:LinearLayout
     private lateinit var preview:OfferTagView
     private var state=0
-    private val gold=Color.rgb(239,190,65)
+    private val colors by lazy { AppAppearance.palette(this) }
+    private val gold get()=colors.gold
+    private val brandGold=Color.rgb(239,190,65)
     private data class DemoOffer(val app:String,val fare:Double,val pickupKm:Double,val tripKm:Double,val minutes:Double,val rating:Double,val pickupMinutes:Double)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
-    override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);window.statusBarColor=Color.rgb(14,15,18);window.navigationBarColor=Color.rgb(14,15,18);window.decorView.systemUiVisibility=0
-        page=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(16),dp(18),dp(24));setBackgroundColor(Color.rgb(14,15,18))}
+    override fun onCreate(savedInstanceState:Bundle?){AppAppearance.apply(this);super.onCreate(savedInstanceState);AppAppearance.styleWindow(this)
+        page=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),dp(16),dp(18),dp(24));setBackgroundColor(colors.background)}
         setContentView(ScrollView(this).apply{addView(page)})
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(page){view,insets->
             val bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -31,7 +33,7 @@ class CardStyleActivity : Activity() {
         choices(listOf("Recusar","Analisar","Boa"),0){state=it;refresh()}
         preview=OfferTagView(this);page.addView(preview,LinearLayout.LayoutParams(dp(310),-2).apply{gravity=android.view.Gravity.CENTER_HORIZONTAL;topMargin=dp(10);bottomMargin=dp(20)})
         title("Tamanho do cartão",16)
-        val size=TextView(this).apply{setTextColor(Color.rgb(245,216,130))};page.addView(size)
+        val size=TextView(this).apply{setTextColor(colors.gold)};page.addView(size)
         page.addView(SeekBar(this).apply{progressTintList=android.content.res.ColorStateList.valueOf(gold);thumbTintList=android.content.res.ColorStateList.valueOf(gold);max=100;progress=prefs.getInt("overlay_scale",100).coerceIn(60,160)-60;setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{override fun onProgressChanged(v:SeekBar?,n:Int,user:Boolean){size.text="${n+60}%";if(user){prefs.edit().putInt("overlay_scale",n+60).apply();refresh()}};override fun onStartTrackingTouch(v:SeekBar?){};override fun onStopTrackingTouch(v:SeekBar?) {}});size.text="${progress+60}%"})
         title("POSIÇÃO LIVRE",13)
         title("Toque e arraste a etiqueta para cima, para baixo ou para os lados. Ela não fica mais presa à janela da oferta.",13)
@@ -57,7 +59,7 @@ class CardStyleActivity : Activity() {
         toggle("Exibir o motivo","card_compact_reason",false)
         title("Posição do aviso",16)
         choices(listOf("Acima do cartão","Abaixo do cartão"),if(prefs.getString("card_banner_position","above")=="above")0 else 1){prefs.edit().putString("card_banner_position",if(it==0)"above" else "below").apply();refresh()}
-        title("Tema",16)
+        title("Tema da etiqueta",16)
         val themes=listOf("light","dark","colored")
         choices(listOf("Claro","Escuro","Colorido"),themes.indexOf(prefs.getString("card_theme","light"))){prefs.edit().putString("card_theme",themes[it]).apply();refresh()}
         title("A etiqueta acompanha a oferta enquanto ela estiver visível.",13)
@@ -69,14 +71,14 @@ class CardStyleActivity : Activity() {
         title("Arraste o cartão para ajustar a posição durante a leitura. Os cálculos aparecem antes da resposta da IA.",13)
         refresh()
     }
-    private fun title(text:String,size:Int){page.addView(TextView(this).apply{this.text=text;textSize=size.toFloat();setTextColor(Color.rgb(245,216,130));typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(14),0,dp(10))})}
+    private fun title(text:String,size:Int){page.addView(TextView(this).apply{this.text=text;textSize=size.toFloat();setTextColor(colors.gold);typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(14),0,dp(10))})}
     private fun styleButton(button:Button,selected:Boolean=false) {
         button.setTextColor(if(selected)Color.BLACK else gold)
         button.typeface=Typeface.DEFAULT_BOLD
         button.textSize=12f
         button.backgroundTintList=null
         button.background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-            if(selected)intArrayOf(Color.rgb(255,232,139),gold)else intArrayOf(Color.rgb(34,35,39),Color.rgb(20,21,24))).apply{
+            if(selected)intArrayOf(Color.rgb(255,232,139),brandGold)else intArrayOf(colors.input,colors.panel)).apply{
             cornerRadius=dp(12).toFloat();setStroke(dp(1),if(selected)gold else Color.rgb(128,105,47))
         }
         button.minHeight=dp(48)
@@ -84,12 +86,12 @@ class CardStyleActivity : Activity() {
     }
     private fun toggle(text:String,key:String,default:Boolean) {
         page.addView(Switch(this).apply{
-            this.text=text;textSize=16f;setTextColor(Color.rgb(245,244,238))
+            this.text=text;textSize=16f;setTextColor(colors.text)
             isChecked=prefs.getBoolean(key,default)
             thumbTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(gold,Color.LTGRAY))
             trackTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(Color.rgb(133,105,39),Color.rgb(74,76,84)))
             setPadding(dp(12),dp(12),dp(12),dp(12))
-            background=GradientDrawable().apply{setColor(Color.rgb(30,33,40));cornerRadius=dp(12).toFloat()}
+            background=GradientDrawable().apply{setColor(colors.input);cornerRadius=dp(12).toFloat()}
             setOnCheckedChangeListener{_,value->prefs.edit().putBoolean(key,value).apply();refresh()}
         },LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(7)})
     }

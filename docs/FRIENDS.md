@@ -34,4 +34,12 @@ Migrações versionadas em `supabase/migrations`, schema privado `jd_social`, ta
 
 `FriendLocationPolicyTest` valida posições inválidas/antigas e durações. `FriendsPrivacyTest` verifica em Android que abrir a área não ativa serviço/GPS e que não há permissão de localização permanente. A bateria preexistente do leitor continua no workflow Android.
 
-Pendência antes da distribuição final: teste com duas contas reais em aparelhos, permissões precisa/aproximada, app em segundo plano, perda de rede e revogação enquanto o mapa está aberto. Não afirmar proteção total nem localização instantânea.
+## Aparência e assinaturas futuras
+
+O motorista escolhe tema escuro ou claro nas configurações ou na área Amigos. A escolha fica no aparelho e acompanha painel, relatórios, histórico, configurações, entrada e editor da etiqueta, sem mudar o tema escolhido para a etiqueta flutuante. Trocar tema não altera as preferências do leitor nem ativa GPS.
+
+Há apenas um anúncio dos futuros planos mensal, trimestral e anual, identificado como **Em breve**. Não há preço, contratação, débito ou cobrança implementados.
+
+`AppAppearanceTest` verifica escolha real no seletor, persistência entre telas, contraste no tema claro, ausência de GPS e preservação das preferências da etiqueta. Capturas usam nomes/dados sintéticos de exemplo.
+
+Validação recomendada em uso real: teste com duas contas reais em aparelhos, permissões precisa/aproximada, app em segundo plano, perda de rede e revogação enquanto o mapa está aberto. Não afirmar proteção total nem localização instantânea.
