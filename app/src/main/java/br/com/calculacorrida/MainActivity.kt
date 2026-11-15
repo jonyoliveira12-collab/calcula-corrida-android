@@ -370,14 +370,14 @@ class MainActivity : Activity() {
         }
         val target=prefs.getFloat("min_per_hour",50f).toDouble()
         val actual=offer?.optDouble("perHour") ?: 0.0
-        val goal=card()
-        goal.addView(label("◎ Meta por hora",19f,gold,true,0,10))
-        goal.addView(label((if(offer==null)"—" else money(actual.toFloat()))+" / "+money(target.toFloat()),17f,white,true))
+        val goal=card().apply{setPadding(dp(12),dp(12),dp(12),dp(12))}
+        goal.addView(label("◎ Meta por hora",17f,gold,true,0,8))
+        goal.addView(label((if(offer==null)"—" else money(actual.toFloat()))+" / "+money(target.toFloat()),16f,white,true))
         goal.addView(ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal).apply{
             max=100;progress=if(target>0)(actual/target*100).toInt().coerceIn(0,100)else 0
             progressTintList=ColorStateList.valueOf(gold)
-        },LinearLayout.LayoutParams(-1,dp(18)).apply{topMargin=dp(12)})
-        goal.addView(label("Projeção da oferta atual",11f,muted,false,8,0))
+        },LinearLayout.LayoutParams(-1,dp(12)).apply{topMargin=dp(8)})
+        goal.addView(label("Projeção da oferta atual",10f,muted,false,6,0))
         if(wide) {
             val main=horizontal().apply{gravity=Gravity.TOP}
             main.addView(rail,LinearLayout.LayoutParams(dp(78),-2).apply{topMargin=dp(14);rightMargin=dp(10)})
