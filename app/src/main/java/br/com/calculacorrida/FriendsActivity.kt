@@ -65,6 +65,8 @@ class FriendsActivity : AppCompatActivity() {
         }
         client = FriendsDependencies.gateway(this, null)
         peer=state?.getString("peer")
+        messageNonce=state?.getString("message_nonce") ?: messageNonce
+        nonceBody=state?.getString("nonce_body").orEmpty()
         val scroll = ScrollView(this).apply { isFillViewport=true; setBackgroundColor(colors.background) }
         root = column(20); scroll.addView(root); setContentView(scroll)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll) { view,insets ->
@@ -159,6 +161,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
     }
     override fun onSaveInstanceState(out: Bundle) {
         out.putString("peer",peer)
+        out.putString("message_nonce",messageNonce);out.putString("nonce_body",nonceBody)
         if(::draft.isInitialized) out.putString("draft",draft.text.toString())
         super.onSaveInstanceState(out)
     }
@@ -337,7 +340,9 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             .setPositiveButton("Confirmar") { _, _ -> changeRelationship(action,id) }.show()
     }
     private fun changeRelationship(action: String,id: String) {
-        execute { client.call(action, JSONObject().put("peer",id)) } then { if (it != null) { if (peer == id) { peer = null; details.visibility = View.GONE; updateMap(null) }; reload() } }
+        execute { client.call(action, JSONObject().put("peer",id)) } then { if (it != null) {
+            if(FriendsService.running) startService(Intent(this,FriendsService::class.java).setAction(FriendsService.FORGET_PEER).putExtra("peer",id))
+            if (peer == id) { peer = null; details.visibility = View.GONE; updateMap(null) }; reload() } }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, results)
@@ -364,7 +369,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         backgroundTintList=null
         background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33EBC04D),
             GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,if(prominent)intArrayOf(Color.rgb(255,225,133),accent) else intArrayOf(colors.input,colors.panel)).apply {
-                cornerRadius=dp(14).toFloat();setStroke(dp(1),if(prominent)accent else colors.border)
+                cornerRadius=dp(14).toFloat();setStroke(dp(1),if(prominent)accent else this@FriendsActivity.colors.border)
             },null)
         layoutParams=LinearLayout.LayoutParams(-1,-2).apply {setMargins(0,dp(6),0,dp(6))}
         setPadding(dp(12),dp(12),dp(12),dp(12));setOnClickListener {action()}

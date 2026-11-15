@@ -26,7 +26,7 @@ class MainActivity : Activity() {
     private val muted get() = colors.muted
     private val green get() = colors.green
     private val red get() = colors.red
-    private val amber = Color.rgb(181,112,11)
+    private val amber get() = if(colors.light) Color.rgb(146,88,0) else Color.rgb(242,157,45)
     private val border get() = colors.border
     private val bgInput get() = colors.input
     private val brandGold = Color.rgb(239,190,65)

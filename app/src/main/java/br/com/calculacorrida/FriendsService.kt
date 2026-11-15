@@ -69,6 +69,11 @@ class FriendsService : Service(), LocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             STOP -> stopSelf()
+            FORGET_PEER -> {
+                intent.getStringExtra("peer")?.let { stoppingPeers.add(it);deadlines.remove(it) }
+                reconcileLocation()
+                notice(if(sharing)"Online • localização compartilhada" else "Online • localização privada")
+            }
             SHARE -> {
                 val peer = intent.getStringExtra("peer") ?: return START_NOT_STICKY
                 val enabled = intent.getBooleanExtra("enabled", false)
@@ -184,6 +189,7 @@ class FriendsService : Service(), LocationListener {
     override fun onBind(intent: Intent?): IBinder? = null
     companion object {
         const val STOP = "br.com.calculacorrida.friends.STOP"
+        const val FORGET_PEER = "br.com.calculacorrida.friends.FORGET_PEER"
         const val SHARE = "br.com.calculacorrida.friends.SHARE"
         private const val CHANNEL = "friends_online"
         private const val CHAT = "friends_messages"

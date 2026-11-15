@@ -91,7 +91,7 @@ class CardStyleActivity : Activity() {
             thumbTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(gold,Color.LTGRAY))
             trackTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(Color.rgb(133,105,39),Color.rgb(74,76,84)))
             setPadding(dp(12),dp(12),dp(12),dp(12))
-            background=GradientDrawable().apply{setColor(colors.input);cornerRadius=dp(12).toFloat()}
+            background=GradientDrawable().apply{setColor(this@CardStyleActivity.colors.input);cornerRadius=dp(12).toFloat()}
             setOnCheckedChangeListener{_,value->prefs.edit().putBoolean(key,value).apply();refresh()}
         },LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(7)})
     }
