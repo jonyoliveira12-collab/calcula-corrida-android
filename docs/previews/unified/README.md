@@ -1,6 +1,6 @@
 # JHONDRIVER — proposta de interface
 
-Capturas reais do aplicativo em emulador, com dados de exemplo. Prévia visual: ainda não publicada no APK. O número exibido nas telas é o da versão base.
+Interface publicada na versão **0.8.0**. Capturas reais do aplicativo em emulador Android 13, com dados de exemplo. Atualize em Configurações → Verificar atualização, sem desinstalar.
 
 O acabamento da tela de Amigos foi estendido ao painel, configurações, histórico, metas, etiquetas, suporte e entrada. Cabeçalho compacto, cartões consistentes e navegação com ícones vetoriais. Os temas claro e escuro mantêm as mesmas funções.
 
@@ -62,4 +62,4 @@ O acabamento da tela de Amigos foi estendido ao painel, configurações, histór
 
 ![Contatos e conversa lado a lado](chat-tablet.png)
 
-Validação: compilação, testes unitários e regressões de interface/privacidade/chat/áudio aprovados no Android 16. Verificação adicional mantém a classificação da corrida e o atalho de ajustar limites totalmente visíveis no tablet de teste.
+Validação: compilação, testes unitários e regressões de interface/privacidade/chat/áudio aprovados no Android 13 e 16. Verificação adicional mantém a classificação da corrida e o atalho de ajustar limites totalmente visíveis no tablet de teste.
