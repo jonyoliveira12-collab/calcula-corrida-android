@@ -131,6 +131,11 @@ class ReaderServiceTest {
             }
             await("Android accessibility service turned off") { !shell("settings get secure enabled_accessibility_services").contains(context.packageName) }
             await("CC removed") { !hasCc() }
+            val notifications=context.getSystemService(android.app.NotificationManager::class.java)
+            await("Bank-mode reminder survives service shutdown") {notifications.activeNotifications.any{it.id==BankModeReminder.ID}}
+            val reminder=notifications.activeNotifications.first{it.id==BankModeReminder.ID}.notification
+            assertTrue(reminder.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString().contains("Retomar leitura"))
+            assertTrue("Reader is really disabled, not merely hidden",!BankModeReminder.isReaderEnabled(context))
             await("Reactivation control is available") {
                 var found = false
                 instrumentation.runOnMainSync { found = findText(activity!!.window.decorView, "REATIVAR ACESSIBILIDADE") != null }
@@ -139,14 +144,25 @@ class ReaderServiceTest {
             assertTrue("Copilot choice preserved", settings.getBoolean("copilot_enabled", false))
             assertTrue("Traffic-light choice preserved", settings.getBoolean("traffic_enabled", false))
 
-            // Simulates the user explicitly enabling the service again in Android settings.
+            reminder.contentIntent.send()
+            await("Reminder opens actual Android settings") {
+                ui.rootInActiveWindow?.packageName?.toString()=="com.android.settings"
+            }
+            assertFalse("Opening the reminder never re-enables accessibility",BankModeReminder.isReaderEnabled(context))
+            assertTrue("Reminder remains until the driver confirms activation",BankModeReminder.isPending(context))
+            // Test-only shell simulates the user's explicit confirmation in the disposable emulator.
             shell("settings put secure enabled_accessibility_services $service")
             shell("settings put secure accessibility_enabled 1")
+            // Android settings suppresses overlays; return to the driver app after confirmation.
+            activity=instrumentation.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
             await("CC returns after user enables accessibility") { hasCc() }
+            await("Reminder clears after confirmed service connection") {notifications.activeNotifications.none{it.id==BankModeReminder.ID}}
+            assertFalse(BankModeReminder.isPending(context))
             assertTrue("Copilot still configured", settings.getBoolean("copilot_enabled", false))
             assertTrue("Traffic-light setting still configured", settings.getBoolean("traffic_enabled", false))
         } finally {
             activity?.let { screen -> instrumentation.runOnMainSync { screen.finish() } }
+            BankModeReminder.clear(context)
             settings.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).commit()
             OfferAccessibilityService.stopReading()
             SessionManager(context).logout()
