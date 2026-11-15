@@ -34,7 +34,7 @@ class FriendsPrivacyTest {
                 }
                 val text = labels(activity!!.window.decorView).joinToString("\n")
                 assertTrue(text.contains("FICAR ONLINE"))
-                assertTrue(text.contains("ADICIONAR AMIGO"))
+                assertTrue(text.contains("Adicionar amigo por código"))
                 assertFalse(FriendsService.running)
                 assertFalse(FriendsService.sharing)
                 assertNull(FriendsService.sessionId)
