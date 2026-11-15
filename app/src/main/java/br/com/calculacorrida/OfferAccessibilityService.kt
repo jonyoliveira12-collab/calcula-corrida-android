@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.os.Build
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.Toast
 import android.widget.TextView
 import android.graphics.Color
 import android.graphics.Typeface

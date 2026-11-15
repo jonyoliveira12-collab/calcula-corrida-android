@@ -4,7 +4,6 @@ import android.app.*
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 
@@ -47,7 +46,7 @@ object BankModeReminder {
         context.getSystemService(NotificationManager::class.java).cancel(ID)
     }
     fun openReaderSettings(activity:Activity) {
-        val details=Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
+        val details=Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
             .putExtra(Intent.EXTRA_COMPONENT_NAME,ComponentName(activity,OfferAccessibilityService::class.java).flattenToString())
         Toast.makeText(activity,"Ative o JHONDRIVER nos ajustes do Android para retomar a leitura.",Toast.LENGTH_LONG).show()
         runCatching{activity.startActivity(details)}
