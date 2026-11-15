@@ -35,7 +35,7 @@ class FriendsService : Service(), LocationListener {
             reconcileLocation()
             if (!busy) {
                 busy = true
-                request("heartbeat", JSONObject().put("session", sid)) { result ->
+                request("heartbeat", JSONObject().put("session", sid).put("mode", mode)) { result ->
                     busy = false
                     if (result == null) { connected = false; reconcileLocation(); notice("Sem conexão • posição pode estar desatualizada") }
                     else if (result.optBoolean("session_ended")) stopSelf()
@@ -48,6 +48,23 @@ class FriendsService : Service(), LocationListener {
     private val expiry = object : Runnable {
         override fun run() { if (active) { reconcileLocation(); main.postDelayed(this, 1000) } }
     }
+    private var autoAway=false
+    private var receiverRegistered=false
+    private val deviceReceiver=object:BroadcastReceiver() {
+        override fun onReceive(context:Context,intent:Intent) {
+            when(intent.action) {
+                Intent.ACTION_SHUTDOWN -> stopSelf()
+                Intent.ACTION_SCREEN_OFF -> if(mode=="online") {autoAway=true;setMode("away",false)}
+                Intent.ACTION_SCREEN_ON -> if(autoAway) {autoAway=false;setMode("online",false)}
+            }
+        }
+    }
+    private fun setMode(value:String,manual:Boolean=true) {
+        if(value !in listOf("online","away"))return
+        if(manual)autoAway=false
+        mode=value
+        request("heartbeat",JSONObject().put("session",sid).put("mode",mode)) {result->if(result!=null)applyState(result)}
+    }
     override fun onCreate() {
         super.onCreate()
         logoutToken = null
@@ -58,7 +75,11 @@ class FriendsService : Service(), LocationListener {
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Amigos em atividade", NotificationManager.IMPORTANCE_LOW))
         manager.createNotificationChannel(NotificationChannel(CHAT, "Mensagens de amigos", NotificationManager.IMPORTANCE_DEFAULT))
         notice("Conectando aos amigos…")
-        running = true
+        running = true;mode="online"
+        androidx.core.content.ContextCompat.registerReceiver(this,deviceReceiver,IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF);addAction(Intent.ACTION_SCREEN_ON);addAction(Intent.ACTION_SHUTDOWN)
+        },androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        receiverRegistered=true
         main.post(expiry)
         request("online", JSONObject().put("session", sid)) { result ->
             if (result == null) { stopSelf(); return@request }
@@ -69,6 +90,7 @@ class FriendsService : Service(), LocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             STOP -> stopSelf()
+            MODE -> setMode(intent.getStringExtra("mode") ?: "online")
             FORGET_PEER -> {
                 intent.getStringExtra("peer")?.let { stoppingPeers.add(it);deadlines.remove(it) }
                 reconcileLocation()
@@ -114,7 +136,7 @@ class FriendsService : Service(), LocationListener {
             if (remaining > 0 && peer !in stoppingPeers) deadlines[peer] = SystemClock.elapsedRealtime() + remaining
         }
         reconcileLocation()
-        notice(if (listening) "Online • localização compartilhada" else "Online • localização privada")
+        notice((if(mode=="away")"Ausente" else "Online")+if(listening)" • localização compartilhada" else " • localização privada")
         val message = json.optJSONObject("inbox")
         if (message != null && message.optString("id") != lastMessage) {
             lastMessage = message.optString("id")
@@ -177,7 +199,8 @@ class FriendsService : Service(), LocationListener {
         } else startForeground(700, notification)
     }
     override fun onDestroy() {
-        active = false; running = false; connected = false; sharing = false; sessionId = null
+        active = false; running = false; connected = false; sharing = false; sessionId = null;mode="offline"
+        if(receiverRegistered)runCatching{unregisterReceiver(deviceReceiver)}
         main.removeCallbacksAndMessages(null)
         runCatching { locations.removeUpdates(this) }
         val captured = logoutToken ?: SessionManager(this).getAccessToken() ?: token
@@ -186,8 +209,11 @@ class FriendsService : Service(), LocationListener {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
+    override fun onTaskRemoved(rootIntent:Intent?) {stopSelf();super.onTaskRemoved(rootIntent)}
     override fun onBind(intent: Intent?): IBinder? = null
     companion object {
+        const val MODE = "br.com.calculacorrida.friends.MODE"
+        @Volatile var mode="offline";private set
         const val STOP = "br.com.calculacorrida.friends.STOP"
         const val FORGET_PEER = "br.com.calculacorrida.friends.FORGET_PEER"
         const val SHARE = "br.com.calculacorrida.friends.SHARE"

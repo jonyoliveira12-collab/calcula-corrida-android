@@ -21,7 +21,7 @@ object DriverNavigation {
         bar.setPadding(dp(3),dp(5),dp(3),dp(5))
         bar.background=GradientDrawable().apply {setColor(colors.panel);cornerRadius=dp(19).toFloat();setStroke(dp(1),colors.border)}
         for((key,icon,title) in listOf(
-            Triple("Início","⌂","Início"),Triple("Finanças","▥","Relatórios"),
+            Triple("Início","⌂","Início"),
             Triple("Semáforo","◎","Metas"),Triple("Histórico","↶","Histórico"),
             Triple("Amigos","♧","Amigos"),Triple("Perfil","⚙","Configurações")
         )) {

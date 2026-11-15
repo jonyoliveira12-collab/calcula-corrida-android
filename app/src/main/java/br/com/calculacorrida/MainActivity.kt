@@ -86,7 +86,7 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = if(colors.light) rounded(bg,0,bg) else getDrawable(R.drawable.home_background)
+            background = if(colors.theme!="dark") rounded(bg,0,bg) else getDrawable(R.drawable.home_background)
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
 
@@ -135,6 +135,13 @@ class MainActivity : Activity() {
         }
         header.addView(brandRow)
         root.addView(header,LinearLayout.LayoutParams(-1,dp(if(resources.configuration.screenWidthDp>=600)180 else 124)))
+        if(colors.theme=="holiday") root.addView(SeasonalHeaderView(this),LinearLayout.LayoutParams(-1,dp(28)))
+        root.addView(TextView(this).apply {
+            text="EM BREVE • Mensal R$ 10,00 • Trimestral R$ 25,00 • Anual R$ 90,00     ✦     SUPORTE: (41) 99597-6826 • gbrigante71@gmail.com     ✦     Novidades e próximas atualizações do JHONDRIVER     ✦     "
+            textSize=12f;setTextColor(gold);setSingleLine(true);ellipsize=android.text.TextUtils.TruncateAt.MARQUEE;marqueeRepeatLimit=-1;isSelected=true
+            setPadding(dp(10),dp(7),dp(10),dp(7));background=rounded(panel,10,border)
+            contentDescription="Em breve: mensal dez reais, trimestral vinte e cinco reais e anual noventa reais. Suporte: 41 99597-6826, gbrigante71@gmail.com."
+        },LinearLayout.LayoutParams(-1,dp(34)).apply {topMargin=dp(6)})
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -188,7 +195,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (AppAppearance.isLight(this) != colors.light) { recreate(); return }
+        if (AppAppearance.theme(this) != colors.theme) { recreate(); return }
         if (!isFinishing) AppUpdates.check(this)
         if (!NetworkGate.isOnline(this)) {
             startActivity(Intent(this, LoginActivity::class.java))
@@ -223,7 +230,6 @@ class MainActivity : Activity() {
         when (tab) {
             "Início" -> buildHome()
             "Histórico" -> buildHistory()
-            "Finanças" -> buildFinances()
             "Semáforo" -> buildTrafficSettings()
             else -> buildProfile()
         }
@@ -231,6 +237,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildHome() {
+        content.addView(subscriptionCard(),margin(0,8))
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val records = JourneyStore.getRecords(this)
         val wide = resources.configuration.screenWidthDp >= 600
@@ -314,7 +321,7 @@ class MainActivity : Activity() {
         feature("● Semáforo", "traffic_enabled")
         content.addView(controls)
 
-        val offerCard = card().apply { background = if(colors.light) rounded(panel,22,border) else GoldPanelDrawable(resources.displayMetrics.density,true) }
+        val offerCard = card().apply { background = if(colors.theme!="dark") rounded(panel,22,border) else GoldPanelDrawable(resources.displayMetrics.density,true) }
         offerCard.addView(label("⚡ ÚLTIMA OFERTA", 22f, gold, true, 0, 18).apply{gravity=Gravity.CENTER})
         val offer = records.firstOrNull { selectedOfferApp == null || it.optString("app").equals(selectedOfferApp,true) }
         selectedOfferApp?.let{offerCard.addView(pill(it,gold))}
@@ -409,10 +416,11 @@ class MainActivity : Activity() {
             diagnostics.visibility = if(diagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         })
         content.addView(diagnostics, margin(0,10))
-        content.addView(subscriptionCard(),margin(0,12))
+
     }
 
     private fun chooseProfilePhoto() {
+        Toast.makeText(this,"A foto será visível aos seus amigos aceitos.",Toast.LENGTH_LONG).show()
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "image/*"
@@ -431,6 +439,11 @@ class MainActivity : Activity() {
             getSharedPreferences("settings", MODE_PRIVATE).edit()
                 .putString("profile_photo_uri", uri.toString()).apply()
             showTab(selectedTab)
+            val app=applicationContext
+            Thread {
+                val result=runCatching{FriendMediaStore(app).uploadPhoto(uri)}
+                runOnUiThread {if(!isFinishing)Toast.makeText(this,if(result.isSuccess)"Foto atualizada para seus amigos." else "Foto salva no aparelho. Não foi possível compartilhar agora; tente novamente com internet.",Toast.LENGTH_LONG).show()}
+            }.start()
         }
     }
 
@@ -760,10 +773,16 @@ class MainActivity : Activity() {
     }
 
     private fun subscriptionCard(): LinearLayout = card().apply {
-        addView(label("EM BREVE",11f,gold,true))
-        addView(label("Assinaturas JHONDRIVER",20f,white,true,4,6))
-        addView(label("Mensal  •  Trimestral  •  Anual",15f,gold,true,2,5))
-        addView(label("Novos planos em preparação. Valores e condições serão divulgados no lançamento.",13f,muted,false))
+        background=GradientDrawable(GradientDrawable.Orientation.TL_BR,if(colors.light)intArrayOf(Color.rgb(255,248,227),Color.WHITE)else intArrayOf(Color.rgb(67,39,46),panel)).apply {cornerRadius=dp(22).toFloat();setStroke(dp(1),brandGold)}
+        addView(label("✦  ASSINATURAS • EM BREVE",12f,gold,true))
+        addView(label("Um plano para o seu ritmo",22f,white,true,6,8))
+        val plans=horizontal()
+        for((name,price) in listOf("Mensal" to "R$ 10,00","Trimestral" to "R$ 25,00","Anual" to "R$ 90,00")) plans.addView(LinearLayout(this@MainActivity).apply {
+            orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(12),dp(8),dp(12));background=rounded(bgInput,14,border)
+            addView(label(name,12f,muted,true));addView(label(price,21f,gold,true,6,0).apply {maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,23,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
+        },LinearLayout.LayoutParams(0,-2,1f).apply {leftMargin=dp(3);rightMargin=dp(3)})
+        addView(plans)
+        addView(label("Planos em preparação. A contratação será disponibilizada em uma próxima atualização.",12f,muted,false,10,0))
     }
 
     private fun buildProfile() {
@@ -774,18 +793,19 @@ class MainActivity : Activity() {
         val appearance = card()
         appearance.addView(label("APARÊNCIA",11f,gold,true))
         appearance.addView(label("Um tema para cada momento",20f,white,true,4,5))
-        appearance.addView(label("Escolha fundo escuro ou branco. Sua escolha fica salva neste aparelho.",13f,muted,false,0,8))
-        val choices=horizontal()
-        for ((title,light) in listOf("◐  Escuro" to false,"☀  Claro" to true)) choices.addView(action((if(colors.light==light)"✓  " else "")+title,colors.light==light) {
-            if(colors.light!=light) { AppAppearance.setLight(this,light); recreate() }
-        },LinearLayout.LayoutParams(0,-2,1f).apply {rightMargin=dp(6)})
-        appearance.addView(choices)
+        appearance.addView(label("Escolha Escuro, Cinza, Claro ou o tema temporário de Natal. Sua preferência fica salva.",13f,muted,false,0,8))
+        appearance.addView(action("ESCOLHER TEMA • "+(AppAppearance.options().firstOrNull{it.first==colors.theme}?.second ?: "Escuro"),true) {
+            val options=AppAppearance.options()
+            AlertDialog.Builder(this).setTitle("Aparência do aplicativo").setSingleChoiceItems(options.map{it.second}.toTypedArray(),options.indexOfFirst{it.first==colors.theme}) {dialog,index->
+                dialog.dismiss();if(options[index].first!=colors.theme){AppAppearance.setTheme(this,options[index].first);recreate()}
+            }.setNegativeButton("Fechar",null).show()
+        })
         content.addView(appearance,margin(0,10))
         content.addView(subscriptionCard(),margin(0,10))
 
         val privacy = card()
         privacy.addView(label("Usar banco com a leitura desligada", 18f, gold, true))
-        privacy.addView(label("Desliga a acessibilidade e oculta o CC. Para voltar a ler corridas, você precisa reativá-la nos ajustes do Android. Suas opções serão mantidas.", 13f, muted, false))
+        privacy.addView(label("Desliga a acessibilidade e oculta o JD. Para voltar a ler corridas, você precisa reativá-la nos ajustes do Android. Suas opções serão mantidas.", 13f, muted, false))
         val serviceOn = isAccessibilityEnabled()
         privacy.addView(action(if (serviceOn) "DESLIGAR PARA USAR BANCO" else "REATIVAR ACESSIBILIDADE", true) {
             if (serviceOn) stopReaderForBank() else openReaderAccessibilitySettings()
@@ -804,18 +824,6 @@ class MainActivity : Activity() {
             startActivity(Intent(this,CardStyleActivity::class.java))
         })
         content.addView(floatingTag,margin(0,10))
-
-        val support = card()
-        support.addView(label("Suporte", 18f, gold, true))
-        support.addView(label("Precisa de ajuda com o JHONDRIVER? Entre em contato.", 13f, muted, false))
-        support.addView(action("TELEFONE: (41) 99597-6826", false) {
-            openSupportContact(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+5541995976826")))
-        })
-        support.addView(action("E-MAIL: gbrigante71@gmail.com", false) {
-            openSupportContact(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:gbrigante71@gmail.com"))
-                .putExtra(Intent.EXTRA_SUBJECT, "Suporte JHONDRIVER"))
-        })
-        content.addView(support, margin(0, 10))
 
         // Perfil do motorista: foto selecionável e identificação da conta.
         val userCard = card()
@@ -934,6 +942,12 @@ class MainActivity : Activity() {
         posCard.addView(posRow)
         content.addView(posCard, margin(0, 10))
 
+        val support = card()
+        support.addView(label("AJUDA E SUPORTE",18f,gold,true))
+        support.addView(label("Escolha o motivo para falar com o suporte.",13f,muted,false,3,5))
+        support.addView(action("ABRIR AJUDA E SUPORTE  ›",true) {startActivity(Intent(this,HelpSupportActivity::class.java))})
+        content.addView(support,margin(0,14))
+
         // Logout
         val logoutBtn = Button(this).apply {
             text = "SAIR DA CONTA"
@@ -959,7 +973,7 @@ class MainActivity : Activity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(16), dp(16), dp(16))
-        background = if(colors.light) rounded(panel,20,border) else GoldPanelDrawable(resources.displayMetrics.density)
+        background = if(colors.theme!="dark") rounded(panel,20,border) else GoldPanelDrawable(resources.displayMetrics.density)
         elevation = dp(6).toFloat()
         layoutParams = margin(0, 10)
     }

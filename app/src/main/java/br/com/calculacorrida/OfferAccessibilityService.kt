@@ -120,7 +120,7 @@ class OfferAccessibilityService : AccessibilityService() {
     private val voice by lazy { OfferVoice(this) { pkg -> readingEnabled() && displayedOffers.containsKey(pkg) } }
 
     private var lastHeartbeat=0L
-    private fun readingEnabled(): Boolean = NetworkGate.isOnline(this) && !sensitiveWindowVisible && foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
+    private fun readingEnabled(): Boolean = (getSystemService(POWER_SERVICE) as android.os.PowerManager).isInteractive && NetworkGate.isOnline(this) && !sensitiveWindowVisible && foregroundPackage != "com.nu.production" && readerConfigured() && !getSharedPreferences("settings",MODE_PRIVATE).getBoolean("reader_paused",false)
     private fun readerConfigured(): Boolean {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
         return prefs.getBoolean("reader_disclosure_accepted", false) &&
@@ -160,10 +160,10 @@ class OfferAccessibilityService : AccessibilityService() {
             visible.forEach{lastWindowSeen[it]=now}
             overlays.keys.filter { it !in visible && now-(lastWindowSeen[it]?:0)>2000L }.forEach(::forgetOffer)
         }
-        if (!NetworkGate.isOnline(this)) {
+        if (!(getSystemService(POWER_SERVICE) as android.os.PowerManager).isInteractive || !NetworkGate.isOnline(this)) {
             hideAllOverlays()
             removeBubble()
-            readerStatus("Sem internet; leitura e cálculos pausados")
+            readerStatus("Tela apagada ou sem conexão; leitura e cálculos pausados")
             return
         }
         if (!readerConfigured() || sensitiveWindowVisible || pkg == "com.nu.production") {
@@ -176,8 +176,8 @@ class OfferAccessibilityService : AccessibilityService() {
             return
         }
         bubble?.apply {
-            val label=if(readingEnabled())"CC" else "Ⅱ"
-            val description=if(readingEnabled())"Copiloto CC ativo em segundo plano" else "Copiloto CC pausado"
+            val label="JD"
+            val description=if(readingEnabled())"JHONDRIVER JD ativo em segundo plano" else "JHONDRIVER JD pausado"
             if(text.toString()!=label)text=label
             if(contentDescription?.toString()!=description)contentDescription=description
         }
@@ -208,10 +208,10 @@ class OfferAccessibilityService : AccessibilityService() {
                 y = prefs.getInt("bubble_y", dp(170)).coerceIn(0, (resources.displayMetrics.heightPixels - dp(48)).coerceAtLeast(0))
             }
         val view = TextView(this).apply {
-            text = "CC"; textSize = 15f; gravity = Gravity.CENTER
-            setTextColor(Color.rgb(255, 218, 108)); typeface = Typeface.DEFAULT_BOLD
-            contentDescription = "Copiloto CC. Arraste para mover; toque para abrir os ajustes."
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(18,18,20)); setStroke(dp(2), Color.rgb(239,190,65)) }
+            text = "JD"; textSize = 15f; gravity = Gravity.CENTER
+            setTextColor(Color.BLACK); typeface = Typeface.DEFAULT_BOLD
+            contentDescription = "JHONDRIVER JD. Arraste para mover; toque para abrir os ajustes."
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE); setStroke(dp(2), Color.rgb(239,190,65)) }
         }
         var startX = 0; var startY = 0; var downX = 0f; var downY = 0f; var moved = false
         view.setOnTouchListener { _, event ->
@@ -240,7 +240,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val prefs=getSharedPreferences("settings",MODE_PRIVATE)
         val paused=prefs.getBoolean("reader_paused",false)
         val dialog=android.app.AlertDialog.Builder(this)
-            .setTitle("Copiloto CC")
+            .setTitle("JHONDRIVER JD")
             .setItems(arrayOf(if(paused)"Retomar leitura" else "Pausar leitura", "Abrir JHONDRIVER", "Desligar para usar banco")) { _, which ->
                 when(which) {
                     0 -> { prefs.edit().putBoolean("reader_paused",!paused).apply();hideAllOverlays();readerStatus(if(!paused)"Leitura pausada pelo usuário" else "Leitura retomada") }
