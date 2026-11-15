@@ -1,9 +1,9 @@
 {
   "channel": "stable",
   "packageName": "br.com.calculacorrida",
-  "versionCode": 22,
-  "versionName": "0.6.1",
+  "versionCode": 23,
+  "versionName": "0.7.0",
   "certificateSha256": "d83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7",
-  "sha256": "bb3e44f3380fcad819eec5ec8b69eacee37ec8adff1a0c1c1cf54441f44a4a83",
-  "apkUrl": "https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.6.1/JHONDRIVER-0.6.1.apk"
+  "sha256": "049103e697cc2e3c79c723ff0ed2701927e656c8ece4267f698ee47661b1aff0",
+  "apkUrl": "https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.7.0/JHONDRIVER-0.7.0.apk"
 }
