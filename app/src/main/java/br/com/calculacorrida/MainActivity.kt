@@ -323,8 +323,8 @@ class MainActivity : Activity() {
         feature("● Semáforo", "traffic_enabled")
         content.addView(controls)
 
-        val offerCard = card()
-        offerCard.addView(label("ÚLTIMA OFERTA", 17f, white, true, 0, 12).apply{gravity=Gravity.CENTER})
+        val offerCard = card().apply{setPadding(dp(16),dp(14),dp(16),dp(14))}
+        offerCard.addView(label("ÚLTIMA OFERTA", 17f, white, true, 0, 8).apply{gravity=Gravity.CENTER})
         val offer = records.firstOrNull { selectedOfferApp == null || it.optString("app").equals(selectedOfferApp,true) }
         selectedOfferApp?.let{offerCard.addView(pill(it,gold))}
         fun number(key: String): String = offer?.let { String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.2f", it.optDouble(key)) } ?: "—"
@@ -333,7 +333,7 @@ class MainActivity : Activity() {
         totals.addView(metric("PERCURSO TOTAL", number("totalKm") + " km"), weight())
         totals.addView(metric("TEMPO TOTAL", number("minutes") + " min"), weight())
         offerCard.addView(totals)
-        offerCard.addView(View(this).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(12); bottomMargin = dp(12) })
+        offerCard.addView(View(this).apply { setBackgroundColor(border) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(8); bottomMargin = dp(8) })
         val arrival = offer?.optDouble("pickupMinutes", Double.NaN)
         offerCard.addView(label("Até o passageiro: " + if (arrival != null && arrival.isFinite()) String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.1f min", arrival) else "não identificado", 12f, muted, false, 0, 4))
         offerCard.addView(label("Nota: " + (offer?.optString("passengerRating")?.takeIf { it.isNotBlank() } ?: "não identificada"), 12f, muted, false, 0, 6))
@@ -342,12 +342,12 @@ class MainActivity : Activity() {
         rates.addView(metric("R$/HORA", if (offer == null) "—" else "R$ " + number("perHour")), weight())
         offerCard.addView(rates)
         val classification = offer?.optString("classification")
-        offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else Color.WHITE, true, 18, 8).apply {
+        offerCard.addView(label(when (classification) { "GOOD" -> "✓ BOA CORRIDA"; "BAD" -> "ABAIXO DOS LIMITES"; "REVIEW" -> "AVALIE A CORRIDA"; else -> "AGUARDANDO UMA OFERTA" }, 16f, if (offer == null) muted else Color.WHITE, true, 12, 8).apply {
             gravity = Gravity.CENTER
             val edge=when(classification){"GOOD"->Color.rgb(54,240,71);"BAD"->Color.rgb(237,78,69);"REVIEW"->gold;else->border}
             val fill=when(classification){"GOOD"->Color.rgb(0,106,20);"BAD"->Color.rgb(106,19,19);"REVIEW"->Color.rgb(106,73,5);else->panel}
             background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(edge,fill)).apply{cornerRadius=dp(16).toFloat();setStroke(dp(1),edge)}
-        }, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(18) })
+        }, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(12) })
         offerCard.addView(label(if (offer == null) "Ative a leitura e abra o aplicativo de motorista." else "Valores brutos • inclui chegada quando informada na oferta.", 12f, muted, false, 12, 0))
 
         val filters = card()
