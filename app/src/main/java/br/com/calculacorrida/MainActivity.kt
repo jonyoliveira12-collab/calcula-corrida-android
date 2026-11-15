@@ -783,13 +783,15 @@ class MainActivity : Activity() {
     }
 
     private fun subscriptionCard(compact:Boolean=false): LinearLayout = card().apply {
+        val shortWide=compact && resources.configuration.screenWidthDp>=600 && resources.configuration.screenHeightDp<800
+        if(shortWide)setPadding(dp(12),dp(12),dp(12),dp(12))
         background=GradientDrawable(GradientDrawable.Orientation.TL_BR,if(colors.light)intArrayOf(Color.rgb(255,248,227),Color.WHITE)else intArrayOf(bgInput,panel)).apply {cornerRadius=dp(22).toFloat();setStroke(dp(1),brandGold)}
         addView(label("✦  ASSINATURAS • EM BREVE",12f,gold,true))
         if(!compact)addView(label("Um plano para o seu ritmo",22f,white,true,6,8))
         val plans=horizontal()
         for((name,price) in listOf("Mensal" to "R$ 10,00","Trimestral" to "R$ 25,00","Anual" to "R$ 90,00")) plans.addView(LinearLayout(this@MainActivity).apply {
-            orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(if(compact)6 else 12),dp(8),dp(if(compact)6 else 12));background=rounded(bgInput,14,border)
-            addView(label(name,12f,muted,true));addView(label(price,if(compact)17f else 21f,gold,true,if(compact)3 else 6,0).apply {maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,if(compact)18 else 23,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
+            orientation=if(shortWide)LinearLayout.HORIZONTAL else LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),dp(if(compact)6 else 12),dp(8),dp(if(compact)6 else 12));background=rounded(bgInput,14,border)
+            addView(label(name,12f,muted,true),if(shortWide)LinearLayout.LayoutParams(0,-2,1f) else LinearLayout.LayoutParams(-1,-2));addView(label(price,if(compact)17f else 21f,gold,true,if(shortWide)0 else if(compact)3 else 6,0).apply {maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,if(compact)18 else 23,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
         },LinearLayout.LayoutParams(0,-2,1f).apply {leftMargin=dp(3);rightMargin=dp(3)})
         addView(plans)
         if(!compact)addView(label("Planos em preparação. A contratação será disponibilizada em uma próxima atualização.",12f,muted,false,10,0))

@@ -61,14 +61,16 @@ class UnifiedDesignTest {
             for(theme in listOf("light","dark")) {
                 AppAppearance.setTheme(context,theme);SessionManager(context).saveUser("motorista.exemplo@teste.invalid","synthetic-token",null)
                 launch(MainActivity::class.java)
+                screen("app-tablet-$theme.png")
                 inst.runOnMainSync {
                     for(label in listOf("AJUSTAR LIMITES", "✓ BOA CORRIDA")) {
                         val view=labels().first{it.text.toString().startsWith(label)}
                         val rect=android.graphics.Rect()
-                        assertTrue("Tablet keeps $label fully visible above navigation",view.getGlobalVisibleRect(rect) && rect.height()==view.height)
+                        val visible=view.getGlobalVisibleRect(rect)
+                        assertTrue("Tablet keeps $label fully visible above navigation (${rect.height()}/${view.height})",visible && rect.height()==view.height)
                     }
                 }
-                screen("app-tablet-$theme.png");close()
+                close()
             }
         } finally {
             close();shell("wm size reset");shell("wm density reset")
