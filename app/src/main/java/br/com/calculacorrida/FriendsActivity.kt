@@ -33,6 +33,8 @@ class FriendsActivity : AppCompatActivity() {
     private val io = Executors.newSingleThreadExecutor()
     private lateinit var client: FriendsGateway
     private lateinit var mediaStore:FriendMediaStore
+    private lateinit var connectionIntro: LinearLayout
+    private lateinit var compactPresence: Button
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var list: LinearLayout
@@ -108,12 +110,15 @@ class FriendsActivity : AppCompatActivity() {
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(page){view,insets->val bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars());view.setPadding(bars.left,bars.top,bars.right,bars.bottom);insets}
         val nav=row()
         nav.addView(text("‹ Voltar",14f,gold).apply{minHeight=dp(44);gravity=android.view.Gravity.CENTER_VERTICAL;setOnClickListener{finish()}},LinearLayout.LayoutParams(0,-2,1f))
+        compactPresence=button("STATUS"){choosePresence()}.apply{visibility=View.GONE}
+        nav.addView(compactPresence,LinearLayout.LayoutParams(-2,-2).apply{rightMargin=dp(6)})
         nav.addView(button("◐ TEMA"){chooseTheme()},LinearLayout.LayoutParams(-2,-2));root.addView(nav)
+        connectionIntro=column();root.addView(connectionIntro)
         val heading=column().apply{gravity=android.view.Gravity.CENTER;setPadding(0,dp(4),0,dp(8))}
         heading.addView(FriendsGlyph(this,"people",gold),LinearLayout.LayoutParams(dp(46),dp(46)))
         heading.addView(text("Amigos",30f).apply{typeface=Typeface.DEFAULT_BOLD;gravity=android.view.Gravity.CENTER})
         heading.addView(text("Conecte-se com quem está na estrada",12f,colors.muted).apply{gravity=android.view.Gravity.CENTER})
-        root.addView(heading)
+        connectionIntro.addView(heading)
         val connection=card().apply{setPadding(dp(16),dp(14),dp(16),dp(14))}
         val connectionRow=row()
         connectionRow.addView(FriendsGlyph(this,"people",gold,true),LinearLayout.LayoutParams(dp(66),dp(66)).apply{rightMargin=dp(14)})
@@ -122,14 +127,14 @@ class FriendsActivity : AppCompatActivity() {
         status=text("Aguarde, consultando seu status.",13f,colors.muted);connectionCopy.addView(status)
         connectionRow.addView(connectionCopy,LinearLayout.LayoutParams(0,-2,1f));connection.addView(connectionRow)
         online=button("FICAR ONLINE • ESCOLHER STATUS",true){choosePresence()};connection.addView(online)
-        root.addView(connection)
+        connectionIntro.addView(connection)
         val privacy=row().apply{background=rounded(colors.panel,18,colors.border);setPadding(dp(12),dp(10),dp(12),dp(10))}
         privacy.addView(FriendsGlyph(this,"shield",gold),LinearLayout.LayoutParams(dp(32),dp(38)).apply{rightMargin=dp(10)})
         privacy.addView(text("Sua localização é compartilhada apenas com amigos autorizados, com o seu consentimento.",12f,colors.muted),LinearLayout.LayoutParams(0,-2,1f))
-        root.addView(privacy,section())
-        root.addView(text("Sua conexão",21f).apply{typeface=Typeface.DEFAULT_BOLD;setPadding(dp(3),dp(14),0,dp(10))})
-        root.addView(connectionAction("code","Meu nome e código","Veja seu código para compartilhar"){showProfile()},section())
-        root.addView(connectionAction("add","Adicionar amigo por código","Conecte-se usando o código de um amigo"){addFriend()},section())
+        connectionIntro.addView(privacy,section())
+        connectionIntro.addView(text("Sua conexão",21f).apply{typeface=Typeface.DEFAULT_BOLD;setPadding(dp(3),dp(14),0,dp(10))})
+        connectionIntro.addView(connectionAction("code","Meu nome e código","Veja seu código para compartilhar"){showProfile()},section())
+        connectionIntro.addView(connectionAction("add","Adicionar amigo por código","Conecte-se usando o código de um amigo"){addFriend()},section())
         val shortcuts=row().apply{background=rounded(colors.panel,20,colors.border);setPadding(dp(4),dp(12),dp(4),dp(12))}
         for((glyph,title,subtitle) in listOf(Triple("add","Convidar","Adicione um motorista"),Triple("chat","Conversar","Abra uma conversa"),Triple("pin","Localização","Veja seus amigos"))) {
             val item=column(4).apply{gravity=android.view.Gravity.CENTER;isClickable=true;isFocusable=true;contentDescription="$title. $subtitle";setOnClickListener{when(glyph){"add"->addFriend();"chat"->selectFriend(false);else->selectFriend(true)}}}
@@ -138,7 +143,7 @@ class FriendsActivity : AppCompatActivity() {
             item.addView(text(subtitle,10f,colors.muted).apply{gravity=android.view.Gravity.CENTER})
             shortcuts.addView(item,LinearLayout.LayoutParams(0,-2,1f))
         }
-        root.addView(shortcuts,section())
+        connectionIntro.addView(shortcuts,section())
         root.addView(text("Seus amigos",21f).apply{typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(16),0,dp(3))})
         stats=text("Sua rede de confiança na estrada",12f,colors.muted);root.addView(stats)
         val search=input("Buscar amigo…",40)
@@ -212,6 +217,8 @@ class FriendsActivity : AppCompatActivity() {
     }
     private fun showConversation() {
         val selected=peer!=null
+        connectionIntro.visibility=if(wide && selected)View.GONE else View.VISIBLE
+        compactPresence.visibility=if(wide && selected)View.VISIBLE else View.GONE
         details.visibility=if(selected)View.VISIBLE else View.GONE;welcome.visibility=if(selected)View.GONE else View.VISIBLE
         contactsScroll.visibility=if(wide || !selected)View.VISIBLE else View.GONE
         conversationHost.visibility=if(wide || selected)View.VISIBLE else View.GONE

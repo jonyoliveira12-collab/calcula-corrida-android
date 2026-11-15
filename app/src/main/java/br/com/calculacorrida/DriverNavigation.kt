@@ -38,7 +38,8 @@ object DriverNavigation {
                         .putExtra(DESTINATION,key).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
                 }
             }
-            cell.addView(TextView(activity).apply{text=icon;textSize=24f;gravity=Gravity.CENTER;setTextColor(if(active)Color.BLACK else colors.gold)})
+            if(key=="Amigos") cell.addView(FriendsGlyph(activity,"people",if(active)Color.BLACK else colors.gold),LinearLayout.LayoutParams(dp(30),dp(30)))
+            else cell.addView(TextView(activity).apply{text=icon;textSize=24f;gravity=Gravity.CENTER;setTextColor(if(active)Color.BLACK else colors.gold)})
             cell.addView(TextView(activity).apply{
                 text=title;gravity=Gravity.CENTER;maxLines=1;setTextColor(if(active)Color.BLACK else colors.text)
                 typeface=if(active)Typeface.DEFAULT_BOLD else Typeface.DEFAULT
