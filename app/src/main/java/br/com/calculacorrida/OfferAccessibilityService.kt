@@ -163,7 +163,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (!(getSystemService(POWER_SERVICE) as android.os.PowerManager).isInteractive || !NetworkGate.isOnline(this)) {
             hideAllOverlays()
             removeBubble()
-            readerStatus("Tela apagada ou sem conexão; leitura e cálculos pausados")
+            readerStatus(if(!(getSystemService(POWER_SERVICE) as android.os.PowerManager).isInteractive)"Tela apagada; leitura e cálculos pausados" else "Sem internet; leitura e cálculos pausados")
             return
         }
         if (!readerConfigured() || sensitiveWindowVisible || pkg == "com.nu.production") {

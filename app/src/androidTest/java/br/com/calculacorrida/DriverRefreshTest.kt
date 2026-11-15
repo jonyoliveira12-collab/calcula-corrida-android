@@ -29,6 +29,8 @@ class DriverRefreshTest {
         fun labels()=views(activity!!.window.decorView).filterIsInstance<TextView>()
         fun click(title:String){inst.runOnMainSync{labels().first{it.text.toString().startsWith(title)}.performClick()};inst.waitForIdleSync()}
         fun await(condition:()->Boolean){val end=SystemClock.elapsedRealtime()+10000;while(!condition()&&SystemClock.elapsedRealtime()<end)Thread.sleep(100);assertTrue(condition())}
+        fun shell(command:String)=ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(command)).use{it.readBytes()}
+        fun screen(name:String){inst.waitForIdleSync();Thread.sleep(250);inst.uiAutomation.takeScreenshot()?.let{image->val dir=java.io.File(context.filesDir,"screenshots").apply{mkdirs()};java.io.File(dir,name).outputStream().use{image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};image.recycle()}}
         fun has(value:String):Boolean {var found=false;inst.runOnMainSync{found=labels().any{it.text.toString().startsWith(value)}};return found}
         try {
             SessionManager(context).saveUser("chat-audio-test@example.invalid","synthetic-token",null)
@@ -51,13 +53,24 @@ class DriverRefreshTest {
             click("GRAVAR ÁUDIO");await{has("PARAR GRAVAÇÃO")}
             Thread.sleep(1000);click("PARAR GRAVAÇÃO");await{has("Áudio pronto")}
             assertEquals("No upload/send before explicit send",0,sent.get())
+            screen("chat-audio-review.png")
             click("DESCARTAR");assertTrue(has("GRAVAR ÁUDIO"));assertEquals(0,sent.get())
             click("GRAVAR ÁUDIO");await{has("PARAR GRAVAÇÃO")}
             // Finishing the visible activity cancels microphone capture, never sends.
             inst.runOnMainSync{activity!!.finish()};inst.waitForIdleSync()
             assertEquals(0,sent.get())
+            shell("wm size 1280x800");shell("wm density 160")
+            activity=inst.startActivitySync(Intent(context,FriendsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));inst.waitForIdleSync()
+            await{has("CONVERSAR E VER MAPA")};Thread.sleep(150);click("CONVERSAR E VER MAPA");await{has("Boa viagem!")}
+            screen("friends-tablet-gray.png")
+            val old=activity
+            inst.runOnMainSync{AppAppearance.setTheme(context,"holiday");activity!!.recreate()}
+            await{var next:Activity?=null;inst.runOnMainSync{next=androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).firstOrNull{it is FriendsActivity && it!==old}};if(next!=null)activity=next;next!=null}
+            await{has("Boa viagem!")};screen("friends-tablet-holiday.png")
+            inst.runOnMainSync{activity!!.finish()}
+            activity=inst.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));inst.waitForIdleSync();screen("dashboard-holiday.png")
         } finally {
-            inst.runOnMainSync{activity?.finish()};FriendsDependencies.gateway=oldFactory;AppAppearance.setTheme(context,previousTheme)
+            inst.runOnMainSync{activity?.finish()};shell("wm size reset");shell("wm density reset");FriendsDependencies.gateway=oldFactory;AppAppearance.setTheme(context,previousTheme)
             val edit=prefs.edit().clear();for((key,value)in previous)when(value){is String->edit.putString(key,value);is Boolean->edit.putBoolean(key,value);is Long->edit.putLong(key,value);is Int->edit.putInt(key,value);is Float->edit.putFloat(key,value)};edit.commit()
         }
     }

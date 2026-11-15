@@ -27,6 +27,7 @@ class FriendsServiceTest {
         val calls = Collections.synchronizedList(mutableListOf<String>())
         val modes=Collections.synchronizedList(mutableListOf<String>())
         val peer = UUID.randomUUID().toString()
+        val inboxId=UUID.randomUUID().toString()
         val fake = object : FriendsGateway {
             @Volatile var granted = false
             override fun call(action: String, data: JSONObject): JSONObject {
@@ -38,7 +39,7 @@ class FriendsServiceTest {
                 if (granted) shares.put(JSONObject().put("peer",peer).put("until_ms",System.currentTimeMillis()+900000))
                 return JSONObject().put("ok",true).put("now_ms",System.currentTimeMillis()).put("shares",shares)
                     .put("me",JSONObject().put("id",UUID.randomUUID().toString()).put("name","Teste").put("code","000000000000"))
-                    .put("friends",JSONArray())
+                    .put("friends",JSONArray()).put("inbox",JSONObject().put("id",inboxId).put("sender",peer).put("name","Amigo de exemplo").put("body","Mensagem de teste"))
             }
         }
         fun shell(command: String) { android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(command)).use { it.readBytes() } }
@@ -65,6 +66,7 @@ class FriendsServiceTest {
             assertFalse("Being away never starts location",FriendsService.sharing)
             assertFalse("Being online never starts location",FriendsService.sharing)
             assertFalse(calls.contains("location"))
+            assertTrue("Incoming message posts a notification",context.getSystemService(android.app.NotificationManager::class.java).activeNotifications.any{it.id==701})
             manager.addTestProvider(LocationManager.GPS_PROVIDER,false,false,false,false,true,true,true,android.location.Criteria.POWER_LOW,android.location.Criteria.ACCURACY_FINE)
             manager.setTestProviderEnabled(LocationManager.GPS_PROVIDER,true)
             inst.runOnMainSync { context.startService(Intent(context,FriendsService::class.java).setAction(FriendsService.SHARE)
