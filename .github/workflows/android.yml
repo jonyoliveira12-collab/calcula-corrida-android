@@ -23,22 +23,22 @@ jobs:
           python - <<'CHECK'
           import hashlib, json
           from pathlib import Path
-          apk = Path('distribution/JHONDRIVER-0.7.0.apk')
+          apk = Path('distribution/JHONDRIVER-0.7.1.apk')
           metadata = json.loads(Path('distribution/update.json').read_text())
           assert metadata['packageName'] == 'br.com.calculacorrida'
-          assert metadata['versionCode'] == 23 and metadata['versionName'] == '0.7.0'
+          assert metadata['versionCode'] == 24 and metadata['versionName'] == '0.7.1'
           assert metadata['channel'] == 'stable'
           assert metadata['certificateSha256'] == 'd83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7'
           assert metadata['sha256'] == hashlib.sha256(apk.read_bytes()).hexdigest()
-          assert metadata['apkUrl'] == 'https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.7.0/JHONDRIVER-0.7.0.apk'
+          assert metadata['apkUrl'] == 'https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.7.1/JHONDRIVER-0.7.1.apk'
           print('Signed APK metadata verified')
           CHECK
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs distribution/JHONDRIVER-0.7.0.apk | tee certificate.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs distribution/JHONDRIVER-0.7.1.apk | tee certificate.txt
           grep -Fx 'Signer #1 certificate SHA-256 digest: d83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7' certificate.txt
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging distribution/JHONDRIVER-0.7.0.apk | grep -F "package: name='br.com.calculacorrida' versionCode='23'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging distribution/JHONDRIVER-0.7.1.apk | grep -F "package: name='br.com.calculacorrida' versionCode='24'"
       - name: Upload the tested installation to the draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release upload preview-0.7.0 distribution/JHONDRIVER-0.7.0.apk distribution/update.json distribution/friends-tablet-gray.png distribution/friends-tablet-holiday.png distribution/dashboard-holiday.png distribution/chat-audio-review.png distribution/card-fire-red-light.png --clobber
+          gh release upload preview-0.7.1 distribution/JHONDRIVER-0.7.1.apk distribution/update.json --clobber
