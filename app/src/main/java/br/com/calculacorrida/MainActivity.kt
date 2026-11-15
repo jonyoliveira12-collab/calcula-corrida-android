@@ -723,8 +723,8 @@ class MainActivity : Activity() {
             val rating = item.optString("passengerRating")
             val app = item.optString("app", "Aplicativo")
             val timestamp = item.optLong("timestamp")
-            val date = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("pt", "BR"))
-                .format(java.util.Date(timestamp))
+            val recordedAt = if(timestamp>0) "Registrada em " + java.text.SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", java.util.Locale("pt", "BR"))
+                .format(java.util.Date(timestamp)) else "Horário não registrado"
             val classification = item.optString("classification")
             val (status, statusColor) = when (classification) {
                 "GOOD" -> Pair("ACEITAR", green)
@@ -733,9 +733,10 @@ class MainActivity : Activity() {
             }
             val entry = card()
             val top = horizontal()
-            top.addView(label("$app • $date", 11f, muted, true), LinearLayout.LayoutParams(0, -2, 1f))
+            top.addView(label(app, 14f, white, true), LinearLayout.LayoutParams(0, -2, 1f))
             top.addView(pill(status, statusColor))
             entry.addView(top)
+            entry.addView(label(recordedAt,16f,white,true,10,6))
             entry.addView(label(money(fare.toFloat()), 25f, white, true, 7, 2))
             entry.addView(label(
                 String.format(java.util.Locale("pt", "BR"), "%.1f km • %.0f min • R$ %.2f/km", km, minutes, perKm).replace(".", ","),
