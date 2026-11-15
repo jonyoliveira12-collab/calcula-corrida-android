@@ -242,6 +242,9 @@ class MainActivity : Activity() {
     }
 
     private fun buildHome() {
+        content.addView(action("AMIGOS • CONVERSA E LOCALIZAÇÃO  ›", false) {
+            startActivity(Intent(this, FriendsActivity::class.java))
+        })
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         val records = JourneyStore.getRecords(this)
         val wide = resources.configuration.screenWidthDp >= 600
