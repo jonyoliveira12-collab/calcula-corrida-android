@@ -267,11 +267,11 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             FriendsService.running -> "Conectando ou sem sinal…"
             else -> "○ Você está offline"
         }
-        status.setTextColor(if(FriendsService.connected)colors.green else colors.text)
+        status.setTextColor(if(FriendsService.mode=="away")gold else if(FriendsService.connected)colors.green else colors.text)
         list.removeAllViews()
         val friends=snapshot.optJSONArray("friends") ?: return
         val all=(0 until friends.length()).map {friends.getJSONObject(it)}
-        stats.text="${all.count {it.optString("state")=="accepted"}} amigos    ·    ${all.count {it.optBoolean("online")}} online    ·    ${all.count {it.optString("state")=="pending"}} convites"
+        stats.text="${all.count {it.optString("state")=="accepted"}} amigos    ·    ${all.count {it.optBoolean("online") && it.optString("status")!="away"}} online    ·    ${all.count {it.optString("state")=="pending"}} convites"
         if(all.isEmpty()) {
             val empty=card()
             empty.addView(text("◎",40f,gold).apply {gravity=android.view.Gravity.CENTER})
@@ -289,7 +289,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             heading.addView(avatar,LinearLayout.LayoutParams(dp(44),dp(44)).apply{rightMargin=dp(10)})
             val names=column();names.addView(text(name,18f,colors.text).apply {typeface=Typeface.DEFAULT_BOLD})
             val state=f.optString("state")
-            names.addView(text(when(state){"pending"->if(f.optBoolean("incoming"))"Convite recebido" else "Aguardando aceite";"blocked"->"Bloqueado";else->if(f.optString("status")=="away")"◐ Ausente" else if(f.optBoolean("online"))"● Online" else "○ Offline"},12f,if(f.optBoolean("online"))colors.green else colors.muted))
+            names.addView(text(when(state){"pending"->if(f.optBoolean("incoming"))"Convite recebido" else "Aguardando aceite";"blocked"->"Bloqueado";else->if(f.optString("status")=="away")"◐ Ausente" else if(f.optBoolean("online"))"● Online" else "○ Offline"},12f,if(f.optString("status")=="away")gold else if(f.optBoolean("online"))colors.green else colors.muted))
             heading.addView(names,LinearLayout.LayoutParams(0,-2,1f));item.addView(heading)
             when(state) {
                 "pending" -> if(f.optBoolean("incoming")) {
@@ -481,6 +481,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         previewAudioButton.visibility=View.VISIBLE;sendAudioButton.visibility=View.VISIBLE;discardAudioButton.visibility=View.VISIBLE
     }
     private fun discardAudio() {
+        stopPlayback()
         val capture=recorder;recorder=null
         if(capture!=null){runCatching{capture.stop()};runCatching{capture.release()}}
         audioFile?.delete();audioFile=null;uploadedAudio=null;audioDuration=0

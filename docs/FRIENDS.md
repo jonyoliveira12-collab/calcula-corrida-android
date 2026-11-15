@@ -43,3 +43,23 @@ Há apenas um anúncio dos futuros planos mensal, trimestral e anual, identifica
 `AppAppearanceTest` verifica escolha real no seletor, persistência entre telas, contraste no tema claro, ausência de GPS e preservação das preferências da etiqueta. Capturas usam nomes/dados sintéticos de exemplo.
 
 Validação recomendada em uso real: teste com duas contas reais em aparelhos, permissões precisa/aproximada, app em segundo plano, perda de rede e revogação enquanto o mapa está aberto. Não afirmar proteção total nem localização instantânea.
+
+## Atualização 0.7.0
+
+- A navegação mantém Início, Metas, Histórico, Amigos e Configurações. Relatórios foi retirado; o histórico de ofertas continua preservado.
+- Assinaturas são somente anúncio **EM BREVE**: mensal R$10, trimestral R$25, anual R$90, sem contratação/cobrança ativa. Avisos e contatos também aparecem na faixa rolante.
+- Ajuda e suporte ficam em uma área própria ao final das configurações, com assunto do atendimento, telefone, e-mail e verificador de atualização.
+- Escuro, Cinza, Claro e Natal/Ano-Novo. A opção sazonal expira em 7/1/2027 e retorna ao Cinza se selecionada.
+- Etiquetas oferecem Padrão verde/Fogo realista; textura de fogo contínua sem nove recortes. A bolinha agora exibe JD, preta sobre branco. Avaliação/cores e cálculos continuam independentes da decoração.
+- Em telas largas, contatos e conversa ficam lado a lado. No celular, abrir um contato mostra a conversa em uma tela própria. O campo de mensagem fica fixo ao final.
+- Online/Ausente/Offline são opções explícitas. Tela apagada pode marcar ausente; um estado manual ausente não é desfeito ao acender a tela. Offline encerra serviço e compartilhamentos. Mensagens em segundo plano são notificadas pelo serviço enquanto online/ausente; não há FCM nem promessa de aviso com o app forçado a parar.
+- A localização continua apenas durante autorização individual vigente. A última posição compartilhada pode abrir Waze/Google Maps; o destino externo não acompanha automaticamente um amigo em movimento.
+- Fotos escolhidas no perfil são publicadas privadamente aos amigos aceitos. Áudios de até60s são gravados somente pela ação explícita do usuário, com permissão de microfone, prévia, envio e descarte. Gravação cancela ao sair da conversa; reprodução para ao sair. Arquivos temporários ficam no cache privado e são apagados no descarte/encerramento normal.
+
+### Segurança dos arquivos
+
+Bucket privado `jd-friend-media`, máximo2MiB e MIME JPEG/MP4-AAC. Caminhos imutáveis separados por usuário; até100uploads/dia por conta. O cliente não recebe URL pública nem chave administrativa.
+
+O teste real de revogação mostrou que usar diretamente Storage GET podia manter autorização em cache. Por isso, somente o proprietário lê diretamente no Storage. O destinatário acessa a Edge Function `jd-friend-media` com seu JWT; ela consulta `jd_friend_media_access` a cada requisição (sessão ainda válida, amizade aceita e arquivo referenciado), busca bytes com chave somente do servidor e responde com `Cache-Control: private, no-store`. Não há URL assinada durável. Bloquear/remover corta novas leituras; arquivos já recebidos no dispositivo não podem ser apagados remotamente.
+
+Validação: SQL transacional com rollback para dono/terceiro/pendente/bloqueado, áudio idempotente, duração e estado ausente; HTTP com três contas sintéticas, JPEG e M4A silencioso reais, upload/leitura/revogação, com limpeza dos objetos e contas ao final; instrumentação Android13/16 para gravação/revisão/descarte/cancelamento do microfone, notificação, seleção de tema e layout do tablet; bateria preexistente do leitor/calculadora. Capturas contêm somente dados de exemplo.

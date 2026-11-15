@@ -225,9 +225,9 @@ class MainActivity : Activity() {
     }
 
     private fun showTab(tab: String) {
-        selectedTab = tab
+        selectedTab = if(tab=="Finanças")"Início" else tab
         content.removeAllViews()
-        when (tab) {
+        when (selectedTab) {
             "Início" -> buildHome()
             "Histórico" -> buildHistory()
             "Semáforo" -> buildTrafficSettings()
