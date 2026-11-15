@@ -92,7 +92,7 @@ class MainActivity : Activity() {
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(11), dp(12), dp(11))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
             background = rounded(panel,22,border)
             gravity = Gravity.CENTER_VERTICAL
             elevation = dp(1).toFloat()
@@ -102,6 +102,7 @@ class MainActivity : Activity() {
         brandRow.addView(ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
             setImageResource(R.drawable.jhondriver_logo)
+            background=rounded(Color.BLACK,24,brandGold);clipToOutline=true
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Logo JHONDRIVER"
         })
@@ -350,11 +351,13 @@ class MainActivity : Activity() {
         offerCard.addView(label(if (offer == null) "Ative a leitura e abra o aplicativo de motorista." else "Valores brutos • inclui chegada quando informada na oferta.", 12f, muted, false, 12, 0))
 
         val filters = card()
-        filters.addView(label("☷ FILTRO DE GANHO", 16f, gold, true, 0, 14))
-        filters.addView(label("Mínimo por km", 13f, muted, false))
-        filters.addView(label(money(prefs.getFloat("min_per_km", 1.8f)), 23f, gold, true, 4, 16))
-        filters.addView(label("Mínimo por hora", 13f, muted, false))
-        filters.addView(label(money(prefs.getFloat("good_per_hour", 60f)), 23f, gold, true, 4, 8))
+        filters.addView(label("FILTRO DE GANHO", 15f, gold, true, 0, 8))
+        for((title,value)in listOf("Mínimo por km" to prefs.getFloat("min_per_km",1.8f),"Mínimo por hora" to prefs.getFloat("good_per_hour",60f))) {
+            val row=horizontal().apply{setPadding(0,dp(4),0,dp(4))}
+            row.addView(label(title,12f,muted,false),weight())
+            row.addView(label(money(value),18f,gold,true))
+            filters.addView(row)
+        }
         filters.addView(action("AJUSTAR LIMITES  ›", false) { showTab("Semáforo") })
         val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=rounded(panel,20,border);setPadding(dp(7),dp(8),dp(7),dp(8))}
         for((app,color) in listOf("Todos" to Color.rgb(33,33,35),"Uber" to Color.BLACK,"99" to Color.rgb(255,214,32),"inDrive" to Color.rgb(151,234,18),"iFood" to Color.rgb(231,27,49))) {
@@ -780,13 +783,13 @@ class MainActivity : Activity() {
     }
 
     private fun subscriptionCard(compact:Boolean=false): LinearLayout = card().apply {
-        background=GradientDrawable(GradientDrawable.Orientation.TL_BR,if(colors.light)intArrayOf(Color.rgb(255,248,227),Color.WHITE)else intArrayOf(Color.rgb(67,39,46),panel)).apply {cornerRadius=dp(22).toFloat();setStroke(dp(1),brandGold)}
+        background=GradientDrawable(GradientDrawable.Orientation.TL_BR,if(colors.light)intArrayOf(Color.rgb(255,248,227),Color.WHITE)else intArrayOf(bgInput,panel)).apply {cornerRadius=dp(22).toFloat();setStroke(dp(1),brandGold)}
         addView(label("✦  ASSINATURAS • EM BREVE",12f,gold,true))
         if(!compact)addView(label("Um plano para o seu ritmo",22f,white,true,6,8))
         val plans=horizontal()
         for((name,price) in listOf("Mensal" to "R$ 10,00","Trimestral" to "R$ 25,00","Anual" to "R$ 90,00")) plans.addView(LinearLayout(this@MainActivity).apply {
             orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(if(compact)6 else 12),dp(8),dp(if(compact)6 else 12));background=rounded(bgInput,14,border)
-            addView(label(name,12f,muted,true));addView(label(price,21f,gold,true,6,0).apply {maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,23,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
+            addView(label(name,12f,muted,true));addView(label(price,if(compact)17f else 21f,gold,true,if(compact)3 else 6,0).apply {maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,if(compact)18 else 23,1,android.util.TypedValue.COMPLEX_UNIT_SP)})
         },LinearLayout.LayoutParams(0,-2,1f).apply {leftMargin=dp(3);rightMargin=dp(3)})
         addView(plans)
         if(!compact)addView(label("Planos em preparação. A contratação será disponibilizada em uma próxima atualização.",12f,muted,false,10,0))
@@ -986,6 +989,7 @@ class MainActivity : Activity() {
 
     private fun horizontal(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
+        isBaselineAligned=false
         gravity = Gravity.CENTER_VERTICAL
     }
 
