@@ -12,8 +12,17 @@ import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
+internal interface FriendMediaGateway {
+    fun uploadPhoto(uri:Uri):String
+    fun uploadAudio(file:java.io.File):String
+    fun download(path:String):ByteArray
+}
+internal object FriendMediaDependencies {
+    @Volatile var create:(Context)->FriendMediaGateway = { FriendMediaStore(it) }
+}
+
 /** Private authenticated Storage; no public or reusable signed media URLs. Call only on IO threads. */
-internal class FriendMediaStore(context:Context) {
+internal class FriendMediaStore(context:Context):FriendMediaGateway {
     private val app=context.applicationContext
     private val session=SessionManager(app)
     private val expected=identity(session.getAccessToken())
@@ -48,7 +57,7 @@ internal class FriendMediaStore(context:Context) {
         }
         error("Entre novamente para acessar o arquivo.")
     }
-    fun uploadPhoto(uri:Uri):String {
+    override fun uploadPhoto(uri:Uri):String {
         check()
         val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true}
         app.contentResolver.openInputStream(uri).use{BitmapFactory.decodeStream(it,null,bounds)}
@@ -64,12 +73,12 @@ internal class FriendMediaStore(context:Context) {
         FriendsClient(app).call("profile",JSONObject().put("avatar_path",path))
         return path
     }
-    fun uploadAudio(file:java.io.File):String {
+    override fun uploadAudio(file:java.io.File):String {
         check();require(file.length() in 1..MAX.toLong())
         val path=expected!!.substringBefore(':')+"/audio/"+UUID.randomUUID()+".m4a"
         request(path,file.readBytes(),"audio/mp4");return path
     }
-    fun download(path:String):ByteArray=request(path)
+    override fun download(path:String):ByteArray=request(path)
     companion object {
         const val MAX=2097152
         private const val BUCKET="jd-friend-media"
