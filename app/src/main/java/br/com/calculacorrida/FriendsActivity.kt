@@ -32,7 +32,7 @@ class FriendsActivity : AppCompatActivity() {
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
     private lateinit var client: FriendsGateway
-    private lateinit var mediaStore:FriendMediaStore
+    private lateinit var mediaStore:FriendMediaGateway
     private lateinit var connectionIntro: LinearLayout
     private lateinit var compactPresence: Button
     private lateinit var root: LinearLayout
@@ -49,6 +49,8 @@ class FriendsActivity : AppCompatActivity() {
     private lateinit var welcome:TextView
     private lateinit var mapGroup:LinearLayout
     private lateinit var messageScroll:ScrollView
+    private lateinit var composer:LinearLayout
+    private lateinit var playbackState:TextView
     private lateinit var audioState:TextView
     private lateinit var recordButton:Button
     private lateinit var sendAudioButton:Button
@@ -61,6 +63,23 @@ class FriendsActivity : AppCompatActivity() {
     private var audioFile:java.io.File?=null
     private var recordingStarted=0L
     private var pendingRecording=false
+    private var pendingAudioSend=false
+    private val audioButtons=mutableMapOf<String,Pair<Button,Long>>()
+    private val audioManager by lazy {getSystemService(android.media.AudioManager::class.java)}
+    private var audioFocus:android.media.AudioFocusRequest?=null
+    private val audioTick=object:Runnable {
+        override fun run() {
+            if(!foreground)return
+            if(recorder!=null)audioState.text="● Gravando ${audioTime(SystemClock.elapsedRealtime()-recordingStarted)} / 1:00 • toque em ENVIAR ÁUDIO"
+            player?.let { current ->
+                runCatching { if(current.isPlaying) {
+                    val volume=if(audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)==0)" • aumente o volume de mídia" else ""
+                    playbackNotice("Reproduzindo ${audioTime(current.currentPosition.toLong())} / ${audioTime(current.duration.toLong())}$volume")
+                }}
+            }
+            if(recorder!=null || player!=null)main.postDelayed(this,300)
+        }
+    }
     private var audioDuration=0L
     @Volatile private var uploadedAudio:String?=null
     private var audioNonce=UUID.randomUUID().toString()
@@ -83,10 +102,11 @@ class FriendsActivity : AppCompatActivity() {
     private var selfId = ""
     private var authAtStart: String? = null
     private val refresh = object : Runnable {
-        override fun run() { if (foreground) { reload(); main.postDelayed(this, 5000) } }
+        override fun run() { if (foreground) { if(!pendingAudioSend)reload(); main.postDelayed(this, 5000) } }
     }
     override fun onCreate(state: Bundle?) {
         AppAppearance.apply(this);super.onCreate(state);AppAppearance.styleWindow(this)
+        volumeControlStream=android.media.AudioManager.STREAM_MUSIC
         authAtStart=SessionManager(this).getEmail()
         if(SessionManager(this).getAccessToken().isNullOrBlank()) {
             AlertDialog.Builder(this).setTitle("Entre para usar Amigos").setMessage("Use sua conta para conversar e compartilhar localização.")
@@ -94,7 +114,7 @@ class FriendsActivity : AppCompatActivity() {
                 .setNegativeButton("Voltar"){_,_->finish()}.setOnCancelListener{finish()}.show();return
         }
         client=FriendsDependencies.gateway(this,null)
-        mediaStore=FriendMediaStore(applicationContext)
+        mediaStore=FriendMediaDependencies.create(applicationContext)
         peer=state?.getString("peer");messageNonce=state?.getString("message_nonce") ?: messageNonce;nonceBody=state?.getString("nonce_body").orEmpty()
         val page=column().apply{setBackgroundColor(colors.background)}
         val body=row()
@@ -170,13 +190,14 @@ class FriendsActivity : AppCompatActivity() {
         messages=column(8)
         messageScroll=ScrollView(this).apply{addView(messages);isFillViewport=true}
         details.addView(messageScroll,LinearLayout.LayoutParams(-1,0,1f))
+        playbackState=text("",13f,gold).apply{visibility=View.GONE};details.addView(playbackState)
         audioState=text("",12f,gold).apply{visibility=View.GONE};details.addView(audioState)
         val audioActions=row()
         previewAudioButton=button("OUVIR / PARAR"){audioFile?.let{playLocal(it)}}.apply{visibility=View.GONE}
         sendAudioButton=button("ENVIAR ÁUDIO",true){sendAudio()}.apply{visibility=View.GONE}
         discardAudioButton=button("DESCARTAR"){if(!busy)discardAudio()}.apply{visibility=View.GONE}
         audioActions.addView(previewAudioButton,LinearLayout.LayoutParams(0,-2,1f));audioActions.addView(sendAudioButton,LinearLayout.LayoutParams(0,-2,1f));audioActions.addView(discardAudioButton,LinearLayout.LayoutParams(0,-2,1f));details.addView(audioActions)
-        val composer=row()
+        composer=row()
         draft=input("Mensagem…",1000).apply{setText(state?.getString("draft").orEmpty());maxLines=4}
         composer.addView(draft,LinearLayout.LayoutParams(0,-2,1f))
         composer.addView(button("ENVIAR",true){sendText()},LinearLayout.LayoutParams(-2,-2).apply{leftMargin=dp(6)})
@@ -235,6 +256,7 @@ class FriendsActivity : AppCompatActivity() {
             .setItems(arrayOf("Parar de compartilhar localização","Remover amigo","Bloquear amigo")){_,which->when(which){0->share(false,15);1->relationship("remove");else->relationship("block")}}.setNegativeButton("Cancelar",null).show()
     }
     private fun sendText() {
+        if(audioFile!=null || recorder!=null){sendAudio();return}
         val id=peer ?: return;val body=draft.text.toString().trim();if(body.isBlank())return
         if(nonceBody!=body){messageNonce=UUID.randomUUID().toString();nonceBody=body};val nonce=messageNonce
         execute{client.call("send",JSONObject().put("peer",id).put("body",body).put("nonce",nonce))} then {result->
@@ -405,18 +427,23 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         val ids=(0 until items.length()).joinToString{items.getJSONObject(it).optString("id")}
         if(ids==lastMessageIds && messages.childCount>0)return
         lastMessageIds=ids
-        messages.removeAllViews()
+        messages.removeAllViews();audioButtons.clear()
         if(items.length()==0) messages.addView(text("Comece a conversa. Sua equipe está a uma mensagem de distância.",14f,colors.muted))
         for(i in 0 until items.length()) {
             val m=items.getJSONObject(i);val mine=m.optString("sender")==selfId
             val bubble=column(12)
             bubble.background=rounded(if(mine)colors.input else colors.background,14,colors.border)
             bubble.addView(text(if(mine)"Você" else friend(peer)?.optString("name") ?: "Amigo",11f,gold))
-            if(m.optString("kind")=="audio") bubble.addView(button("▶ OUVIR / PARAR • "+(m.optLong("duration_ms")/1000)+" s"){playRemote(m.optString("audio_path"))})
+            if(m.optString("kind")=="audio") {
+                val path=m.optString("audio_path");val duration=m.optLong("duration_ms")
+                val control=button("▶ OUVIR ÁUDIO • "+audioTime(duration)){playRemote(path)}
+                audioButtons[path]=control to duration;bubble.addView(control)
+            }
             else bubble.addView(text(m.optString("body"),15f,colors.text))
             bubble.addView(text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(m.optLong("time_ms"))),10f,colors.muted))
             messages.addView(bubble,LinearLayout.LayoutParams(-1,-2).apply {topMargin=dp(7);leftMargin=if(mine)dp(24) else 0;rightMargin=if(mine)0 else dp(24)})
         }
+        updatePlaybackButtons()
         messageScroll.post{messageScroll.fullScroll(View.FOCUS_DOWN)}
     }
     private fun showProfile() {
@@ -508,16 +535,51 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             execute{val path=mediaStore.uploadPhoto(uri);client.call("profile",JSONObject().put("avatar_path",path))} then {if(it!=null){snapshot=it;renderFriends();status.text="Foto compartilhada com seus amigos aceitos."}}
         }
     }
+    private fun audioTime(ms:Long):String {
+        val seconds=(ms.coerceAtLeast(0)/1000).toInt()
+        return "%d:%02d".format(java.util.Locale.ROOT,seconds/60,seconds%60)
+    }
+    private fun playbackNotice(value:String) {
+        if(::playbackState.isInitialized){playbackState.text=value;playbackState.visibility=View.VISIBLE}
+    }
+    private fun updatePlaybackButtons() {
+        for((key,item)in audioButtons) {
+            item.first.text=when {
+                key==playbackKey && playbackLoading -> "CANCELAR CARREGAMENTO"
+                key==playbackKey && player!=null -> "■ PARAR ÁUDIO • "+audioTime(item.second)
+                else -> "▶ OUVIR ÁUDIO • "+audioTime(item.second)
+            }
+        }
+    }
+    private fun updateAudioControls() {
+        if(!::recordButton.isInitialized)return
+        val hasAudio=audioFile!=null
+        composer.visibility=if(hasAudio)View.GONE else View.VISIBLE
+        audioState.visibility=if(hasAudio)View.VISIBLE else View.GONE
+        previewAudioButton.visibility=if(hasAudio && recorder==null)View.VISIBLE else View.GONE
+        sendAudioButton.visibility=if(hasAudio)View.VISIBLE else View.GONE
+        discardAudioButton.visibility=if(hasAudio)View.VISIBLE else View.GONE
+        for(button in listOf(previewAudioButton,sendAudioButton,discardAudioButton))button.isEnabled=!pendingAudioSend
+        sendAudioButton.text=if(pendingAudioSend)"ENVIANDO…" else "ENVIAR ÁUDIO"
+        recordButton.visibility=if(pendingAudioSend || (hasAudio && recorder==null))View.GONE else View.VISIBLE
+        recordButton.text=if(recorder!=null)"PARAR GRAVAÇÃO" else "GRAVAR ÁUDIO"
+    }
+    private fun audioAccountValid():Boolean {
+        if(validAccount())return true
+        discardAudio();playbackNotice("Sua sessão mudou. Abra novamente a conversa.")
+        return false
+    }
     private fun requestRecording() {
-        if(peer==null)return
+        if(!audioAccountValid())return
+        if(peer==null || pendingAudioSend)return
         if(audioFile!=null){Toast.makeText(this,"Envie ou descarte o áudio gravado antes de gravar outro.",Toast.LENGTH_SHORT).show();return}
         if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){pendingRecording=true;requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),73);return}
         startRecording()
     }
     @Suppress("DEPRECATION") private fun startRecording() {
-        if(!foreground || peer==null || recorder!=null)return
+        if(!foreground || !audioAccountValid() || peer==null || recorder!=null || pendingAudioSend)return
         stopPlayback()
-        val file=java.io.File.createTempFile("jd-record-",".m4a",cacheDir)
+        val file=runCatching{java.io.File.createTempFile("jd-record-",".m4a",cacheDir)}.getOrElse{playbackNotice("Sem espaço para gravar o áudio.");return}
         try {
             val capture=android.media.MediaRecorder();recorder=capture
             capture.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
@@ -526,71 +588,98 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
             capture.setAudioEncodingBitRate(64000);capture.setAudioSamplingRate(44100)
             capture.setMaxDuration(60000);capture.setMaxFileSize(FriendMediaStore.MAX.toLong())
             capture.setOutputFile(file.absolutePath)
-            capture.setOnInfoListener{_,what,_->if(what==android.media.MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED || what==android.media.MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED)finishRecording()}
-            capture.prepare();capture.start();recorder=capture;audioFile=file;recordingStarted=SystemClock.elapsedRealtime()
+            capture.setOnInfoListener{_,what,_->if(recorder===capture && (what==android.media.MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED || what==android.media.MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED))finishRecording()}
+            capture.setOnErrorListener{_,_,_->main.post{if(recorder===capture){discardAudio();playbackNotice("A gravação foi interrompida. Confira o microfone e grave novamente.")}}}
+            capture.prepare();capture.start();audioFile=file;recordingStarted=SystemClock.elapsedRealtime()
             audioNonce=UUID.randomUUID().toString();uploadedAudio=null;audioDuration=0
-            audioState.visibility=View.VISIBLE;audioState.text="● Gravando para ${friend(peer)?.optString("name") ?: "seu amigo"} • até 60 s"
-            recordButton.text="PARAR GRAVAÇÃO";discardAudioButton.visibility=View.VISIBLE
-        } catch(_:Exception){recorder?.release();recorder=null;file.delete();audioFile=null;status.text="Não foi possível iniciar o microfone. Confira a permissão e tente novamente."}
+            audioState.text="● Gravando 0:00 / 1:00 • toque em ENVIAR ÁUDIO"
+            updateAudioControls();main.removeCallbacks(audioTick);main.post(audioTick)
+        } catch(_:Exception){recorder?.release();recorder=null;file.delete();audioFile=null;updateAudioControls();playbackNotice("Não foi possível iniciar o microfone. Confira a permissão e tente novamente.")}
     }
     private fun finishRecording() {
         val capture=recorder ?: return
-        recorder=null
+        recorder=null;main.removeCallbacks(audioTick)
         val elapsed=(SystemClock.elapsedRealtime()-recordingStarted).coerceAtMost(60000)
         val ok=runCatching{capture.stop()}.isSuccess
         capture.release()
-        if(!ok || elapsed<300 || audioFile?.length()==0L){discardAudio();status.text="Áudio muito curto. Grave novamente.";return}
+        if(!ok || elapsed<300 || audioFile?.length()==0L){discardAudio();playbackNotice("Áudio muito curto ou interrompido. Grave novamente.");return}
         audioDuration=elapsed
-        audioState.text="Áudio pronto • ${(elapsed+999)/1000} s • confira antes de enviar"
-        recordButton.text="GRAVAR ÁUDIO"
-        previewAudioButton.visibility=View.VISIBLE;sendAudioButton.visibility=View.VISIBLE;discardAudioButton.visibility=View.VISIBLE
+        audioState.text="Áudio pronto • ${audioTime(elapsed)} • ouça ou envie"
+        updateAudioControls()
     }
     private fun discardAudio() {
-        stopPlayback()
+        pendingAudioSend=false;main.removeCallbacks(audioTick);stopPlayback()
         val capture=recorder;recorder=null
         if(capture!=null){runCatching{capture.stop()};runCatching{capture.release()}}
         audioFile?.delete();audioFile=null;uploadedAudio=null;audioDuration=0
-        if(::recordButton.isInitialized){recordButton.text="GRAVAR ÁUDIO";audioState.visibility=View.GONE;previewAudioButton.visibility=View.GONE;sendAudioButton.visibility=View.GONE;discardAudioButton.visibility=View.GONE}
+        updateAudioControls()
     }
     private fun sendAudio() {
+        if(!audioAccountValid())return
+        if(pendingAudioSend)return
+        if(recorder!=null)finishRecording()
         val file=audioFile ?: return;val id=peer ?: return
-        if(recorder!=null || audioDuration<300 || busy)return
-        stopPlayback()
-        val duration=audioDuration;val nonce=audioNonce
+        if(audioDuration<300)return
+        stopPlayback();pendingAudioSend=true;audioState.text="Enviando áudio…";updateAudioControls()
+        submitAudioWhenReady(id,file,audioNonce,audioDuration)
+    }
+    private fun submitAudioWhenReady(id:String,file:java.io.File,nonce:String,duration:Long) {
+        if(!pendingAudioSend || audioFile!==file || peer!=id || !validAccount())return
+        if(!foreground){pendingAudioSend=false;audioState.text="Áudio pronto • toque em ENVIAR ÁUDIO para enviar";updateAudioControls();return}
+        if(busy){main.postDelayed({submitAudioWhenReady(id,file,nonce,duration)},150);return}
         execute {
             val path=uploadedAudio ?: mediaStore.uploadAudio(file).also{uploadedAudio=it}
             client.call("send",JSONObject().put("peer",id).put("kind","audio").put("audio_path",path).put("duration_ms",duration).put("nonce",nonce))
-        } then {result->if(result!=null && peer==id){discardAudio();renderMessages(result)}}
+        } then {result->
+            pendingAudioSend=false
+            if(result!=null && peer==id){discardAudio();renderMessages(result)}
+            else if(audioFile===file){audioState.text="Áudio não enviado. Confira a conexão e toque em ENVIAR ÁUDIO para tentar novamente.";updateAudioControls()}
+        }
     }
     private fun stopPlayback() {
-        playbackGeneration++;playbackKey=null;playbackLoading=false
+        main.removeCallbacks(audioTick);playbackGeneration++;playbackKey=null;playbackLoading=false
         player?.let{runCatching{it.stop()};it.release()};player=null
+        audioFocus?.let{audioManager.abandonAudioFocusRequest(it)};audioFocus=null
         playbackFile?.delete();playbackFile=null
+        if(::playbackState.isInitialized)playbackState.visibility=View.GONE
+        updatePlaybackButtons()
     }
     private fun playLocal(file:java.io.File,key:String=file.absolutePath) {
+        if(!audioAccountValid())return
+        if(recorder!=null || pendingAudioSend){playbackNotice("Finalize ou envie a gravação antes de ouvir outro áudio.");return}
         if(playbackKey==key && player!=null){stopPlayback();return}
         stopPlayback();playbackKey=key
         val playback=android.media.MediaPlayer();player=playback
         try {
-            playback.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            val attributes=android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build()
+            playback.setAudioAttributes(attributes)
             playback.setDataSource(file.absolutePath)
-            playback.setOnPreparedListener{if(foreground && player===it)it.start()else it.release()}
-            playback.setOnCompletionListener{stopPlayback()}
-            playback.setOnErrorListener{_,_,_->stopPlayback();status.text="Não foi possível reproduzir esse áudio.";true}
-            playback.prepareAsync()
-        }catch(_:Exception){stopPlayback();status.text="Não foi possível reproduzir esse áudio."}
+            playback.setOnPreparedListener{ready->
+                if(!foreground || player!==ready){runCatching{ready.release()};return@setOnPreparedListener}
+                val focus=android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes(attributes)
+                    .setOnAudioFocusChangeListener({change->if(change<0 && player===ready){stopPlayback();playbackNotice("Reprodução interrompida por outro aplicativo. Toque em ouvir para tentar novamente.")}},main).build()
+                audioFocus=focus
+                if(audioManager.requestAudioFocus(focus)!=android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED){stopPlayback();playbackNotice("O som está sendo usado por outro aplicativo. Tente ouvir novamente.");return@setOnPreparedListener}
+                ready.setVolume(1f,1f);ready.start();updatePlaybackButtons();main.post(audioTick)
+            }
+            playback.setOnCompletionListener{if(player===it){stopPlayback();playbackNotice("Áudio finalizado. Toque em ouvir para reproduzir novamente.")}}
+            playback.setOnErrorListener{failed,_,_->if(player===failed){stopPlayback();playbackNotice("Não foi possível reproduzir esse áudio. Tente novamente.")};true}
+            playbackNotice("Preparando áudio…");playback.prepareAsync();updatePlaybackButtons()
+        }catch(_:Exception){stopPlayback();playbackNotice("Não foi possível reproduzir esse áudio. Tente novamente.")}
     }
     private fun playRemote(path:String) {
-        if(path.isBlank() || path=="null")return
+        if(!audioAccountValid())return
+        if(recorder!=null || pendingAudioSend){playbackNotice("Finalize ou envie a gravação antes de ouvir outro áudio.");return}
+        if(path.isBlank() || path=="null"){playbackNotice("Esse áudio está indisponível.");return}
         if(playbackKey==path && (player!=null || playbackLoading)){stopPlayback();return}
         stopPlayback();playbackKey=path;playbackLoading=true;val generation=playbackGeneration;val id=peer
-        status.text="Carregando áudio…"
+        playbackNotice("Carregando áudio…");updatePlaybackButtons()
         mediaIo.execute {
             val file=runCatching{val bytes=mediaStore.download(path);java.io.File.createTempFile("jd-play-",".m4a",cacheDir).apply{writeBytes(bytes)}}.getOrNull()
             main.post {
                 if(!validAccount() || !foreground || peer!=id || generation!=playbackGeneration){file?.delete();return@post}
-                if(file==null){playbackLoading=false;playbackKey=null;status.text="Áudio indisponível. Confira a conexão e a amizade.";return@post}
-                playLocal(file,path);playbackFile=file
+                if(file==null){playbackLoading=false;playbackKey=null;updatePlaybackButtons();playbackNotice("Áudio indisponível. Confira a conexão e tente ouvir novamente.");return@post}
+                playLocal(file,path);if(player!=null)playbackFile=file else file.delete()
             }
         }
     }
