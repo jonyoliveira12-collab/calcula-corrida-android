@@ -564,14 +564,20 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         recordButton.visibility=if(pendingAudioSend || (hasAudio && recorder==null))View.GONE else View.VISIBLE
         recordButton.text=if(recorder!=null)"PARAR GRAVAÇÃO" else "GRAVAR ÁUDIO"
     }
+    private fun audioAccountValid():Boolean {
+        if(validAccount())return true
+        discardAudio();playbackNotice("Sua sessão mudou. Abra novamente a conversa.")
+        return false
+    }
     private fun requestRecording() {
+        if(!audioAccountValid())return
         if(peer==null || pendingAudioSend)return
         if(audioFile!=null){Toast.makeText(this,"Envie ou descarte o áudio gravado antes de gravar outro.",Toast.LENGTH_SHORT).show();return}
         if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){pendingRecording=true;requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),73);return}
         startRecording()
     }
     @Suppress("DEPRECATION") private fun startRecording() {
-        if(!foreground || peer==null || recorder!=null || pendingAudioSend)return
+        if(!foreground || !audioAccountValid() || peer==null || recorder!=null || pendingAudioSend)return
         stopPlayback()
         val file=runCatching{java.io.File.createTempFile("jd-record-",".m4a",cacheDir)}.getOrElse{playbackNotice("Sem espaço para gravar o áudio.");return}
         try {
@@ -609,6 +615,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         updateAudioControls()
     }
     private fun sendAudio() {
+        if(!audioAccountValid())return
         if(pendingAudioSend)return
         if(recorder!=null)finishRecording()
         val file=audioFile ?: return;val id=peer ?: return
@@ -638,6 +645,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         updatePlaybackButtons()
     }
     private fun playLocal(file:java.io.File,key:String=file.absolutePath) {
+        if(!audioAccountValid())return
         if(recorder!=null || pendingAudioSend){playbackNotice("Finalize ou envie a gravação antes de ouvir outro áudio.");return}
         if(playbackKey==key && player!=null){stopPlayback();return}
         stopPlayback();playbackKey=key
@@ -660,6 +668,7 @@ function showPoint(lat,lng,accuracy){clearPoint();if(!map.hasLayer(tiles)){tiles
         }catch(_:Exception){stopPlayback();playbackNotice("Não foi possível reproduzir esse áudio. Tente novamente.")}
     }
     private fun playRemote(path:String) {
+        if(!audioAccountValid())return
         if(recorder!=null || pendingAudioSend){playbackNotice("Finalize ou envie a gravação antes de ouvir outro áudio.");return}
         if(path.isBlank() || path=="null"){playbackNotice("Esse áudio está indisponível.");return}
         if(playbackKey==path && (player!=null || playbackLoading)){stopPlayback();return}

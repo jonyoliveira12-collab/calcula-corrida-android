@@ -139,6 +139,14 @@ class AudioMessageTest {
         chat.inst.runOnMainSync{chat.activity.finish()};chat.inst.waitForIdleSync()
         assertNull(chat.field<MediaPlayer>("player"));assertFalse("Leaving deletes private playback bytes",file.exists())
     }
+    @Test fun changingAccountCannotPlayAnOldUnsentRecording()=withChat {chat->
+        chat.click("GRAVAR ÁUDIO");Thread.sleep(1400);chat.click("PARAR GRAVAÇÃO")
+        val oldFile=chat.field<File>("audioFile")!!
+        SessionManager(chat.context).saveUser("other-account@example.invalid","another-synthetic-token",null)
+        chat.click("OUVIR / PARAR");chat.await{chat.has("Sua sessão mudou")}
+        assertNull(chat.field<MediaPlayer>("player"));assertNull(chat.field<File>("audioFile"))
+        assertFalse(oldFile.exists());assertEquals(0,chat.uploads.get())
+    }
     @Test fun lostSendResponseKeepsAudioAndRetryDoesNotUploadOrDeliverTwice()=withChat {chat->
         chat.failSend.set(true);chat.click("GRAVAR ÁUDIO");Thread.sleep(1400);chat.click("ENVIAR ÁUDIO")
         chat.await{chat.has("Áudio não enviado")}
