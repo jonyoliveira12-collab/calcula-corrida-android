@@ -36,6 +36,7 @@ class ReaderWindowTest {
                 listOf("com.ubercab.driver","55,76","1","normal"),
                 listOf("com.app99.driver","32,45","0","normal"),
                 listOf("com.ubercab.driver","40,08","0","floating"),
+                listOf("com.ubercab.driver","114,54","0","priority"),
                 listOf("sinet.startup.inDriver","60,00","1","normal"),
                 listOf("com.ubercab.driver","60,00","0","moto"),
                 listOf("com.ubercab.driver","16,71","0","envios"),

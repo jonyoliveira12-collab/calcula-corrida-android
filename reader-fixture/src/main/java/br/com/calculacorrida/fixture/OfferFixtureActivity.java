@@ -35,7 +35,7 @@ public class OfferFixtureActivity extends Activity {
         final String layout=getIntent().getStringExtra("layout");
         final boolean realistic="dual_realistic".equals(layout);
         final boolean dual="dual".equals(layout) || realistic;
-        final boolean floating=dual || "floating".equals(layout) || "pop99_floating".equals(layout) || layout!=null && layout.startsWith("envios");
+        final boolean floating=dual || "floating".equals(layout) || "priority".equals(layout) || "pop99_floating".equals(layout) || layout!=null && layout.startsWith("envios");
         View offer=new View(this) {
             final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
             boolean marked=false;
@@ -44,7 +44,7 @@ public class OfferFixtureActivity extends Activity {
                     marked=true;
                     try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getFilesDir(),"offer-drawn-at"))) {out.write(Long.toString(System.currentTimeMillis()).getBytes(java.nio.charset.StandardCharsets.UTF_8));}catch(java.io.IOException e){throw new RuntimeException(e);}
                 }
-                boolean dark=(floating && !dual) || getPackageName().equals("com.app99.driver");
+                boolean dark=(floating && !dual && !"priority".equals(layout)) || getPackageName().equals("com.app99.driver");
                 canvas.drawColor(dark?0xff20242c:Color.WHITE);paint.setColor(dark?Color.WHITE:Color.BLACK);
                 float d=getResources().getDisplayMetrics().density;paint.setTextSize(18*d);
                 if(!offerVisible) {canvas.drawText("Mapa aberto sem chamada ativa",12*d,45*d,paint);return;}
@@ -56,6 +56,7 @@ public class OfferFixtureActivity extends Activity {
                 if(getPackageName().equals("com.app99.driver"))lines=new String[]{"Não afeta a TA","R$11,90","R$2,95 Tarifa base dinâmica inicial.","4,79 · +999 corridas · Perfil Premium","10min (4,4km)","12min (6km)"};
                 if(getPackageName().equals("sinet.startup.inDriver"))lines=new String[]{"R$ 30,00","30 min • 12.0 km","Nota 4,90","5 min (2.0 km)","25 min (10.0 km)","Aceitar"};
                 if(layout!=null && layout.startsWith("envios"))lines=new String[]{"Envios Moto","R$ 8,91","32 min • 19.1 km","5,00 (98)","Verificado","Rua de coleta","Rua de entrega","Aceitar"};
+                if("priority".equals(layout)){paint.setTextSize(14*d);lines=new String[]{"Priority Exclusivo","R$ 19,09","10 min • 7.0 km • Est. de R$2,73/km","4,87 (114) Verificado","+R$ 4,00 incluído","+R$ 1,79 incluída para retirada","1 min (0.1 km)","9 minutos (6.9 km)","Aceitar"};}
                 if("moto".equals(layout))lines=new String[]{"Uber Moto","R$ 18,00","2 min 600 m","16 min 6,7 km","Escolher"};
                 if(layout!=null && layout.startsWith("pop99"))lines=new String[]{"99Pop","pop99_floating".equals(layout)?"R$ 21,00":"R$ 20,00","Dinheiro","2 min (600 m)","16 min (6,7 km)"};
                 if("moto99".equals(layout))lines=new String[]{"99Moto","R$ 18,00","2 min (600 m)","16 min (6,7 km)"};
@@ -67,7 +68,7 @@ public class OfferFixtureActivity extends Activity {
                 }
                 float first=floating?35*d:("small".equals(layout)?getHeight()*0.42f:Math.max(35*d,getHeight()-210*d));
                 if(realistic && getPackageName().equals("com.app99.driver"))first=getHeight()*0.40f;
-                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*((layout!=null && layout.startsWith("envios"))?24:32)*d,paint);
+                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*((layout!=null && (layout.startsWith("envios") || layout.equals("priority")))?24:32)*d,paint);
             }
         };
         offer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
@@ -96,7 +97,7 @@ public class OfferFixtureActivity extends Activity {
             int screenWidth=getResources().getDisplayMetrics().widthPixels;
             int screenHeight=getResources().getDisplayMetrics().heightPixels;
             int width=realistic?(int)(screenWidth/3-12*d):dual?(int)(screenWidth/2-12*d):(int)(screenWidth-16*d);
-            int height=realistic?screenHeight-(int)(80*d):(int)(("envios_tall".equals(layout)?500:dual?300:240)*d);
+            int height=realistic?screenHeight-(int)(80*d):(int)(("envios_tall".equals(layout)?500:"priority".equals(layout)?300:dual?300:240)*d);
             WindowManager.LayoutParams p=new WindowManager.LayoutParams(width,height,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,PixelFormat.TRANSLUCENT);
             if(dual) {
                 p.gravity=Gravity.TOP|Gravity.LEFT;
