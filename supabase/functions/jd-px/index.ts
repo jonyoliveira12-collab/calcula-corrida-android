@@ -13,10 +13,10 @@ function config(){const ws=(Deno.env.get('LIVEKIT_URL')||'').trim(),key=(Deno.en
 async function jwt(grant:Record<string,unknown>,identity?:string,name?:string){const cfg=config(),now=Math.floor(Date.now()/1000),part=(v:unknown)=>b64(enc.encode(JSON.stringify(v)));const value=part({alg:'HS256',typ:'JWT'})+'.'+part({iss:cfg.key,nbf:now-5,exp:now+90,...(identity?{sub:identity,name}:{}),video:grant});const key=await crypto.subtle.importKey('raw',enc.encode(cfg.secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return value+'.'+b64(new Uint8Array(await crypto.subtle.sign('HMAC',key,enc.encode(value))));}
 async function live(method:string,room:string,body:Record<string,unknown>={}){
  const token=await jwt({roomAdmin:true,room});const response=await fetch(config().http+'/twirp/livekit.RoomService/'+method,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({room,...body}),signal:AbortSignal.timeout(5000)});
- if(response.status===404&&method==='ListParticipants')return {participants:[]};
+ if(response.status===404&&['ListParticipants','DeleteRoom','RemoveParticipant'].includes(method))return {participants:[]};
  if(!response.ok)throw Error('voice-server');return await response.json();
 }
-async function reconcile(channel:string){const state=await rpc('inspect',null,null,{channel}),room='jdpx-'+channel,allowed=new Set((state.connections||[]).map((x:{identity:string})=>x.identity));const people=(await live('ListParticipants',room)).participants||[];
+async function reconcile(channel:string){const state=await rpc('inspect',null,null,{channel}),room='jdpx-'+state.room_key,allowed=new Set((state.connections||[]).map((x:{identity:string})=>x.identity));for(const key of state.retired||[]){await live('DeleteRoom','jdpx-'+key);await rpc('retired_done',null,null,{channel,room_key:key});}const people=(await live('ListParticipants',room)).participants||[];
  // Revoke everyone else before granting a new speaker: no overlapping transmitters.
  for(const person of people){if(!allowed.has(person.identity)){await live('RemoveParticipant',room,{identity:person.identity});continue;}if(person.identity!==state.speaker&&person.permission?.canPublish)await live('UpdateParticipant',room,{identity:person.identity,permission:{canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:[2]}});}
  const speaker=people.find((p:{identity:string})=>p.identity===state.speaker&&allowed.has(p.identity));if(speaker&&!speaker.permission?.canPublish)await live('UpdateParticipant',room,{identity:speaker.identity,permission:{canSubscribe:true,canPublish:true,canPublishData:false,canPublishSources:[2]}});
@@ -34,7 +34,7 @@ Deno.serve(async(req:Request)=>{
  if(['list','private','group'].includes(action))return json(200,await rpc(action,user.id,session,data));
  if(!uuid(data.channel))return json(400,{error:'Canal inválido.'});
  const result=await locked(data.channel,async()=>{const value=await rpc(action,user.id,session,data);await reconcile(data.channel);return value;});
- if(action==='connect'){result.url=config().ws;result.token=await jwt({roomJoin:true,room:'jdpx-'+data.channel,canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:[2]},result.connection,result.display_name);}
+ if(action==='connect'){result.url=config().ws;result.token=await jwt({roomJoin:true,room:'jdpx-'+result.room_key,canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:['microphone']},result.connection,result.display_name);}
  return json(200,result);
  }catch(error){const message=error instanceof Error?error.message:'';if(message==='access')return json(403,{error:'Acesso encerrado. Confira amizade, convite e sessão.'});if(message==='busy')return json(409,{error:'Canal ocupado. Tente novamente.'});console.warn('PX request failed',message==='voice-server'?'voice-server':'request');return json(503,{error:'Não foi possível conectar ao rádio. Tente novamente.'});}
 });
