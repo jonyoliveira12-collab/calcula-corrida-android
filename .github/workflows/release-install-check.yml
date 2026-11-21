@@ -1,0 +1,37 @@
+name: Verify signed APK installation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 33, 36]
+    steps:
+      - name: Download published signed versions
+        run: |
+          curl -fL --retry 2 -o previous.apk https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.8.2/JHONDRIVER-0.8.2.apk
+          curl -fL --retry 2 -o current.apk https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.9.0/JHONDRIVER-0.9.0.apk
+          echo 'f6ba120907861b10e15e819177ebc1076d532b2fd72e7cd95b4287625fb1bcc2  current.apk' | sha256sum -c -
+      - name: Enable acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb shell getprop ro.product.cpu.abilist
+            adb install previous.apk
+            adb install -r current.apk
+            adb shell dumpsys package br.com.calculacorrida | grep versionName
+            adb shell monkey -p br.com.calculacorrida -c android.intent.category.LAUNCHER 1
+            adb logcat -d -b crash
