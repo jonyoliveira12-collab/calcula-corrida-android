@@ -52,7 +52,7 @@ class ReaderConcurrentOffersTest {
                             window.type != AccessibilityWindowInfo.TYPE_SYSTEM) return@mapNotNull null
                         Rect().also { window.getBoundsInScreen(it) }.takeIf { it.width() >= 160 && it.height() >= 100 }
                     } finally { root.recycle() }
-                }.maxByOrNull { it.width().toLong() * it.height() } ?: return "fixture window unavailable"
+                }.minByOrNull { it.left } ?: return "fixture window unavailable"
                 val screenshot = ui.takeScreenshot() ?: return "fixture screenshot unavailable"
                 val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
                     com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
@@ -76,6 +76,14 @@ class ReaderConcurrentOffersTest {
             val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
                 .joinToString(" / ") { prefs.getString(it, "").orEmpty() }
             if (!check()) {
+                ui.takeScreenshot()?.let { image ->
+                    try {
+                        val folder=java.io.File(context.filesDir,"screenshots").apply { mkdirs() }
+                        java.io.File(folder,"concurrent-failure-${label.hashCode()}.png").outputStream().use {
+                            image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)
+                        }
+                    } finally { image.recycle() }
+                }
                 // The emulator fixtures contain synthetic offers only.
                 val records = JourneyStore.getRecords(context).take(5).joinToString(" | ") {
                     listOf(it.optString("app"), it.optDouble("fare"), it.optDouble("totalKm"), it.optDouble("minutes"), it.optDouble("perKm"), it.optDouble("perHour"), it.optString("passengerRating")).joinToString(";")

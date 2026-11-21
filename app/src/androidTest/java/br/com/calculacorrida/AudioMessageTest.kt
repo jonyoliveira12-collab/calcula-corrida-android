@@ -90,7 +90,7 @@ class AudioMessageTest {
             // an Activity reference; Pixel phone profiles otherwise recreate it.
             await {
                 val image=inst.uiAutomation.takeScreenshot()
-                val ready=image!=null && image.width==1280 && image.height==800
+                val ready=image!=null && image.width==1280 && image.height==800 && context.resources.displayMetrics.densityDpi==160
                 image?.recycle()
                 ready
             }
