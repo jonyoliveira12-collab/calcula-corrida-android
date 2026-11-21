@@ -1,5 +1,8 @@
 name: Verify signed APK installation
 on:
+  push:
+    branches: [feat/px-radio]
+    paths: [.github/workflows/release-install-check.yml]
   workflow_dispatch:
 permissions:
   contents: read
