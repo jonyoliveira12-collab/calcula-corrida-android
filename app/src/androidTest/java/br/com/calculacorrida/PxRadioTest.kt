@@ -31,6 +31,7 @@ class PxRadioTest {
         f.touch(MotionEvent.ACTION_DOWN);f.waitFor("second capture starts"){f.enabled.get()==2};f.touch(MotionEvent.ACTION_CANCEL);f.waitFor("cancel mutes"){!f.microphone}
         f.main{f.activity!!.finish()};f.activity=null
         assertTrue(PxService.status.value.active)
+        f.overlayTouch(MotionEvent.ACTION_DOWN);f.waitFor("background bubble starts voice"){f.enabled.get()==3&&f.microphone};f.overlayTouch(MotionEvent.ACTION_UP);f.waitFor("background release stops voice"){!f.microphone}
         f.stop();f.waitFor("bubble removed after stop"){!PxService.status.value.active&&!PxService.overlayVisibleForTest()};assertFalse(f.microphone)
     }
     @Test fun releasingBeforeGrantNeverStartsMicrophone()=fixture{f->
@@ -63,6 +64,7 @@ class PxRadioTest {
         }
         fun join(){if(activity==null)activity=inst.startActivitySync(Intent(context,PxActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitFor("channel loads"){var found=false;main{found=find(activity!!.window.decorView,"Entrar no canal")!=null};found};main{find(activity!!.window.decorView,"Entrar no canal")!!.performClick()}}
         fun touch(action:Int){main{val button=find(activity!!.window.decorView,"Segure para falar")?:find(activity!!.window.decorView,"Transmitindo • solte para parar")!!;val t=SystemClock.uptimeMillis();val e=MotionEvent.obtain(t,t,action,25f,25f,0);button.dispatchTouchEvent(e);e.recycle()}}
+        fun overlayTouch(action:Int){var rect:android.graphics.Rect?=null;main{rect=PxService.overlayRectForTest()};val r=rect?:error("PX overlay missing");val now=SystemClock.uptimeMillis();val event=MotionEvent.obtain(now,now,action,r.centerX().toFloat(),r.centerY().toFloat(),0);event.source=android.view.InputDevice.SOURCE_TOUCHSCREEN;assertTrue(inst.uiAutomation.injectInputEvent(event,true));event.recycle()}
         fun stop(){main{context.stopService(Intent(context,PxService::class.java))}}
         fun cleanup(){claimGate?.countDown();stop();main{activity?.finish()};Thread.sleep(250);PxDependencies.gateway=oldGateway;PxVoiceDependencies.create=oldVoice;FriendsDependencies.gateway=oldFriends;main{prefs.edit().clear().apply();val e=prefs.edit();for((k,v)in original)when(v){is String->e.putString(k,v);is Boolean->e.putBoolean(k,v);is Int->e.putInt(k,v);is Long->e.putLong(k,v)};e.apply()}}
     }

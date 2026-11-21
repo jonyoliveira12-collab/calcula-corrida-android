@@ -58,7 +58,7 @@ class PxService:Service() {
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         when(intent?.action){
             STOP->shutdown("PX desligado")
-            MUTE->{state.value=state.value.copy(muted=!state.value.muted);applyVolumes();notice();paintBubble()}
+            MUTE->{if(!state.value.active){stopSelf();return START_NOT_STICKY};state.value=state.value.copy(muted=!state.value.muted);applyVolumes();notice();paintBubble()}
             JOIN->{
                 if(state.value.active)return START_NOT_STICKY
                 if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED||!client.currentAccount()){shutdown("Permita o microfone para entrar no PX.");return START_NOT_STICKY}
@@ -118,7 +118,7 @@ class PxService:Service() {
         try{window.addView(view,layout);bubble=view;params=layout;paintBubble()}catch(_:Exception){bubble=null}
     }
     private fun paintBubble(){bubble?.apply{text="PX • ${state.value.name}\n"+when{state.value.talking->"FALANDO";requesting->"AGUARDE";state.value.muted->"SILENCIADO";state.value.speaker.isNotBlank()->"${state.value.speaker} fala";else->"Segure para falar"};background=GradientDrawable().apply{setColor(if(PxService.state.value.talking)Color.rgb(10,120,75)else Color.rgb(27,36,51));cornerRadius=24f;setStroke(2,Color.rgb(226,188,85))}}}
-    private fun removeBubble(){main.removeCallbacksAndMessages(null);bubble?.let{runCatching{window.removeView(it)}};bubble=null;params=null}
+    private fun removeBubble(){if(bubble!=null&&held)releaseTalk();main.removeCallbacksAndMessages(null);bubble?.let{runCatching{window.removeView(it)}};bubble=null;params=null}
     private fun shutdown(message:String){if(stopping)return;stopping=true;held=false;state.value=State(status=message);removeBubble();room?.close();room=null;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
     override fun onTaskRemoved(rootIntent:Intent?){shutdown("PX desligado ao fechar o aplicativo.")}
     override fun onConfigurationChanged(config:android.content.res.Configuration){super.onConfigurationChanged(config);releaseTalk();removeBubble();showBubble()}
@@ -127,6 +127,7 @@ class PxService:Service() {
         const val JOIN="br.com.calculacorrida.PX_JOIN";const val STOP="br.com.calculacorrida.PX_STOP";const val MUTE="br.com.calculacorrida.PX_MUTE";private const val CHANNEL="jd_px_voice";private const val NOTICE=904
         private val state=MutableStateFlow(State());val status=state.asStateFlow()
         @Volatile private var instance:PxService?=null
+        internal fun overlayRectForTest():android.graphics.Rect? {val view=instance?.bubble?:return null;val xy=IntArray(2);view.getLocationOnScreen(xy);return android.graphics.Rect(xy[0],xy[1],xy[0]+view.width,xy[1]+view.height)}
         internal fun stoppedForTest()=instance==null
         internal fun overlayVisibleForTest()=instance?.bubble!=null
         fun press(){instance?.pressTalk()};fun release(){instance?.releaseTalk()}
