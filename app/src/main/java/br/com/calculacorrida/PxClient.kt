@@ -18,14 +18,16 @@ internal class PxClient(context:Context,private val capturedToken:String?=null):
     override fun call(action:String,data:JSONObject):JSONObject {
         if(!currentAccount())error("Entre novamente para usar PX.")
         var token=capturedToken?:session.getAccessToken() ?: error("Entre novamente.")
-        repeat(2){attempt->
+        var refreshed=false
+        repeat(4){attempt->
             if(!currentAccount())error("Sua conta mudou. Entre novamente no canal.")
             val request=Request.Builder().url("https://hyoaomusfpeccdchgoik.supabase.co/functions/v1/jd-px")
                 .header("apikey","sb_publishable_pLJTLctnmN2Z1DVNIoqyBA_DmQZv-EX").header("Authorization","Bearer $token")
                 .post(JSONObject(data.toString()).put("action",action).toString().toRequestBody("application/json".toMediaType())).build()
             http.newCall(request).execute().use { response->
                 val json=runCatching{JSONObject(response.body?.string().orEmpty())}.getOrNull()
-                if(response.code==401&&attempt==0&&capturedToken==null){token=session.refreshAccessToken() ?: error("Entre novamente para usar PX.")}
+                if(response.code==409&&attempt<3){Thread.sleep(150L*(attempt+1))}
+                else if(response.code==401&&!refreshed&&attempt<3&&capturedToken==null){refreshed=true;token=session.refreshAccessToken() ?: error("Entre novamente para usar PX.")}
                 else {if(!response.isSuccessful)error(json?.optString("error")?.takeIf{it.isNotBlank()} ?: "Rádio indisponível. Tente novamente.");return json ?: error("Resposta inválida do rádio.")}
             }
         }

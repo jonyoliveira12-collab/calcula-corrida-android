@@ -44,9 +44,10 @@ class PxLiveNetworkTest {
             activity=inst.startActivitySync(Intent(context,PxActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));inst.waitForIdleSync()
             val joins=clients.mapIndexed{i,c->c.call("connect",JSONObject().put("channel",channel).put("connection",ids[i]))};val received=CountDownLatch(5)
             scope.launch{b.events.collect{if(it is RoomEvent.TrackSubscribed){val track=it.track;if(track is RemoteAudioTrack)track.addSink(AudioTrackSink{bytes,_,_,_,frames,_->if(bytes.remaining()>0&&frames>0)received.countDown()})}}}
+            val pulse=scope.launch{while(isActive){delay(2000);for(i in 0..1)withContext(Dispatchers.IO){clients[i].call("tick",JSONObject().put("channel",channel).put("connection",ids[i]).put("talking",i==0&&speaking))}}}
             runBlocking{withTimeout(60000){a.connect(joins[0].getString("url"),joins[0].getString("token"));b.connect(joins[1].getString("url"),joins[1].getString("token"))}}
             val audio=context.getSystemService(android.media.AudioManager::class.java);assertTrue("Microphone must remain absent on join",audio.activeRecordingConfigurations.isEmpty())
-            val pulse=scope.launch{while(isActive){delay(2000);for(i in 0..1)withContext(Dispatchers.IO){clients[i].call("tick",JSONObject().put("channel",channel).put("connection",ids[i]).put("talking",i==0&&speaking))}}}
+
             var claim:JSONObject?=null;repeat(5){if(claim?.optBoolean("can_talk")!=true){try{claim=clients[0].call("claim",JSONObject().put("channel",channel).put("connection",ids[0]))}catch(_:Exception){};if(claim?.optBoolean("can_talk")!=true)Thread.sleep(400)}};assertTrue("Voice floor granted",claim?.optBoolean("can_talk")==true);speaking=true
             runBlocking{withTimeout(10000){while(!a.mayPublish)delay(40)};assertTrue(a.microphone(true))}
             assertTrue("Real remote audio PCM arrived through LiveKit",received.await(15,TimeUnit.SECONDS))

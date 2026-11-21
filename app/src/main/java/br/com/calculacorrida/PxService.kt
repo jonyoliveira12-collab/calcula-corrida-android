@@ -77,6 +77,7 @@ class PxService:Service() {
     private fun join(){connection=UUID.randomUUID().toString();scope.launch {
         try {
             val data=request("connect");if(stopping||!client.currentAccount())return@launch
+            launch{while(isActive&&!stopping){delay(2500);try{val tick=request("tick",JSONObject().put("talking",held&&(requesting||state.value.talking)));if(state.value.talking){if(!tick.optBoolean("can_talk"))releaseTalk()else deadline=SystemClock.elapsedRealtime()+(tick.optLong("lease_ms")-2000).coerceIn(0,5000)};state.value=state.value.copy(speaker=tick.optString("speaker").takeIf{it!="null"}.orEmpty());paintBubble()}catch(_:Exception){shutdown("A conexão falhou. Entre novamente no PX.")}}}
             val voice=PxVoiceDependencies.create(applicationContext,scope){event,value->when(event){
                 "disconnected","focus-lost"->if(!stopping)shutdown(if(event=="focus-lost")"PX desligado por interrupção de áudio."else"Conexão de voz encerrada. Entre novamente.")
                 "speaker"->{state.value=state.value.copy(speaker=value);paintBubble()}
@@ -86,7 +87,7 @@ class PxService:Service() {
             if(stopping||!client.currentAccount())return@launch
             state.value=state.value.copy(connected=true,name=data.optString("name",state.value.name),status="Conectado • segure para falar")
             notice();showBubble()
-            launch{while(isActive&&!stopping){delay(2500);try{val tick=request("tick",JSONObject().put("talking",held&&(requesting||state.value.talking)));if(state.value.talking){if(!tick.optBoolean("can_talk"))releaseTalk()else deadline=SystemClock.elapsedRealtime()+(tick.optLong("lease_ms")-2000).coerceIn(0,5000)};state.value=state.value.copy(speaker=tick.optString("speaker").takeIf{it!="null"}.orEmpty());paintBubble()}catch(_:Exception){shutdown("A conexão falhou. Entre novamente no PX.")}}}
+
             launch{while(isActive&&!stopping){delay(100);if(state.value.talking&&(SystemClock.elapsedRealtime()>=deadline||SystemClock.elapsedRealtime()-started>=29000||privacy))releaseTalk();if(!client.currentAccount())shutdown("Sua sessão mudou.");if(privacy||!Settings.canDrawOverlays(this@PxService))removeBubble()else showBubble()}}
         }catch(error:Exception){if(!stopping)shutdown(error.message?:"Não foi possível entrar no rádio.")}
     }}
