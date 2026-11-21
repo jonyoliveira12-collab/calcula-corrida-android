@@ -30,8 +30,12 @@ jobs:
           PX_PREVIOUS: ${{ inputs.previous_version }}
           PX_SHA256: ${{ inputs.apk_sha256 }}
         run: |
-          gh release download "preview-${PX_PREVIOUS}" --pattern "JHONDRIVER-${PX_PREVIOUS}.apk" --output previous.apk
-          gh release download "preview-${PX_CURRENT}" --pattern "JHONDRIVER-${PX_CURRENT}.apk" --output current.apk
+          [[ "$PX_CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$PX_PREVIOUS" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          curl -fL --retry 2 -o previous.apk "https://github.com/${GH_REPO}/releases/download/preview-${PX_PREVIOUS}/JHONDRIVER-${PX_PREVIOUS}.apk"
+          PX_DISTRIBUTION="${PX_CURRENT//./}"
+          curl -fL --retry 2 -o current.zip "https://raw.githubusercontent.com/${GH_REPO}/distribution/apk${PX_DISTRIBUTION}/distribution/JHONDRIVER-${PX_CURRENT}.apk.zip"
+          python -c 'import os,zipfile,pathlib; z=zipfile.ZipFile("current.zip"); name="JHONDRIVER-"+os.environ["PX_CURRENT"]+".apk"; assert z.namelist()==[name]; pathlib.Path("current.apk").write_bytes(z.read(name))'
           printf '%s  current.apk\n' "$PX_SHA256" | sha256sum -c -
       - name: Enable acceleration
         run: |

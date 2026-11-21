@@ -13,7 +13,7 @@ object IncomingOfferPolicy {
     }
     /** Markers of the driver's 99 offer card, including negotiated offers. */
     fun hasNinetyNineOfferMarker(text:String):Boolean {
-        val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFD)
+        val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFKD)
             .replace(Regex("\\p{Mn}+"),"").lowercase(java.util.Locale.ROOT)
         return Regex("""\b99\s*(?:pop|plus|comfort|taxi|negocia|moto|entrega(?:s)?)\b""").containsMatchIn(n) || listOf("nao afeta a ta","tarifa base dinamica","negocia","pgto. no app",
             "pgto no app","pagamento no app","cartao verif","perfil essencial","perfil premium").any{n.contains(it)}
@@ -21,7 +21,7 @@ object IncomingOfferPolicy {
 
     fun isIncoming(pkg:String,text:String):Boolean {
         val driverName = DriverPackages.name(pkg) ?: return false
-        val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFD)
+        val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFKD)
             .replace(Regex("\\p{Mn}+"),"").lowercase(java.util.Locale.ROOT)
         if(listOf("encerrar viagem","finalizar viagem","em viagem","cheguei").any{n.contains(it)})return false
         if(!Regex("""r\s*\$\s*[0-9]""").containsMatchIn(n))return false

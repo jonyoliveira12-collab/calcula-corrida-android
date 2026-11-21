@@ -716,7 +716,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun isIncomingOfferScreen(root: AccessibilityNodeInfo, rawText: String): Boolean {
-        val normalized = java.text.Normalizer.normalize(rawText, java.text.Normalizer.Form.NFD)
+        val normalized = java.text.Normalizer.normalize(rawText, java.text.Normalizer.Form.NFKD)
             .replace(Regex("\\p{Mn}+"), "")
             .lowercase(java.util.Locale.ROOT)
 
@@ -734,7 +734,7 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     private fun normalizeActionText(value: CharSequence?): String {
-        return java.text.Normalizer.normalize(value?.toString().orEmpty(), java.text.Normalizer.Form.NFD)
+        return java.text.Normalizer.normalize(value?.toString().orEmpty(), java.text.Normalizer.Form.NFKD)
             .replace(Regex("\\p{Mn}+"), "")
             .lowercase(java.util.Locale.ROOT)
             .trim()

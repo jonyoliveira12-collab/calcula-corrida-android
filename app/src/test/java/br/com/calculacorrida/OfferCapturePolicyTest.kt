@@ -19,6 +19,18 @@ class OfferCapturePolicyTest {
             assertFalse(IncomingOfferPolicy.isIncoming("com.app99.driver","$full Em viagem"))
         }
     }
+    @Test fun ninetyNineAccessibilityNonBreakingSpacesDoNotHideAnOffer() {
+        for(space in listOf("\u00a0","\u202f","\u2007")) {
+            val offer="99${space}Pop\nR$${space}20,00\nDinheiro\n2${space}min (600${space}m)\n16${space}min (6,7${space}km)"
+            assertTrue(IncomingOfferPolicy.isIncoming("com.app99.driver",offer))
+            val parsed=OfferTextParser.parse(offer,"com.app99.driver")!!
+            assertEquals(20.0,parsed.fare,.00001)
+            assertEquals(18.0,parsed.minutes,.00001)
+            assertEquals(7.3,parsed.pickupKm+parsed.tripKm,.00001)
+            assertFalse(IncomingOfferPolicy.isIncoming("com.app99.driver",offer+" Em viagem"))
+            assertFalse(IncomingOfferPolicy.isIncoming("com.taxis99",offer))
+        }
+    }
     @Test fun explicitNewIfoodRouteCanBeReadWithoutATextAcceptButton() {
         val pkg="br.com.ifood.driver.app"
         val text="Nova rota\nR$ 12,50\nPercurso total: 5,0 km\nTempo estimado da rota: 20 min"
