@@ -102,7 +102,7 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
-          profile: ${{ matrix.form == 'tablet' && 'pixel_c' || '' }}
+          profile: ${{ matrix.form == 'tablet' && 'pixel_c' || 'pixel_4' }}
           disable-animations: true
           script: |
             gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
