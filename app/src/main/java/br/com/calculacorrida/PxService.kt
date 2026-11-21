@@ -40,6 +40,7 @@ class PxService:Service() {
     private var activeChannel=""
     private var held=false
     private var requesting=false
+    private var talkJob:Job?=null
     private var deadline=0L
     private var started=0L
     private var stopping=false
@@ -89,7 +90,7 @@ class PxService:Service() {
             launch{while(isActive&&!stopping){delay(100);if(state.value.talking&&(SystemClock.elapsedRealtime()>=deadline||SystemClock.elapsedRealtime()-started>=29000||privacy))releaseTalk();if(!client.currentAccount())shutdown("Sua sessão mudou.");if(privacy||!Settings.canDrawOverlays(this@PxService))removeBubble()else showBubble()}}
         }catch(error:Exception){if(!stopping)shutdown(error.message?:"Não foi possível entrar no rádio.")}
     }}
-    fun pressTalk(){if(held||stopping||!state.value.connected||privacy)return;held=true;requesting=true;state.value=state.value.copy(status="Pedindo a vez de fala...");scope.launch{
+    fun pressTalk(){if(held||stopping||!state.value.connected||privacy)return;held=true;requesting=true;state.value=state.value.copy(status="Pedindo a vez de fala...");talkJob=scope.launch{
         try{val answer=request("claim");if(!held||stopping||!client.currentAccount())return@launch
             if(!answer.optBoolean("can_talk")){held=false;state.value=state.value.copy(status="Canal ocupado. Aguarde a outra pessoa terminar.");return@launch}
             val voice=room?:return@launch
@@ -99,9 +100,9 @@ class PxService:Service() {
             if(deadline<=started||!voice.microphone(true)){releaseTalk();return@launch}
             if(!held||stopping){voice.microphone(false);return@launch}
             state.value=state.value.copy(talking=true,status="Transmitindo • solte para parar");notice();paintBubble()
-        }catch(error:Exception){held=false;state.value=state.value.copy(status=error.message?:"Não foi possível falar.");scope.launch{room?.microphone(false)}}finally{requesting=false;paintBubble()}
+        }catch(error:Exception){if(error is CancellationException)throw error;held=false;state.value=state.value.copy(status=error.message?:"Não foi possível falar.");scope.launch{room?.microphone(false)}}finally{requesting=false;paintBubble()}
     }}
-    fun releaseTalk(){held=false;requesting=false;deadline=0;val was=state.value.talking;state.value=state.value.copy(talking=false,status=if(state.value.connected)"Conectado • segure para falar"else state.value.status);scope.launch{try{room?.microphone(false)}catch(_:Exception){};if(!stopping)runCatching{request("release")}};if(was){notice();paintBubble()}}
+    fun releaseTalk(){held=false;talkJob?.cancel();talkJob=null;requesting=false;deadline=0;val was=state.value.talking;state.value=state.value.copy(talking=false,status=if(state.value.connected)"Conectado • segure para falar"else state.value.status);scope.launch{try{room?.microphone(false)}catch(_:Exception){};if(!stopping)runCatching{request("release")}};if(was){notice();paintBubble()}}
     private fun applyVolumes(){room?.volumes(state.value.muted)}
     private fun foreground(){val manager=getSystemService(NOTIFICATION_SERVICE)as NotificationManager;manager.createNotificationChannel(NotificationChannel(CHANNEL,"Rádio PX",NotificationManager.IMPORTANCE_LOW));val notification=notification();if(Build.VERSION.SDK_INT>=29)startForeground(NOTICE,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)else startForeground(NOTICE,notification)}
     private fun notification():Notification {val open=PendingIntent.getActivity(this,0,Intent(this,PxActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE);fun action(value:String,code:Int)=PendingIntent.getService(this,code,Intent(this,PxService::class.java).setAction(value),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
