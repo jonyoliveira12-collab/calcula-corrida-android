@@ -21,3 +21,17 @@ class PxTalkButton(context:Context):AppCompatButton(context) {
         pen.style=Paint.Style.STROKE;pen.strokeWidth=4.2f;pen.strokeCap=Paint.Cap.ROUND;val path=Path().apply{moveTo(-20f,-1f);lineTo(-20f,5f);cubicTo(-20f,34f,20f,34f,20f,5f);lineTo(20f,-1f)};canvas.drawPath(path,pen);canvas.drawLine(0f,27f,0f,37f,pen);canvas.drawLine(-12f,37f,12f,37f,pen);canvas.restore();pen.alpha=255
     }
 }
+
+/** Voice activity indication, not a fabricated microphone-level measurement. */
+class PxVoiceIndicator(context:Context):android.view.View(context){
+    private val pen=Paint(Paint.ANTI_ALIAS_FLAG)
+    var active=false
+        set(value){field=value;invalidate()}
+    init {contentDescription="Atividade do rádio";importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_NO}
+    override fun onDraw(canvas:Canvas){
+        val d=resources.displayMetrics.density;val p=AppAppearance.palette(context);pen.color=if(active)p.gold else p.border;pen.strokeWidth=2*d;pen.strokeCap=Paint.Cap.ROUND
+        val spacing=width/43f;val time=android.os.SystemClock.uptimeMillis()/160.0
+        for(i in 1..41){val envelope=1f-kotlin.math.abs(i-21)/22f;val amplitude=if(active)(.2+kotlin.math.abs(kotlin.math.sin(time+i*.63))).toFloat()*envelope*height*.32f else d;val x=i*spacing;canvas.drawLine(x,height/2f-amplitude,x,height/2f+amplitude,pen)}
+        if(active)postInvalidateOnAnimation()
+    }
+}

@@ -1,9 +1,16 @@
 name: Verify signed APK installation
 on:
-  push:
-    branches: [feat/px-radio]
-    paths: [.github/workflows/release-install-check.yml]
   workflow_dispatch:
+    inputs:
+      current_version:
+        type: string
+        required: true
+      previous_version:
+        type: string
+        required: true
+      apk_sha256:
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -15,11 +22,17 @@ jobs:
       matrix:
         api: [26, 33, 36]
     steps:
-      - name: Download published signed versions
+      - name: Download signed versions and verify exact bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PX_CURRENT: ${{ inputs.current_version }}
+          PX_PREVIOUS: ${{ inputs.previous_version }}
+          PX_SHA256: ${{ inputs.apk_sha256 }}
         run: |
-          curl -fL --retry 2 -o previous.apk https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.8.2/JHONDRIVER-0.8.2.apk
-          curl -fL --retry 2 -o current.apk https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.9.0/JHONDRIVER-0.9.0.apk
-          echo 'f6ba120907861b10e15e819177ebc1076d532b2fd72e7cd95b4287625fb1bcc2  current.apk' | sha256sum -c -
+          gh release download "preview-${PX_PREVIOUS}" --pattern "JHONDRIVER-${PX_PREVIOUS}.apk" --output previous.apk
+          gh release download "preview-${PX_CURRENT}" --pattern "JHONDRIVER-${PX_CURRENT}.apk" --output current.apk
+          printf '%s  current.apk\n' "$PX_SHA256" | sha256sum -c -
       - name: Enable acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
