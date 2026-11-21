@@ -170,7 +170,10 @@ class ReaderConcurrentOffersTest {
             assertFalse("The tags do not overlap", Rect.intersects(uber, ninetyNine))
             // A driver may drag a tag outside the offer pane and keep it there.
             val screen=ui.takeScreenshot()!!
-            val targetY=screen.height-uber.height()/2-80
+            // Short landscape phones have no vertical space below the panes.
+            // Move across the pane boundary, which exists on every supported display.
+            val targetX=screen.width-uber.width()/2-12
+            val targetY=(screen.height-uber.height()/2-32).coerceAtLeast(uber.height()/2+35)
             screen.recycle()
             val startX=uber.centerX().toFloat()
             val startY=uber.centerY().toFloat()
@@ -183,12 +186,12 @@ class ReaderConcurrentOffersTest {
             touch(android.view.MotionEvent.ACTION_DOWN,startX,startY)
             repeat(8){step->
                 Thread.sleep(25)
-                touch(android.view.MotionEvent.ACTION_MOVE,startX,startY+(targetY-startY)*(step+1)/8f)
+                touch(android.view.MotionEvent.ACTION_MOVE,startX+(targetX-startX)*(step+1)/8f,startY+(targetY-startY)*(step+1)/8f)
             }
-            touch(android.view.MotionEvent.ACTION_UP,startX,targetY.toFloat())
-            await("Dragged tag stays outside the original offer window",12000){(uberTag()?.top ?: 0)>uberPane.bottom}
+            touch(android.view.MotionEvent.ACTION_UP,targetX.toFloat(),targetY.toFloat())
+            await("Dragged tag stays outside the original offer window",12000){(uberTag()?.centerX() ?: 0)>uberPane.right}
             Thread.sleep(1200)
-            assertTrue("Polling preserves the freely chosen tag position",uberTag()!!.top>uberPane.bottom)
+            assertTrue("Polling preserves the freely chosen tag position",uberTag()!!.centerX()>uberPane.right)
 
             val records = JourneyStore.getRecords(context).filter { it.optLong("timestamp") >= startedAt }
             assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-12.0)<0.001 })
