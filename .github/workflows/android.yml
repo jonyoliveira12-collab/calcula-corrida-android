@@ -66,6 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         api: [33, 36]
+        form: [phone, tablet]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +83,7 @@ jobs:
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
       - name: Fetch private synthetic voice fixture
-        if: github.ref == 'refs/heads/fix/px-design-and-99' && inputs.live_px_qa
+        if: github.ref == 'refs/heads/fix/px-design-and-99' && inputs.live_px_qa && matrix.form == 'phone'
         env:
           PX_API_LEVEL: ${{ matrix.api }}
         run: python .github/scripts/fetch_px_qa.py
@@ -96,6 +97,7 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
+          profile: ${{ matrix.form == 'tablet' && 'pixel_c' || '' }}
           disable-animations: true
           script: |
             gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
@@ -109,18 +111,13 @@ jobs:
             adb install -r reader-fixture/build/outputs/apk/indrive/debug/reader-fixture-indrive-debug.apk
             adb install -r reader-fixture/build/outputs/apk/ifood/debug/reader-fixture-ifood-debug.apk
             if [ -f "$RUNNER_TEMP/px-qa.json" ]; then adb shell run-as br.com.calculacorrida.avaliacao051 mkdir -p files; adb exec-in run-as br.com.calculacorrida.avaliacao051 sh -c 'cat > files/px-qa.json' < "$RUNNER_TEMP/px-qa.json"; rm "$RUNNER_TEMP/px-qa.json"; fi
-            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.ReaderConcurrentOffersTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews.tar
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
-            adb shell wm size 960x1536
-            adb shell wm density 160
-            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
-            grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
-            adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews.tar
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: card-previews-${{ matrix.api }}
+          name: card-previews-${{ matrix.api }}-${{ matrix.form }}
           path: card-previews.tar
           if-no-files-found: error
 
