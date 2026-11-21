@@ -10,8 +10,8 @@ Estado: especificação de produto e compatibilidade. Não implementado nem publ
 - Um único canal ativo por aparelho, com nome do destinatário/grupo sempre visível.
 - Uma pessoa transmite por vez. Pedido de fala recusado se o canal estiver ocupado.
 - Na tela PX: segurar para falar, soltar para parar; ouvir os demais enquanto conectado.
-- Fora do aplicativo: mesma operação ao segurar a bolinha JD. Toque curto mantém o menu existente; arrastar move a bolinha. Movimento antes de iniciar a fala cancela o gesto de transmissão.
-- Estado da bolinha e notificação identificam canal, conexão, quem fala e microfone ativo. Nenhuma transmissão apenas por entrar no canal.
+- Fora do aplicativo: bolinha PX própria e independente, com o nome da pessoa ou do grupo. Não reutilizar nem alterar a bolinha JD do leitor. A bolinha PX aparece somente após ativar o rádio e entrar explicitamente no canal; desaparece ao sair/desligar. Segurar solicita a fala; soltar/cancelar encerra a transmissão. Arrastar move somente a bolinha PX e cancela o gesto de fala.
+- Estado da bolinha PX e notificação identificam canal, conexão, quem fala e microfone ativo. Nenhuma transmissão apenas por entrar no canal.
 - Perda do toque, ACTION_CANCEL, desconexão, saída do canal, troca de conta, revogação de convite ou parada do serviço encerram a captura e liberam a vez de fala.
 - Limite de fala e validade curta da autorização evitam microfone preso após falha de rede.
 - Notificação permanente com silenciar, sair e parar o PX. O usuário pode desligar a escuta fora do app.

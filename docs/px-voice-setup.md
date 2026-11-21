@@ -31,3 +31,9 @@ Referências consultadas:
 - https://livekit.com/pricing
 - https://supabase.com/docs/guides/realtime/authorization
 - https://developer.android.com/develop/background-work/services/fgs/service-types
+
+## Verificação de configuração — 21/11/2026
+
+O usuário cadastrou LIVEKIT_URL, LIVEKIT_API_KEY e LIVEKIT_API_SECRET nos Edge Function Secrets. A sonda temporária autenticada por desafio privado confirmou a presença dos três campos sem retornar os valores. Uma chamada de servidor para servidor ao LiveKit RoomService/ListRooms foi rejeitada com HTTP 401. A segunda verificação, normalizando espaços nas extremidades, também retornou 401. A causa específica não foi confirmada; conferir chave e segredo da mesma credencial no projeto correto antes de prosseguir com os testes de mídia. Nenhum segredo foi exposto ao chat, APK ou repositório.
+
+A definição do produto mudou: o rádio deve ter bolinha PX separada, com o nome da pessoa/grupo; a bolinha JD do leitor permanece independente e inalterada. Não publicar um APK anunciando PX funcional enquanto autenticação e transmissão real não forem validadas.
