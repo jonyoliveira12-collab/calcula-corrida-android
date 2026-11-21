@@ -68,7 +68,17 @@ public class OfferFixtureActivity extends Activity {
                 }
                 float first=floating?35*d:("small".equals(layout)?getHeight()*0.42f:Math.max(35*d,getHeight()-210*d));
                 if(realistic && getPackageName().equals("com.app99.driver"))first=getHeight()*0.40f;
-                for(int i=0;i<lines.length;i++)canvas.drawText(lines[i],12*d,first+i*((layout!=null && (layout.startsWith("envios") || layout.equals("priority")))?24:32)*d,paint);
+                float baseTextSize=paint.getTextSize();
+                for(int i=0;i<lines.length;i++) {
+                    // Real cards lay out their text inside each pane. Keep the
+                    // synthetic summary rate visible instead of clipping its /km,
+                    // which would turn it into a second apparent fare.
+                    paint.setTextSize(baseTextSize);
+                    float measured=paint.measureText(lines[i]);
+                    float available=getWidth()-24*d;
+                    if(dual && measured>available)paint.setTextSize(baseTextSize*available/measured);
+                    canvas.drawText(lines[i],12*d,first+i*((layout!=null && (layout.startsWith("envios") || layout.equals("priority")))?24:32)*d,paint);
+                }
             }
         };
         offer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
