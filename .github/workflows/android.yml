@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      live_px_qa:
+        description: Use a separately provisioned, short-lived synthetic voice fixture
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -76,7 +82,7 @@ jobs:
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
       - name: Fetch private synthetic voice fixture
-        if: github.ref == 'refs/heads/feat/px-radio'
+        if: github.ref == 'refs/heads/feat/px-radio' && inputs.live_px_qa
         env:
           PX_API_LEVEL: ${{ matrix.api }}
         run: python .github/scripts/fetch_px_qa.py
