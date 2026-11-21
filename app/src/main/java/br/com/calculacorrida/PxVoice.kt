@@ -43,5 +43,5 @@ internal class LivePxVoice(context:Context,scope:CoroutineScope,event:(String,St
         microphoneTrack=null;return true
     }
     override fun volumes(muted:Boolean){room.remoteParticipants.values.forEach{p->p.trackPublications.values.forEach{publication->(publication.track as? RemoteAudioTrack)?.setVolume(if(muted)0.0 else 1.0)}}}
-    override fun close(){microphoneTrack?.stopPrewarm();microphoneTrack?.stop();microphoneTrack=null;room.disconnect();room.release()}
+    override fun close(){runCatching{microphoneTrack?.stopPrewarm()};runCatching{microphoneTrack?.stop()};microphoneTrack=null;room.disconnect();room.release()}
 }

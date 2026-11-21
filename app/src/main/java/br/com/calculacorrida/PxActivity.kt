@@ -31,6 +31,7 @@ class PxActivity:AppCompatActivity(){
     private var friends=listOf<JSONObject>()
     private var busy=false
     private var pending:JSONObject?=null
+    private var bluetoothAsked=false
     private val colors get()=AppAppearance.palette(this)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
     private fun column()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
@@ -69,10 +70,11 @@ class PxActivity:AppCompatActivity(){
     }
     private fun enter(channel:JSONObject){if(PxService.status.value.active){Toast.makeText(this,"Saia do canal atual antes de entrar em outro.",Toast.LENGTH_LONG).show();return};pending=channel
         val permissions=mutableListOf<String>();if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)permissions.add(Manifest.permission.RECORD_AUDIO);if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        if(Build.VERSION.SDK_INT>=31&&!bluetoothAsked&&ContextCompat.checkSelfPermission(this,Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){bluetoothAsked=true;permissions.add(Manifest.permission.BLUETOOTH_CONNECT)}
         if(permissions.isNotEmpty()){ActivityCompat.requestPermissions(this,permissions.toTypedArray(),901);return};pending=null
         ContextCompat.startForegroundService(this,Intent(this,PxService::class.java).setAction(PxService.JOIN).putExtra("channel",channel.getString("id")).putExtra("name",channel.optString("name")))
     }
-    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,results:IntArray){super.onRequestPermissionsResult(requestCode,permissions,results);if(requestCode==901){val channel=pending;pending=null;if(results.isNotEmpty()&&results.all{it==PackageManager.PERMISSION_GRANTED}&&channel!=null)enter(channel)else Toast.makeText(this,"Permita microfone e notificações para entrar no rádio.",Toast.LENGTH_LONG).show()}}
+    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,results:IntArray){super.onRequestPermissionsResult(requestCode,permissions,results);if(requestCode==901){val channel=pending;pending=null;if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&channel!=null)enter(channel)else Toast.makeText(this,"Permita microfone e notificações para entrar no rádio.",Toast.LENGTH_LONG).show()}}
     override fun onPause(){PxService.release();super.onPause()}
     override fun onDestroy(){scope.cancel();super.onDestroy()}
 }
