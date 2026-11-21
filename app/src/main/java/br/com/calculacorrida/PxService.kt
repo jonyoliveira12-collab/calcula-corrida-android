@@ -127,6 +127,8 @@ class PxService:Service() {
         const val JOIN="br.com.calculacorrida.PX_JOIN";const val STOP="br.com.calculacorrida.PX_STOP";const val MUTE="br.com.calculacorrida.PX_MUTE";private const val CHANNEL="jd_px_voice";private const val NOTICE=904
         private val state=MutableStateFlow(State());val status=state.asStateFlow()
         @Volatile private var instance:PxService?=null
+        internal fun stoppedForTest()=instance==null
+        internal fun overlayVisibleForTest()=instance?.bubble!=null
         fun press(){instance?.pressTalk()};fun release(){instance?.releaseTalk()}
     }
     init{instance=this}
