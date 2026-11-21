@@ -41,8 +41,8 @@ class ReaderWindowTest {
                 listOf("com.ubercab.driver","16,71","0","envios"),
                 listOf("com.ubercab.driver","16,71","0","envios_tall"),
                 listOf("com.app99.driver","60,00","0","moto99"),
-                listOf("com.app99.driver","60,00","0","pop99"),
-                listOf("com.app99.driver","60,00","0","pop99_floating"),
+                listOf("com.app99.driver","66,67","0","pop99"),
+                listOf("com.app99.driver","70,00","0","pop99_floating"),
                 listOf("br.com.ifood.driver.app","37,50","0","delivery"))
             for((driver,expected,rotation,layout) in scenarios) {
             listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver","br.com.ifood.driver.app").forEach {shell("am force-stop $it")}

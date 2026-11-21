@@ -57,7 +57,7 @@ public class OfferFixtureActivity extends Activity {
                 if(getPackageName().equals("sinet.startup.inDriver"))lines=new String[]{"R$ 30,00","30 min • 12.0 km","Nota 4,90","5 min (2.0 km)","25 min (10.0 km)","Aceitar"};
                 if(layout!=null && layout.startsWith("envios"))lines=new String[]{"Envios Moto","R$ 8,91","32 min • 19.1 km","5,00 (98)","Verificado","Rua de coleta","Rua de entrega","Aceitar"};
                 if("moto".equals(layout))lines=new String[]{"Uber Moto","R$ 18,00","2 min 600 m","16 min 6,7 km","Escolher"};
-                if(layout!=null && layout.startsWith("pop99"))lines=new String[]{"99Pop","R$ 18,00","Dinheiro","2 min (600 m)","16 min (6,7 km)"};
+                if(layout!=null && layout.startsWith("pop99"))lines=new String[]{"99Pop","pop99_floating".equals(layout)?"R$ 21,00":"R$ 20,00","Dinheiro","2 min (600 m)","16 min (6,7 km)"};
                 if("moto99".equals(layout))lines=new String[]{"99Moto","R$ 18,00","2 min (600 m)","16 min (6,7 km)"};
                 if(getPackageName().equals("br.com.ifood.driver.app"))lines=new String[]{"Nova rota","R$ 12,50","Percurso total: 5,0 km","Tempo estimado da rota: 20 min"};
                 if(dual && getPackageName().equals("com.ubercab.driver"))lines=new String[]{"UberX Exclusivo","R$ 12,00","20 min • 8.0 km • Est. de R$1,50/km","4,80 (100)","4 min (1.0 km)","16 minutos (7.0 km)","Aceitar"};
