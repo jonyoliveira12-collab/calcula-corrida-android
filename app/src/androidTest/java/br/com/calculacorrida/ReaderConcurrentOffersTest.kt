@@ -220,6 +220,13 @@ class ReaderConcurrentOffersTest {
             // larger map window from the same app must not starve its OCR.
             shell("am force-stop com.ubercab.driver")
             await("Previous tags leave after the apps close", 12000) { uberTag()==null && ninetyNineTag()==null }
+            // The preceding scenario deliberately saved a freely dragged tag.
+            // Test automatic placement with its defaults, independently of that
+            // user-chosen position, which is allowed to overlap another pane.
+            prefs.edit().also { editor ->
+                prefs.all.keys.filter { it.startsWith("offer_tag_x_") || it.startsWith("offer_tag_y_") }
+                    .forEach { editor.remove(it) }
+            }.commit()
             // Clear the fake app's old task: Android otherwise resumes the
             // backdrop without creating the new fixture or its offer window.
             val uberStart=shell("am start -W -S -f 0x10008000 -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")

@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      concurrent_only:
+        description: Recheck only concurrent-offer placement after test-fixture changes
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -116,7 +121,8 @@ jobs:
             adb install -r reader-fixture/build/outputs/apk/indrive/debug/reader-fixture-indrive-debug.apk
             adb install -r reader-fixture/build/outputs/apk/ifood/debug/reader-fixture-ifood-debug.apk
             if [ -f "$RUNNER_TEMP/px-qa.json" ]; then adb shell run-as br.com.calculacorrida.avaliacao051 mkdir -p files; adb exec-in run-as br.com.calculacorrida.avaliacao051 sh -c 'cat > files/px-qa.json' < "$RUNNER_TEMP/px-qa.json"; rm "$RUNNER_TEMP/px-qa.json"; fi
-            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.ReaderConcurrentOffersTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            if [ "${{ inputs.concurrent_only }}" = "true" ]; then TEST_CLASSES=br.com.calculacorrida.ReaderConcurrentOffersTest; else TEST_CLASSES=br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.ReaderConcurrentOffersTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest; fi
+            adb shell am instrument -w -r -e class "$TEST_CLASSES" br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews.tar
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
       - uses: actions/upload-artifact@v4
