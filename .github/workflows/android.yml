@@ -16,6 +16,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Extract the unchanged signed APK
+        run: |
+          python - <<'EXTRACT'
+          from pathlib import Path
+          import zipfile
+          with zipfile.ZipFile('distribution/JHONDRIVER-0.9.0.apk.zip') as archive:
+              assert archive.namelist() == ['JHONDRIVER-0.9.0.apk']
+              Path('distribution/JHONDRIVER-0.9.0.apk').write_bytes(archive.read('JHONDRIVER-0.9.0.apk'))
+          EXTRACT
       - name: Verify the signed installation and update metadata
         shell: bash
         run: |
@@ -23,22 +32,22 @@ jobs:
           python - <<'CHECK'
           import hashlib, json
           from pathlib import Path
-          apk = Path('distribution/JHONDRIVER-0.8.2.apk')
+          apk = Path('distribution/JHONDRIVER-0.9.0.apk')
           metadata = json.loads(Path('distribution/update.json').read_text())
           assert metadata['packageName'] == 'br.com.calculacorrida'
-          assert metadata['versionCode'] == 28 and metadata['versionName'] == '0.8.2'
+          assert metadata['versionCode'] == 29 and metadata['versionName'] == '0.9.0'
           assert metadata['channel'] == 'stable'
           assert metadata['certificateSha256'] == 'd83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7'
           assert metadata['sha256'] == hashlib.sha256(apk.read_bytes()).hexdigest()
-          assert metadata['apkUrl'] == 'https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.8.2/JHONDRIVER-0.8.2.apk'
+          assert metadata['apkUrl'] == 'https://github.com/jonyoliveira12-collab/calcula-corrida-android/releases/download/preview-0.9.0/JHONDRIVER-0.9.0.apk'
           print('Signed APK metadata verified')
           CHECK
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs distribution/JHONDRIVER-0.8.2.apk | tee certificate.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs distribution/JHONDRIVER-0.9.0.apk | tee certificate.txt
           grep -Fx 'Signer #1 certificate SHA-256 digest: d83716fc3266eed7046de4cfc5c30f87dfce4e47387d0e53f223fa3dfb83a9b7' certificate.txt
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging distribution/JHONDRIVER-0.8.2.apk | grep -F "package: name='br.com.calculacorrida' versionCode='28'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging distribution/JHONDRIVER-0.9.0.apk | grep -F "package: name='br.com.calculacorrida' versionCode='29'"
       - name: Upload the tested installation to the draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release upload preview-0.8.2 distribution/JHONDRIVER-0.8.2.apk distribution/update.json --clobber
+          gh release upload preview-0.9.0 distribution/JHONDRIVER-0.9.0.apk distribution/update.json --clobber
