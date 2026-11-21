@@ -7,8 +7,10 @@ import androidx.appcompat.widget.AppCompatButton
 /** A real native hold-to-talk control; pending and transmitting have distinct feedback. */
 class PxTalkButton(context:Context):AppCompatButton(context) {
     private val pen=Paint(Paint.ANTI_ALIAS_FLAG)
-    var transmitting=false;set(value){field=value;invalidate()}
-    var requesting=false;set(value){field=value;invalidate()}
+    var transmitting=false
+        set(value){field=value;invalidate()}
+    var requesting=false
+        set(value){field=value;invalidate()}
     init {background=null;backgroundTintList=null;minWidth=0;minHeight=0;setPadding(0,0,0,0);text="Segure para falar";contentDescription="Segure para falar no rádio PX e solte para parar"}
     override fun onDraw(canvas:Canvas){
         val p=AppAppearance.palette(context);val x=width/2f;val y=height/2f;val r=minOf(width,height)*.42f
