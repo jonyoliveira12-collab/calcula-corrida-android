@@ -10,7 +10,7 @@ permissions=subprocess.check_output([str(aapt),'dump','permissions',str(apk)],te
 manifest=subprocess.check_output([str(aapt),'dump','xmltree',str(apk),'AndroidManifest.xml'],text=True)
 assert 'SYSTEM_ALERT_WINDOW' in permissions
 assert 'BIND_ACCESSIBILITY_SERVICE' in manifest
-for unwanted in ['READ_SMS','READ_CONTACTS','READ_CALL_LOG','QUERY_ALL_PACKAGES','REQUEST_INSTALL_PACKAGES','MANAGE_EXTERNAL_STORAGE']:
+for unwanted in ['CAMERA','FOREGROUND_SERVICE_MEDIA_PROJECTION','READ_SMS','READ_CONTACTS','READ_CALL_LOG','QUERY_ALL_PACKAGES','REQUEST_INSTALL_PACKAGES','MANAGE_EXTERNAL_STORAGE']:
     assert unwanted not in permissions, unwanted
 config=subprocess.check_output([str(aapt),'dump','xmltree',str(apk),'res/xml/accessibility_service_config.xml'],text=True)
 assert 'packageNames' in config and 'com.ubercab.driver' in config and 'com.app99.driver' in config

@@ -5,3 +5,5 @@ keystore.properties
 local.properties
 .gradle/
 **/build/
+
+supabase/.temp/
