@@ -43,6 +43,8 @@ class PxService:Service() {
     private var talkJob:Job?=null
     private var talkGeneration=0L
     private var deadline=0L
+    private var directVoice=false
+    private var connectedUntil=0L
     private var started=0L
     private var stopping=false
     private var bubble:TextView?=null
@@ -78,7 +80,8 @@ class PxService:Service() {
     private fun join(){connection=UUID.randomUUID().toString();scope.launch {
         try {
             val data=request("connect");if(stopping||!client.currentAccount())return@launch
-            launch{while(isActive&&!stopping){delay(2500);try{val tick=request("tick",JSONObject().put("talking",held&&(requesting||state.value.talking)));if(state.value.talking){if(!tick.optBoolean("can_talk"))releaseTalk()else deadline=SystemClock.elapsedRealtime()+(tick.optLong("lease_ms")-2000).coerceIn(0,5000)};state.value=state.value.copy(speaker=tick.optString("speaker").takeIf{it!="null"}.orEmpty());paintBubble()}catch(_:Exception){shutdown("A conexão falhou. Entre novamente no PX.")}}}
+            directVoice=data.optBoolean("direct_ptt");connectedUntil=SystemClock.elapsedRealtime()+10000
+            launch{while(isActive&&!stopping){delay(2500);try{val tick=request("tick",JSONObject().put("talking",held&&(requesting||state.value.talking)));connectedUntil=SystemClock.elapsedRealtime()+10000;if(state.value.talking){if(directVoice)deadline=connectedUntil else if(!tick.optBoolean("can_talk"))releaseTalk()else deadline=SystemClock.elapsedRealtime()+(tick.optLong("lease_ms")-2000).coerceIn(0,5000)};if(!directVoice)state.value=state.value.copy(speaker=tick.optString("speaker").takeIf{it!="null"}.orEmpty());paintBubble()}catch(_:Exception){shutdown("A conexão falhou. Entre novamente no PX.")}}}
             val voice=PxVoiceDependencies.create(applicationContext,scope){event,value->when(event){
                 "disconnected","focus-lost"->if(!stopping)shutdown(if(event=="focus-lost")"PX desligado por interrupção de áudio."else"Conexão de voz encerrada. Entre novamente.")
                 "speaker"->{state.value=state.value.copy(speaker=value);paintBubble()}
@@ -89,22 +92,22 @@ class PxService:Service() {
             state.value=state.value.copy(connected=true,name=data.optString("name",state.value.name),status="Conectado • segure para falar")
             notice();showBubble()
 
-            launch{while(isActive&&!stopping){delay(100);if(state.value.talking&&(SystemClock.elapsedRealtime()>=deadline||SystemClock.elapsedRealtime()-started>=29000||privacy))releaseTalk();if(!client.currentAccount())shutdown("Sua sessão mudou.");if(uiVisible||privacy||!Settings.canDrawOverlays(this@PxService))removeBubble()else showBubble()}}
+            launch{while(isActive&&!stopping){delay(100);if(state.value.talking&&(SystemClock.elapsedRealtime()>=deadline||SystemClock.elapsedRealtime()-started>=29000||privacy||room?.mayPublish!=true))releaseTalk();if(!client.currentAccount())shutdown("Sua sessão mudou.");if(directVoice&&SystemClock.elapsedRealtime()>=connectedUntil)shutdown("A conexão expirou. Entre novamente no PX.");if(uiVisible||privacy||!Settings.canDrawOverlays(this@PxService))removeBubble()else showBubble()}}
         }catch(error:Exception){if(!stopping)shutdown(error.message?:"Não foi possível entrar no rádio.")}
     }}
     fun pressTalk(){if(held||stopping||!state.value.connected||privacy)return;held=true;val generation=++talkGeneration;requesting=true;state.value=state.value.copy(requesting=true,status="Preparando sua fala…");paintBubble();talkJob=scope.launch{
-        try{val answer=request("claim");if(!held||stopping||!client.currentAccount())return@launch
+        try{val answer=if(directVoice)JSONObject().put("can_talk",SystemClock.elapsedRealtime()<connectedUntil)else request("claim");if(!held||stopping||!client.currentAccount())return@launch
             if(!answer.optBoolean("can_talk")){held=false;state.value=state.value.copy(status="Canal ocupado. Aguarde a outra pessoa terminar.");return@launch}
             val voice=room?:return@launch
             val permitted=withTimeoutOrNull(1800){while(!voice.mayPublish){delay(40)};true}==true
             if(!held||stopping||!permitted){releaseTalk();return@launch}
-            deadline=SystemClock.elapsedRealtime()+(answer.optLong("lease_ms")-2500).coerceIn(0,4500);started=SystemClock.elapsedRealtime()
+            deadline=if(directVoice)connectedUntil else SystemClock.elapsedRealtime()+(answer.optLong("lease_ms")-2500).coerceIn(0,4500);started=SystemClock.elapsedRealtime()
             if(deadline<=started||!voice.microphone(true)){releaseTalk();return@launch}
             if(!held||stopping){voice.microphone(false);return@launch}
             state.value=state.value.copy(talking=true,status="Transmitindo • solte para parar");notice();paintBubble()
         }catch(error:Exception){if(error is CancellationException)throw error;held=false;state.value=state.value.copy(status=error.message?:"Não foi possível falar.");scope.launch{room?.microphone(false)}}finally{if(talkGeneration==generation){requesting=false;state.value=state.value.copy(requesting=false);paintBubble()}}
     }}
-    fun releaseTalk(){talkGeneration++;held=false;talkJob?.cancel();talkJob=null;requesting=false;deadline=0;val was=state.value.talking;state.value=state.value.copy(talking=false,requesting=false,status=if(state.value.connected)"Conectado • segure para falar"else state.value.status);scope.launch{try{room?.microphone(false)}catch(_:Exception){};if(!stopping)runCatching{request("release")}};if(was){notice();paintBubble()}}
+    fun releaseTalk(){talkGeneration++;held=false;talkJob?.cancel();talkJob=null;requesting=false;deadline=0;val was=state.value.talking;state.value=state.value.copy(talking=false,requesting=false,status=if(state.value.connected)"Conectado • segure para falar"else state.value.status);scope.launch{try{room?.microphone(false)}catch(_:Exception){};if(!stopping&&!directVoice)runCatching{request("release")}};if(was){notice();paintBubble()}}
     private fun applyVolumes(){room?.volumes(state.value.muted)}
     private fun foreground(){val manager=getSystemService(NOTIFICATION_SERVICE)as NotificationManager;manager.createNotificationChannel(NotificationChannel(CHANNEL,"Rádio PX",NotificationManager.IMPORTANCE_LOW));val notification=notification();if(Build.VERSION.SDK_INT>=29)startForeground(NOTICE,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)else startForeground(NOTICE,notification)}
     private fun notification():Notification {val open=PendingIntent.getActivity(this,0,Intent(this,PxActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE);fun action(value:String,code:Int)=PendingIntent.getService(this,code,Intent(this,PxService::class.java).setAction(value),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

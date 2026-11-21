@@ -30,9 +30,10 @@ async function live(method:string,room:string,body:Record<string,unknown>={}){
 }
 const publishes=(person:{permission?:{canPublish?:boolean,can_publish?:boolean}})=>person.permission?.canPublish===true||person.permission?.can_publish===true;
 async function reconcile(channel:string,snapshot?:any){const state=snapshot||await rpc('inspect',null,null,{channel}),room='jdpx-'+state.room_key,allowed=new Set((state.connections||[]).map((x:{identity:string})=>x.identity));for(const key of state.retired||[]){await live('DeleteRoom','jdpx-'+key);await rpc('retired_done',null,null,{channel,room_key:key});}const people=(await live('ListParticipants',room)).participants||[];
- // Revoke everyone else before granting a new speaker: no overlapping transmitters.
- for(const person of people){if(!allowed.has(person.identity)){await live('RemoveParticipant',room,{identity:person.identity});continue;}if(person.identity!==state.speaker&&publishes(person))await live('UpdateParticipant',room,{identity:person.identity,permission:{canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:[2]}});}
- const speaker=people.find((p:{identity:string})=>p.identity===state.speaker&&allowed.has(p.identity));if(speaker&&!publishes(speaker))await live('UpdateParticipant',room,{identity:speaker.identity,permission:{canSubscribe:true,canPublish:true,canPublishData:false,canPublishSources:[2]}});
+ // Publication is authorized once on explicit channel entry. Capture remains
+ // under the local hold gesture, so talking never waits for a control HTTP call.
+ // The durable session/membership/connection leases still govern every recipient.
+ for(const person of people){if(!allowed.has(person.identity)){await live('RemoveParticipant',room,{identity:person.identity});continue;}if(!publishes(person))await live('UpdateParticipant',room,{identity:person.identity,permission:{canSubscribe:true,canPublish:true,canPublishData:false,canPublishSources:[2]}});}
  if(!people.length&&!state.connections.length)await rpc('settled',null,null,{channel});
 }
 async function mediaStep(action:string,user:string,session:string,data:{channel:string}){
@@ -56,7 +57,7 @@ Deno.serve(async(req:Request)=>{
  // reaper still reconciles expired sessions and floor leases independently.
  if(action==='tick')return json(200,await rpc(action,user.id,session,data));
  const result=['connect','claim','release','leave'].includes(action)?await mediaStep(action,user.id,session,data):await locked(data.channel,async()=>{const value=await rpc(action,user.id,session,data);await reconcile(data.channel);return value;});
- if(action==='connect'){result.url=config().ws;result.token=await jwt({roomJoin:true,room:'jdpx-'+result.room_key,canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:['microphone']},result.connection,result.display_name);}
+ if(action==='connect'){result.direct_ptt=true;result.url=config().ws;result.token=await jwt({roomJoin:true,room:'jdpx-'+result.room_key,canSubscribe:true,canPublish:true,canPublishData:false,canPublishSources:['microphone']},result.connection,result.display_name);}
  return json(200,result);
  }catch(error){const message=error instanceof Error?error.message:'';if(message==='authentication')return json(401,{error:'Entre novamente para usar PX.'});if(message==='access')return json(403,{error:'Acesso encerrado. Confira amizade, convite e sessão.'});if(message==='busy')return json(409,{error:'Canal ocupado. Tente novamente.'});console.warn('PX request failed',message);return json(503,{error:'Não foi possível conectar ao rádio. Tente novamente.'});}
 });

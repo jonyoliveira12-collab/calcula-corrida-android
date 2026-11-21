@@ -34,6 +34,12 @@ class PxRadioTest {
         f.overlayTouch(MotionEvent.ACTION_DOWN);f.waitFor("background bubble starts voice"){f.enabled.get()==3&&f.microphone};f.overlayTouch(MotionEvent.ACTION_UP);f.waitFor("background release stops voice"){!f.microphone}
         f.stop();f.waitFor("bubble removed after stop"){!PxService.status.value.active&&!PxService.overlayVisibleForTest()};assertFalse(f.microphone)
     }
+    @Test fun authorizedChannelStartsLocallyWithoutAnyTalkRequest()=fixture{f->
+        f.direct=true;f.join();f.waitFor("PX connects"){PxService.status.value.connected};f.claimGate=CountDownLatch(1)
+        f.touch(MotionEvent.ACTION_DOWN);f.waitFor("local microphone starts"){f.microphone};assertEquals("No network floor request on direct PTT",0,f.claims.get())
+        f.touch(MotionEvent.ACTION_UP);f.waitFor("local microphone stops"){!f.microphone};assertFalse(PxService.status.value.talking)
+        f.touch(MotionEvent.ACTION_DOWN);f.waitFor("second hold starts"){f.enabled.get()==2};f.touch(MotionEvent.ACTION_CANCEL);f.waitFor("cancel stops immediately"){!f.microphone};assertEquals(0,f.claims.get())
+    }
     @Test fun releasingBeforeGrantNeverStartsMicrophone()=fixture{f->
         f.join();f.waitFor("PX connects"){PxService.status.value.connected};f.claimGate=CountDownLatch(1)
         f.touch(MotionEvent.ACTION_DOWN);assertTrue("Touch feedback is immediate while authorization is pending",PxService.status.value.requesting);f.waitFor("claim requested"){f.claims.get()>0};f.touch(MotionEvent.ACTION_UP);f.claimGate!!.countDown();Thread.sleep(600);assertEquals(0,f.enabled.get());assertFalse(f.microphone)
@@ -45,7 +51,7 @@ class PxRadioTest {
     private fun fixture(run:(Fixture)->Unit){val f=Fixture();try{f.setup();run(f)}finally{f.cleanup()}}
     private class Fixture {
         val inst=InstrumentationRegistry.getInstrumentation();val context=inst.targetContext
-        var activity:Activity?=null;var valid=true;var microphone=false;val enabled=AtomicInteger();val claims=AtomicInteger();var claimGate:CountDownLatch?=null
+        var activity:Activity?=null;var valid=true;var direct=false;var microphone=false;val enabled=AtomicInteger();val claims=AtomicInteger();var claimGate:CountDownLatch?=null
         var voiceEvent:((String,String)->Unit)?=null
         private val channel=UUID.randomUUID().toString();private val oldGateway=PxDependencies.gateway;private val oldVoice=PxVoiceDependencies.create;private val oldFriends=FriendsDependencies.gateway
         private val prefs=context.getSharedPreferences("user_session",0);private val original=prefs.all.toMap();private val settings=context.getSharedPreferences("settings",0);val readerSetting=settings.getBoolean("reader_paused",false)
@@ -55,7 +61,7 @@ class PxRadioTest {
         private fun find(view:View,label:String):Button?{if(view is Button&&view.text.toString()==label)return view;if(view is ViewGroup)for(i in 0 until view.childCount)find(view.getChildAt(i),label)?.let{return it};return null}
         fun setup(){
             main{context.stopService(Intent(context,PxService::class.java))};Thread.sleep(150)
-            PxDependencies.gateway={object:PxGateway{override fun currentAccount()=valid;override fun call(action:String,data:JSONObject):JSONObject{if(action=="claim"){claims.incrementAndGet();claimGate?.await(5,TimeUnit.SECONDS)};return if(action=="list")JSONObject().put("ok",true).put("channels",JSONArray().put(JSONObject().put("id",channel).put("name","Douglas").put("kind","private").put("accepted",true)))else JSONObject().put("ok",true).put("url","wss://synthetic.invalid").put("token","synthetic-token").put("name","Douglas").put("can_talk",action=="claim"||action=="tick").put("lease_ms",8000)}}}
+            PxDependencies.gateway={object:PxGateway{override fun currentAccount()=valid;override fun call(action:String,data:JSONObject):JSONObject{if(action=="claim"){claims.incrementAndGet();claimGate?.await(5,TimeUnit.SECONDS)};return if(action=="list")JSONObject().put("ok",true).put("channels",JSONArray().put(JSONObject().put("id",channel).put("name","Douglas").put("kind","private").put("accepted",true)))else JSONObject().put("ok",true).put("direct_ptt",direct).put("url","wss://synthetic.invalid").put("token","synthetic-token").put("name","Douglas").put("can_talk",action=="claim"||action=="tick").put("lease_ms",8000)}}}
             PxVoiceDependencies.create={_,_,event->voiceEvent=event;object:PxVoice{override val mayPublish=true;override suspend fun connect(url:String,token:String){};override suspend fun microphone(enabledNow:Boolean):Boolean{this@Fixture.microphone=enabledNow;if(enabledNow)enabled.incrementAndGet();return true};override fun volumes(muted:Boolean){};override fun close(){this@Fixture.microphone=false}}}
             FriendsDependencies.gateway={_,_->object:FriendsGateway{override fun call(action:String,data:JSONObject)=JSONObject().put("friends",JSONArray())}}
             main{SessionManager(context).saveUser("px-native@example.invalid","synthetic-token",null)}

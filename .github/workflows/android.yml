@@ -82,7 +82,7 @@ jobs:
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
       - name: Fetch private synthetic voice fixture
-        if: github.ref == 'refs/heads/feat/px-radio' && inputs.live_px_qa
+        if: github.ref == 'refs/heads/fix/px-design-and-99' && inputs.live_px_qa
         env:
           PX_API_LEVEL: ${{ matrix.api }}
         run: python .github/scripts/fetch_px_qa.py
