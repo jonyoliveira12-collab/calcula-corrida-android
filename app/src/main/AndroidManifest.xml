@@ -8,6 +8,10 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
@@ -18,6 +22,8 @@
         <activity android:name=".CardStyleActivity" android:theme="@style/CardSettingsTheme" android:exported="false" />
         <activity android:name=".BankResumeActivity" android:exported="false" android:excludeFromRecents="true" android:noHistory="true" />
         <activity android:name=".HelpSupportActivity" android:exported="false" />
+        <activity android:name=".PxActivity" android:exported="false" />
+        <service android:name=".PxService" android:exported="false" android:foregroundServiceType="microphone|mediaPlayback" />
         <activity android:name=".FriendsActivity" android:exported="false" />
         <service android:name=".FriendsService" android:exported="false" android:foregroundServiceType="remoteMessaging|location" />
         <activity android:name=".MainActivity" android:exported="false" />

@@ -23,7 +23,7 @@ object DriverNavigation {
         for((key,icon,title) in listOf(
             Triple("Início","⌂","Início"),
             Triple("Semáforo","◎","Metas"),Triple("Histórico","↶","Histórico"),
-            Triple("Amigos","♧","Amigos"),Triple("Perfil","⚙","Configurações")
+            Triple("Amigos","♧","Amigos"),Triple("PX","◉","PX"),Triple("Perfil","⚙","Configurações")
         )) {
             val active=selected==key
             val cell=LinearLayout(activity).apply {
@@ -31,14 +31,16 @@ object DriverNavigation {
                 isClickable=true;isFocusable=true;isSelected=active;contentDescription=title
                 if(active) background=GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(255,232,139),Color.rgb(239,190,65),Color.rgb(213,151,18))).apply{cornerRadius=dp(16).toFloat()}
                 setOnClickListener {
-                    if(key=="Amigos") {
+                    if(key=="PX") {
+                        if(selected!="PX") activity.startActivity(Intent(activity,PxActivity::class.java))
+                    } else if(key=="Amigos") {
                         if(selected!="Amigos") activity.startActivity(Intent(activity,FriendsActivity::class.java))
                     } else if(onDashboardTab!=null) onDashboardTab(key)
                     else activity.startActivity(Intent(activity,MainActivity::class.java)
                         .putExtra(DESTINATION,key).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
                 }
             }
-            val glyph=when(key){"Início"->"home";"Semáforo"->"target";"Histórico"->"history";"Amigos"->"people";else->"settings"}
+            val glyph=when(key){"Início"->"home";"Semáforo"->"target";"Histórico"->"history";"Amigos"->"people";"PX"->"chat";else->"settings"}
             cell.addView(FriendsGlyph(activity,glyph,if(active)Color.BLACK else colors.gold),LinearLayout.LayoutParams(dp(30),dp(30)))
             cell.addView(TextView(activity).apply{
                 text=title;gravity=Gravity.CENTER;maxLines=1;setTextColor(if(active)Color.BLACK else colors.text)
