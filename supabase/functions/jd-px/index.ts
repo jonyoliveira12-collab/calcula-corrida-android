@@ -5,6 +5,18 @@ const enc=new TextEncoder();
 const b64=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 const url=Deno.env.get('SUPABASE_URL')!,serverKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Only memoize identity already verified by Auth; every action still checks the
+// live auth.sessions row, channel membership and connection lease in Postgres.
+const identities=new Map<string,{id:string,session:string,expires:number}>();
+async function identity(auth:string){
+ const existing=identities.get(auth);if(existing&&existing.expires>Date.now())return existing;
+ identities.delete(auth);
+ let claims;try{claims=JSON.parse(atob(auth.slice(7).split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));}catch{throw Error('authentication');}
+ if(!uuid(claims.sub)||!uuid(claims.session_id)||!Number.isFinite(claims.exp)||claims.exp*1000<=Date.now())throw Error('authentication');
+ const response=await fetch(url+'/auth/v1/user',{headers:{Authorization:auth,apikey:serverKey},signal:AbortSignal.timeout(6000)});if(!response.ok)throw Error('authentication');const user=await response.json();if(user.id!==claims.sub)throw Error('authentication');
+ const value={id:user.id,session:claims.session_id,expires:Math.min(Date.now()+30000,claims.exp*1000)};
+ if(identities.size>=128)identities.delete(identities.keys().next().value!);identities.set(auth,value);return value;
+}
 async function rpc(action:string,user:string|null,session:string|null,data:unknown={}){
  const response=await fetch(url+'/rest/v1/rpc/jd_px',{method:'POST',headers:{Authorization:'Bearer '+serverKey,apikey:serverKey,'Content-Type':'application/json'},body:JSON.stringify({p_action:action,p_user:user,p_session:session,p_data:data}),signal:AbortSignal.timeout(8000)});
  const value=await response.json();if(!response.ok)throw new Error(value.code==='42501'?'access':value.message||'rpc');return value;
@@ -29,13 +41,16 @@ Deno.serve(async(req:Request)=>{
  try{
  if(Number(req.headers.get('content-length')||0)>4096)return json(413,{error:'Pedido muito grande.'});const raw=await req.text();if(raw.length>4096)return json(413,{error:'Pedido muito grande.'});const body=JSON.parse(raw);
  const hook=req.headers.get('X-PX-Hook');if(hook){if(hook.length!==64||!(await rpc('hook_check',null,null,{nonce:hook})).ok)return json(403,{error:'Acesso indisponível.'});const rooms=(await rpc('rooms',null,null)).rooms||[];let failed=0;for(const channel of rooms){try{await locked(channel,()=>reconcile(channel));}catch{failed++;}}return json(failed?503:200,{ok:failed===0});}
- const auth=req.headers.get('Authorization')||'';if(!/^Bearer \S+$/.test(auth))return json(401,{error:'Entre novamente para usar PX.'});const userResponse=await fetch(url+'/auth/v1/user',{headers:{Authorization:auth,apikey:serverKey},signal:AbortSignal.timeout(6000)});if(!userResponse.ok)return json(401,{error:'Entre novamente para usar PX.'});const user=await userResponse.json();let session:string;try{const part=auth.slice(7).split('.')[1].replace(/-/g,'+').replace(/_/g,'/');session=JSON.parse(atob(part)).session_id;}catch{return json(401,{error:'Sessão inválida.'});}if(!uuid(user.id)||!uuid(session))return json(401,{error:'Sessão inválida.'});
+ const auth=req.headers.get('Authorization')||'';if(!/^Bearer \S+$/.test(auth))return json(401,{error:'Entre novamente para usar PX.'});const user=await identity(auth),session=user.session;
  const action=String(body.action||''),valid=['list','private','group','accept','invite','remove','exit','close','connect','tick','claim','release','leave'];if(!valid.includes(action))return json(400,{error:'Ação inválida.'});
  const data={channel:body.channel,peer:body.peer,connection:body.connection,name:body.name,talking:body.talking===true};
  if(['list','private','group'].includes(action))return json(200,await rpc(action,user.id,session,data));
  if(!uuid(data.channel))return json(400,{error:'Canal inválido.'});
+ // Keepalive does not change SFU membership or grant publication. The server
+ // reaper still reconciles expired sessions and floor leases independently.
+ if(action==='tick')return json(200,await rpc(action,user.id,session,data));
  const result=await locked(data.channel,async()=>{const value=await rpc(action,user.id,session,data);await reconcile(data.channel);return value;});
  if(action==='connect'){result.url=config().ws;result.token=await jwt({roomJoin:true,room:'jdpx-'+result.room_key,canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:['microphone']},result.connection,result.display_name);}
  return json(200,result);
- }catch(error){const message=error instanceof Error?error.message:'';if(message==='access')return json(403,{error:'Acesso encerrado. Confira amizade, convite e sessão.'});if(message==='busy')return json(409,{error:'Canal ocupado. Tente novamente.'});console.warn('PX request failed',message);return json(503,{error:'Não foi possível conectar ao rádio. Tente novamente.'});}
+ }catch(error){const message=error instanceof Error?error.message:'';if(message==='authentication')return json(401,{error:'Entre novamente para usar PX.'});if(message==='access')return json(403,{error:'Acesso encerrado. Confira amizade, convite e sessão.'});if(message==='busy')return json(409,{error:'Canal ocupado. Tente novamente.'});console.warn('PX request failed',message);return json(503,{error:'Não foi possível conectar ao rádio. Tente novamente.'});}
 });

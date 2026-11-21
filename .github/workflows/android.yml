@@ -114,8 +114,9 @@ jobs:
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
             adb shell wm size 960x1536
             adb shell wm density 160
-            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
+            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
+            adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews.tar
       - uses: actions/upload-artifact@v4
         if: always()
         with:

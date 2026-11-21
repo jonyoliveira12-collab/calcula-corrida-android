@@ -15,7 +15,7 @@ object IncomingOfferPolicy {
     fun hasNinetyNineOfferMarker(text:String):Boolean {
         val n=java.text.Normalizer.normalize(text,java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{Mn}+"),"").lowercase(java.util.Locale.ROOT)
-        return Regex("""\b99\s*(?:moto|entrega(?:s)?)\b""").containsMatchIn(n) || listOf("nao afeta a ta","tarifa base dinamica","negocia","pgto. no app",
+        return Regex("""\b99\s*(?:pop|plus|comfort|taxi|negocia|moto|entrega(?:s)?)\b""").containsMatchIn(n) || listOf("nao afeta a ta","tarifa base dinamica","negocia","pgto. no app",
             "pgto no app","pagamento no app","cartao verif","perfil essencial","perfil premium").any{n.contains(it)}
     }
 

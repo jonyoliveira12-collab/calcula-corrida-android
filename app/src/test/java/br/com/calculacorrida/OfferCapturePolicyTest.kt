@@ -11,7 +11,7 @@ class OfferCapturePolicyTest {
         assertFalse(OfferCapturePolicy.needsRotationRetry("Você está disponível procurando novas rotas"))
     }
     @Test fun ninetyNineMotoAndDeliveryWithoutTextButtonNeedBothLegs() {
-        for(category in listOf("99Moto","99 Moto","99Entrega")) {
+        for(category in listOf("99Pop","99 Pop","99Plus","99 Comfort","99Taxi","99Negocia","99Moto","99 Moto","99Entrega")) {
             val full="$category R$ 12,00 2 min (1 km) 15 min (6 km)"
             assertTrue(IncomingOfferPolicy.isIncoming("com.app99.driver",full))
             assertNotNull(OfferTextParser.parse(full,"com.app99.driver"))
