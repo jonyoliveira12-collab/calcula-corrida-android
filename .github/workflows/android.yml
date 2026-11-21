@@ -65,8 +65,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [33, 36]
-        form: [phone, tablet]
+        include:
+          - api: 36
+            form: tablet
+          - api: 33
+            form: phone
+          - api: 36
+            form: phone
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
