@@ -16,10 +16,11 @@ async function live(method:string,room:string,body:Record<string,unknown>={}){
  if(response.status===404&&['ListParticipants','DeleteRoom','RemoveParticipant'].includes(method))return {participants:[]};
  if(!response.ok)throw Error('voice-'+method+'-'+response.status);return await response.json();
 }
+const publishes=(person:{permission?:{canPublish?:boolean,can_publish?:boolean}})=>person.permission?.canPublish===true||person.permission?.can_publish===true;
 async function reconcile(channel:string){const state=await rpc('inspect',null,null,{channel}),room='jdpx-'+state.room_key,allowed=new Set((state.connections||[]).map((x:{identity:string})=>x.identity));for(const key of state.retired||[]){await live('DeleteRoom','jdpx-'+key);await rpc('retired_done',null,null,{channel,room_key:key});}const people=(await live('ListParticipants',room)).participants||[];
  // Revoke everyone else before granting a new speaker: no overlapping transmitters.
- for(const person of people){if(!allowed.has(person.identity)){await live('RemoveParticipant',room,{identity:person.identity});continue;}if(person.identity!==state.speaker&&person.permission?.canPublish)await live('UpdateParticipant',room,{identity:person.identity,permission:{canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:[2]}});}
- const speaker=people.find((p:{identity:string})=>p.identity===state.speaker&&allowed.has(p.identity));if(speaker&&!speaker.permission?.canPublish)await live('UpdateParticipant',room,{identity:speaker.identity,permission:{canSubscribe:true,canPublish:true,canPublishData:false,canPublishSources:[2]}});
+ for(const person of people){if(!allowed.has(person.identity)){await live('RemoveParticipant',room,{identity:person.identity});continue;}if(person.identity!==state.speaker&&publishes(person))await live('UpdateParticipant',room,{identity:person.identity,permission:{canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:[2]}});}
+ const speaker=people.find((p:{identity:string})=>p.identity===state.speaker&&allowed.has(p.identity));if(speaker&&!publishes(speaker))await live('UpdateParticipant',room,{identity:speaker.identity,permission:{canSubscribe:true,canPublish:true,canPublishData:false,canPublishSources:[2]}});
  if(!people.length&&!state.connections.length)await rpc('settled',null,null,{channel});
 }
 async function locked<T>(channel:string,work:()=>Promise<T>):Promise<T>{const lock=crypto.randomUUID();let acquired=false;for(let i=0;i<5;i++){if((await rpc('lock',null,null,{channel,lock})).ok){acquired=true;break;}await new Promise(r=>setTimeout(r,100));}if(!acquired)throw Error('busy');try{return await work();}finally{await rpc('unlock',null,null,{channel,lock}).catch(()=>{});}}
