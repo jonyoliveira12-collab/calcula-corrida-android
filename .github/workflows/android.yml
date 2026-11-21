@@ -51,6 +51,9 @@ jobs:
           retention-days: 14
 
   device-check:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     needs: test
     strategy:
@@ -72,6 +75,11 @@ jobs:
           if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" ]]; then
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
+      - name: Fetch private synthetic voice fixture
+        if: github.ref == 'refs/heads/feat/px-radio'
+        env:
+          PX_API_LEVEL: ${{ matrix.api }}
+        run: python .github/scripts/fetch_px_qa.py
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -94,11 +102,21 @@ jobs:
             adb install -r reader-fixture/build/outputs/apk/ninetynine/debug/reader-fixture-ninetynine-debug.apk
             adb install -r reader-fixture/build/outputs/apk/indrive/debug/reader-fixture-indrive-debug.apk
             adb install -r reader-fixture/build/outputs/apk/ifood/debug/reader-fixture-ifood-debug.apk
-            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            if [[ -f "$RUNNER_TEMP/px-qa.json" ]]; then
+              adb shell run-as br.com.calculacorrida.avaliacao051 mkdir -p files
+              adb exec-in run-as br.com.calculacorrida.avaliacao051 sh -c 'cat > files/px-qa.json' < "$RUNNER_TEMP/px-qa.json"
+              rm "$RUNNER_TEMP/px-qa.json"
+            fi
+            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews.tar
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
             adb shell wm size 960x1536
             adb shell wm density 160
+            if [[ -f "$RUNNER_TEMP/px-qa.json" ]]; then
+              adb shell run-as br.com.calculacorrida.avaliacao051 mkdir -p files
+              adb exec-in run-as br.com.calculacorrida.avaliacao051 sh -c 'cat > files/px-qa.json' < "$RUNNER_TEMP/px-qa.json"
+              rm "$RUNNER_TEMP/px-qa.json"
+            fi
             adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
             grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
       - uses: actions/upload-artifact@v4

@@ -12,9 +12,9 @@ async function rpc(action:string,user:string|null,session:string|null,data:unkno
 function config(){const ws=(Deno.env.get('LIVEKIT_URL')||'').trim(),key=(Deno.env.get('LIVEKIT_API_KEY')||'').trim(),secret=(Deno.env.get('LIVEKIT_API_SECRET')||'').trim();const host=new URL(ws);if(!key||!secret||host.protocol!=='wss:'||!host.hostname.endsWith('.livekit.cloud'))throw Error('config');return{ws,http:'https://'+host.host,key,secret};}
 async function jwt(grant:Record<string,unknown>,identity?:string,name?:string){const cfg=config(),now=Math.floor(Date.now()/1000),part=(v:unknown)=>b64(enc.encode(JSON.stringify(v)));const value=part({alg:'HS256',typ:'JWT'})+'.'+part({iss:cfg.key,nbf:now-5,exp:now+90,...(identity?{sub:identity,name}:{}),video:grant});const key=await crypto.subtle.importKey('raw',enc.encode(cfg.secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return value+'.'+b64(new Uint8Array(await crypto.subtle.sign('HMAC',key,enc.encode(value))));}
 async function live(method:string,room:string,body:Record<string,unknown>={}){
- const token=await jwt({roomAdmin:true,room});const response=await fetch(config().http+'/twirp/livekit.RoomService/'+method,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({room,...body}),signal:AbortSignal.timeout(5000)});
+ const token=await jwt(method==='DeleteRoom'?{roomCreate:true}:{roomAdmin:true,room});const response=await fetch(config().http+'/twirp/livekit.RoomService/'+method,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({room,...body}),signal:AbortSignal.timeout(5000)});
  if(response.status===404&&['ListParticipants','DeleteRoom','RemoveParticipant'].includes(method))return {participants:[]};
- if(!response.ok)throw Error('voice-server');return await response.json();
+ if(!response.ok)throw Error('voice-'+method+'-'+response.status);return await response.json();
 }
 async function reconcile(channel:string){const state=await rpc('inspect',null,null,{channel}),room='jdpx-'+state.room_key,allowed=new Set((state.connections||[]).map((x:{identity:string})=>x.identity));for(const key of state.retired||[]){await live('DeleteRoom','jdpx-'+key);await rpc('retired_done',null,null,{channel,room_key:key});}const people=(await live('ListParticipants',room)).participants||[];
  // Revoke everyone else before granting a new speaker: no overlapping transmitters.
@@ -36,5 +36,5 @@ Deno.serve(async(req:Request)=>{
  const result=await locked(data.channel,async()=>{const value=await rpc(action,user.id,session,data);await reconcile(data.channel);return value;});
  if(action==='connect'){result.url=config().ws;result.token=await jwt({roomJoin:true,room:'jdpx-'+result.room_key,canSubscribe:true,canPublish:false,canPublishData:false,canPublishSources:['microphone']},result.connection,result.display_name);}
  return json(200,result);
- }catch(error){const message=error instanceof Error?error.message:'';if(message==='access')return json(403,{error:'Acesso encerrado. Confira amizade, convite e sessão.'});if(message==='busy')return json(409,{error:'Canal ocupado. Tente novamente.'});console.warn('PX request failed',message==='voice-server'?'voice-server':'request');return json(503,{error:'Não foi possível conectar ao rádio. Tente novamente.'});}
+ }catch(error){const message=error instanceof Error?error.message:'';if(message==='access')return json(403,{error:'Acesso encerrado. Confira amizade, convite e sessão.'});if(message==='busy')return json(409,{error:'Canal ocupado. Tente novamente.'});console.warn('PX request failed',message);return json(503,{error:'Não foi possível conectar ao rádio. Tente novamente.'});}
 });
