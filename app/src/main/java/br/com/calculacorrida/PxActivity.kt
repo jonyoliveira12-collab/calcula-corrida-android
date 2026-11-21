@@ -38,6 +38,7 @@ class PxActivity:AppCompatActivity(){
     private lateinit var privateTab:Button
     private lateinit var groupTab:Button
     private var renderedChannel=""
+    private var soundPreview:PxSounds?=null
     private lateinit var client:PxGateway
     private var channels=listOf<JSONObject>()
     private var friends=listOf<JSONObject>()
@@ -82,7 +83,8 @@ class PxActivity:AppCompatActivity(){
         }}
         work{reload()}
     }
-    private fun viewOptions(){val labels=arrayOf("Bolinha fora do aplicativo","Atualizar canais","Desligar PX");AlertDialog.Builder(this).setTitle("Opções do PX").setItems(labels){_,which->when(which){0->startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")));1->work{reload()};2->if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(PxService.STOP))}}.setNegativeButton("Fechar",null).show()}
+    private fun viewOptions(){val labels=arrayOf("Som do rádio PX","Bolinha fora do aplicativo","Atualizar canais","Desligar PX");AlertDialog.Builder(this).setTitle("Opções do PX").setItems(labels){_,which->when(which){0->chooseSound();1->startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")));2->work{reload()};3->if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(PxService.STOP))}}.setNegativeButton("Fechar",null).show()}
+    private fun chooseSound(){val keys=listOf("traditional","digital","off");val prefs=getSharedPreferences("px_audio",MODE_PRIVATE);val selected=keys.indexOf(prefs.getString("sound","traditional")?:"traditional").coerceAtLeast(0);AlertDialog.Builder(this).setTitle("Som do rádio PX").setSingleChoiceItems(arrayOf("PX tradicional • clique e chiado","Rádio digital • toque duplo","Silencioso"),selected){dialog,index->prefs.edit().putString("sound",keys[index]).apply();soundPreview?.close();soundPreview=if(index==2)null else PxSounds(this).also{it.previewWhenReady()};dialog.dismiss()}.setNegativeButton("Cancelar",null).show()}
     private fun work(block:()->Unit){if(busy)return;busy=true;scope.launch{try{withContext(Dispatchers.IO){block()}}catch(error:Exception){Toast.makeText(this@PxActivity,error.message?:"Não foi possível conectar.",Toast.LENGTH_LONG).show()}finally{busy=false;if(!isFinishing)drawChannels()}}}
     private fun reload(){val data=client.call("list").optJSONArray("channels");channels=if(data==null)emptyList()else(0 until data.length()).map{data.getJSONObject(it)};val list=FriendsDependencies.gateway(this,null).call("snapshot").optJSONArray("friends");friends=if(list==null)emptyList()else(0 until list.length()).map{list.getJSONObject(it)}.filter{it.optString("state")=="accepted"}}
     private fun chooseFriend(action:(JSONObject)->Unit){if(friends.isEmpty()){Toast.makeText(this,"Adicione um amigo na aba Amigos e aguarde o aceite.",Toast.LENGTH_LONG).show();return};AlertDialog.Builder(this).setTitle("Escolha um amigo").setItems(friends.map{it.optString("name","Motorista")}.toTypedArray()){_,i->action(friends[i])}.setNegativeButton("Cancelar",null).show()}
@@ -106,5 +108,5 @@ class PxActivity:AppCompatActivity(){
     override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,results:IntArray){super.onRequestPermissionsResult(requestCode,permissions,results);if(requestCode==901){val channel=pending;pending=null;if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&channel!=null)enter(channel)else Toast.makeText(this,"Permita microfone e notificações para entrar no rádio.",Toast.LENGTH_LONG).show()}}
     override fun onResume(){super.onResume();PxService.setUiVisible(true)}
     override fun onPause(){PxService.release();PxService.setUiVisible(false);super.onPause()}
-    override fun onDestroy(){scope.cancel();super.onDestroy()}
+    override fun onDestroy(){soundPreview?.close();soundPreview=null;scope.cancel();super.onDestroy()}
 }

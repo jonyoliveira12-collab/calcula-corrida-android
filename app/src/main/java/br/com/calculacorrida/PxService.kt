@@ -36,6 +36,7 @@ class PxService:Service() {
     private val wire=Mutex()
     private lateinit var client:PxGateway
     private var room:PxVoice?=null
+    private var radioSounds:PxSounds?=null
     private var connection=""
     private var activeChannel=""
     private var held=false
@@ -57,7 +58,7 @@ class PxService:Service() {
         else if(privacy){releaseTalk();removeBubble()}
     }
     private val receiver=object:BroadcastReceiver(){override fun onReceive(context:Context,intent:Intent){if(intent.action==Intent.ACTION_SCREEN_OFF)shutdown("PX desligado com a tela.");if(intent.action==android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)releaseTalk()}}
-    override fun onCreate(){super.onCreate();window=getSystemService(WINDOW_SERVICE)as WindowManager;client=PxDependencies.gateway(this);getSharedPreferences("user_session",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(prefsListener);getSharedPreferences("settings",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(prefsListener);ContextCompat.registerReceiver(this,receiver,IntentFilter().apply{addAction(Intent.ACTION_SCREEN_OFF);addAction(android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)},ContextCompat.RECEIVER_NOT_EXPORTED)}
+    override fun onCreate(){super.onCreate();radioSounds=runCatching{PxSounds(this)}.getOrNull();window=getSystemService(WINDOW_SERVICE)as WindowManager;client=PxDependencies.gateway(this);getSharedPreferences("user_session",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(prefsListener);getSharedPreferences("settings",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(prefsListener);ContextCompat.registerReceiver(this,receiver,IntentFilter().apply{addAction(Intent.ACTION_SCREEN_OFF);addAction(android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)},ContextCompat.RECEIVER_NOT_EXPORTED)}
     override fun onBind(intent:Intent?)=null
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         when(intent?.action){
@@ -95,7 +96,7 @@ class PxService:Service() {
             launch{while(isActive&&!stopping){delay(100);if(state.value.talking&&(SystemClock.elapsedRealtime()>=deadline||SystemClock.elapsedRealtime()-started>=29000||privacy||room?.mayPublish!=true))releaseTalk();if(!client.currentAccount())shutdown("Sua sessão mudou.");if(directVoice&&SystemClock.elapsedRealtime()>=connectedUntil)shutdown("A conexão expirou. Entre novamente no PX.");if(uiVisible||privacy||!Settings.canDrawOverlays(this@PxService))removeBubble()else showBubble()}}
         }catch(error:Exception){if(!stopping)shutdown(error.message?:"Não foi possível entrar no rádio.")}
     }}
-    fun pressTalk(){if(held||stopping||!state.value.connected||privacy)return;held=true;val generation=++talkGeneration;requesting=true;state.value=state.value.copy(requesting=true,status="Preparando sua fala…");paintBubble();talkJob=scope.launch{
+    fun pressTalk(){if(held||stopping||!state.value.connected||privacy)return;held=true;val generation=++talkGeneration;radioSounds?.opening();requesting=true;state.value=state.value.copy(requesting=true,status="Preparando sua fala…");paintBubble();talkJob=scope.launch{
         try{val answer=if(directVoice)JSONObject().put("can_talk",SystemClock.elapsedRealtime()<connectedUntil)else request("claim");if(!held||stopping||!client.currentAccount())return@launch
             if(!answer.optBoolean("can_talk")){held=false;state.value=state.value.copy(status="Canal ocupado. Aguarde a outra pessoa terminar.");return@launch}
             val voice=room?:return@launch
@@ -107,7 +108,7 @@ class PxService:Service() {
             state.value=state.value.copy(talking=true,status="Transmitindo • solte para parar");notice();paintBubble()
         }catch(error:Exception){if(error is CancellationException)throw error;held=false;state.value=state.value.copy(status=error.message?:"Não foi possível falar.");scope.launch{room?.microphone(false)}}finally{if(talkGeneration==generation){requesting=false;state.value=state.value.copy(requesting=false);paintBubble()}}
     }}
-    fun releaseTalk(){talkGeneration++;held=false;talkJob?.cancel();talkJob=null;requesting=false;deadline=0;val was=state.value.talking;state.value=state.value.copy(talking=false,requesting=false,status=if(state.value.connected)"Conectado • segure para falar"else state.value.status);scope.launch{try{room?.microphone(false)}catch(_:Exception){};if(!stopping&&!directVoice)runCatching{request("release")}};if(was){notice();paintBubble()}}
+    fun releaseTalk(){val ended=held||state.value.talking;talkGeneration++;held=false;talkJob?.cancel();talkJob=null;requesting=false;deadline=0;val was=state.value.talking;state.value=state.value.copy(talking=false,requesting=false,status=if(state.value.connected)"Conectado • segure para falar"else state.value.status);scope.launch{try{room?.microphone(false)}catch(_:Exception){};if(ended&&!stopping)radioSounds?.closing();if(!stopping&&!directVoice)runCatching{request("release")}};if(was){notice();paintBubble()}}
     private fun applyVolumes(){room?.volumes(state.value.muted)}
     private fun foreground(){val manager=getSystemService(NOTIFICATION_SERVICE)as NotificationManager;manager.createNotificationChannel(NotificationChannel(CHANNEL,"Rádio PX",NotificationManager.IMPORTANCE_LOW));val notification=notification();if(Build.VERSION.SDK_INT>=29)startForeground(NOTICE,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)else startForeground(NOTICE,notification)}
     private fun notification():Notification {val open=PendingIntent.getActivity(this,0,Intent(this,PxActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE);fun action(value:String,code:Int)=PendingIntent.getService(this,code,Intent(this,PxService::class.java).setAction(value),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -127,7 +128,7 @@ class PxService:Service() {
     private fun shutdown(message:String){if(stopping)return;stopping=true;held=false;state.value=State(status=message);removeBubble();room?.close();room=null;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
     override fun onTaskRemoved(rootIntent:Intent?){shutdown("PX desligado ao fechar o aplicativo.")}
     override fun onConfigurationChanged(config:android.content.res.Configuration){super.onConfigurationChanged(config);releaseTalk();removeBubble();showBubble()}
-    override fun onDestroy(){stopping=true;held=false;removeBubble();room?.close();room=null;scope.cancel();getSharedPreferences("user_session",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(prefsListener);getSharedPreferences("settings",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(prefsListener);runCatching{unregisterReceiver(receiver)};val channel=activeChannel;val conn=connection;state.value=State(status=state.value.status);if(channel.isNotBlank()&&conn.isNotBlank())Thread{runCatching{client.call("leave",JSONObject().put("channel",channel).put("connection",conn))}}.start();super.onDestroy();instance=null}
+    override fun onDestroy(){radioSounds?.close();radioSounds=null;stopping=true;held=false;removeBubble();room?.close();room=null;scope.cancel();getSharedPreferences("user_session",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(prefsListener);getSharedPreferences("settings",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(prefsListener);runCatching{unregisterReceiver(receiver)};val channel=activeChannel;val conn=connection;state.value=State(status=state.value.status);if(channel.isNotBlank()&&conn.isNotBlank())Thread{runCatching{client.call("leave",JSONObject().put("channel",channel).put("connection",conn))}}.start();super.onDestroy();instance=null}
     companion object{
         const val JOIN="br.com.calculacorrida.PX_JOIN";const val STOP="br.com.calculacorrida.PX_STOP";const val MUTE="br.com.calculacorrida.PX_MUTE";private const val CHANNEL="jd_px_voice";private const val NOTICE=904
         private val state=MutableStateFlow(State());val status=state.asStateFlow()
