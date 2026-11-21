@@ -84,7 +84,17 @@ class AudioMessageTest {
                     return files[path] ?: error("Unknown private test file")
                 }
             }}
+            shell("wm user-rotation lock 0")
             shell("wm size 1280x800");shell("wm density 160")
+            // Wait for the actual surface/configuration to settle before keeping
+            // an Activity reference; Pixel phone profiles otherwise recreate it.
+            await {
+                val image=inst.uiAutomation.takeScreenshot()
+                val ready=image!=null && image.width==1280 && image.height==800
+                image?.recycle()
+                ready
+            }
+            inst.waitForIdleSync()
             shell("pm grant ${context.packageName} ${Manifest.permission.RECORD_AUDIO}")
             AppAppearance.setTheme(context,"gray")
             SessionManager(context).saveUser("audio-flow@example.invalid","synthetic-token",null)
@@ -95,14 +105,14 @@ class AudioMessageTest {
         fun views(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{views(v.getChildAt(it))}else emptyList()
         fun labels()=views(activity.window.decorView).filterIsInstance<TextView>()
         fun has(prefix:String):Boolean {var found=false;inst.runOnMainSync{found=labels().any{it.text.toString().startsWith(prefix) && it.isShown}};return found}
-        fun click(prefix:String,last:Boolean=false) {inst.runOnMainSync{val items=labels().filterIsInstance<Button>().filter{it.isShown && it.isEnabled && it.text.toString().startsWith(prefix)}; (if(last)items.last() else items.first()).performClick()};inst.waitForIdleSync()}
+        fun click(prefix:String,last:Boolean=false) {await{var ready=false;inst.runOnMainSync{ready=labels().filterIsInstance<Button>().any{it.isShown && it.isEnabled && it.text.toString().startsWith(prefix)}};ready};inst.runOnMainSync{val items=labels().filterIsInstance<Button>().filter{it.isShown && it.isEnabled && it.text.toString().startsWith(prefix)}; (if(last)items.last() else items.first()).performClick()};inst.waitForIdleSync()}
         fun await(condition:()->Boolean) {val end=SystemClock.elapsedRealtime()+12000;while(!condition() && SystemClock.elapsedRealtime()<end)Thread.sleep(80);assertTrue("Audio flow reaches the expected state",condition())}
         @Suppress("UNCHECKED_CAST") fun <T> field(name:String):T? {var result:Any?=null;inst.runOnMainSync{result=FriendsActivity::class.java.getDeclaredField(name).apply{isAccessible=true}.get(activity)};return result as T?}
         fun playing():Boolean {var value=false;inst.runOnMainSync{val player=FriendsActivity::class.java.getDeclaredField("player").apply{isAccessible=true}.get(activity) as? MediaPlayer;value=runCatching{player?.isPlaying==true && player.currentPosition>100}.getOrDefault(false)};return value}
         fun screen(name:String){inst.waitForIdleSync();val image=inst.uiAutomation.takeScreenshot()!!;val folder=File(context.filesDir,"screenshots").apply{mkdirs()};File(folder,name).outputStream().use{image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};image.recycle()}
         fun close() {
             if(::activity.isInitialized)inst.runOnMainSync{activity.finish()}
-            inst.waitForIdleSync();shell("wm size reset");shell("wm density reset")
+            inst.waitForIdleSync();shell("wm size reset");shell("wm density reset");shell("wm user-rotation free")
             FriendsDependencies.gateway=oldGateway;FriendMediaDependencies.create=oldMedia;AppAppearance.setTheme(context,oldTheme)
             val edit=session.edit().clear();for((key,value)in saved)when(value){is String->edit.putString(key,value);is Boolean->edit.putBoolean(key,value);is Long->edit.putLong(key,value);is Int->edit.putInt(key,value);is Float->edit.putFloat(key,value)};edit.commit()
         }
