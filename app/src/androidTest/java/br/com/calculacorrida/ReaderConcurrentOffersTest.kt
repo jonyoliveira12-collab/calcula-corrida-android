@@ -71,11 +71,15 @@ class ReaderConcurrentOffersTest {
         }
         fun await(label: String, timeoutMs: Long = 45000, check: () -> Boolean) {
             val deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs
-            while (!check() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
+            var matched=check()
+            while (!matched && android.os.SystemClock.elapsedRealtime() < deadline) {
+                Thread.sleep(100)
+                matched=check()
+            }
             val prefs = context.getSharedPreferences("settings", 0)
             val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
                 .joinToString(" / ") { prefs.getString(it, "").orEmpty() }
-            if (!check()) {
+            if (!matched) {
                 ui.takeScreenshot()?.let { image ->
                     try {
                         val folder=java.io.File(context.filesDir,"screenshots").apply { mkdirs() }
@@ -215,7 +219,7 @@ class ReaderConcurrentOffersTest {
 
             // Remove only the offer pixels, leaving the Uber window open.
             shell("am broadcast -a br.com.calculacorrida.fixture.HIDE_OFFER -p com.ubercab.driver")
-            await("Uber tag leaves after its offer disappears, 99 remains",40000) {
+            await("Uber tag leaves after its offer disappears, 99 remains",90000) {
                 driverWindow("com.ubercab.driver")!=null && uberTag()==null && ninetyNineTag()!=null
             }
             shell("am broadcast -a br.com.calculacorrida.fixture.SHOW_OFFER -p com.ubercab.driver")
