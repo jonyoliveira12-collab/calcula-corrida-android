@@ -38,6 +38,11 @@ class OfferCaptureSafetyTest {
         assertFalse(OfferCaptureSafety.allows(full,listOf(full)+bars,"reader",emptySet()))
         assertTrue(OfferCaptureSafety.allows(full.copy(area=CaptureArea(300,24,600,960)),listOf(full)+bars,"reader",emptySet()))
     }
+    @Test fun anotherDisplaysCoordinatesCannotAuthorizeACapture() {
+        val external=target.copy(display=1)
+        assertFalse(OfferCaptureSafety.allows(external,listOf(external),"reader",emptySet()))
+        assertTrue(allowed(CaptureSurface(20,"private.chat",owned,5,3,1)))
+    }
     @Test fun emptyWindowsCannotOccludeAnOffer() {
         assertTrue(allowed(CaptureSurface(20,null,CaptureArea(400,300,400,500),5,3)))
     }

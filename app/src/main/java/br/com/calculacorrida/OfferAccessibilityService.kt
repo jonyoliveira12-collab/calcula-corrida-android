@@ -63,6 +63,11 @@ class OfferAccessibilityService : AccessibilityService() {
     private data class DriverFrame(val id:Int,val bounds:Rect,val text:String,val fareBounds:Rect?,val score:Long,val layer:Int=0)
     @Volatile private var captureSurfaces:List<CaptureSurface> = emptyList()
     private val displayFallbackUntil=mutableMapOf<Pair<String,Int>,Long>()
+    private val captureWindowManager:WindowManager by lazy {
+        val display=(getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
+        val uiContext=if(Build.VERSION.SDK_INT>=30)createDisplayContext(display).createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,null) else this
+        uiContext.getSystemService(WINDOW_SERVICE) as WindowManager
+    }
     private fun captureArea(bounds:Rect)=CaptureArea(bounds.left,bounds.top,bounds.right,bounds.bottom)
     private val windowExecutor=Executors.newSingleThreadExecutor()
     private val windowRefreshPending=java.util.concurrent.atomic.AtomicBoolean(false)
@@ -372,7 +377,7 @@ class OfferAccessibilityService : AccessibilityService() {
                         val root=window.root
                         val owner=try{root?.packageName?.toString()}finally{root?.recycle()}
                         val area=Rect().also{window.getBoundsInScreen(it)}
-                        CaptureSurface(window.id,owner,captureArea(area),window.layer,window.type)
+                        CaptureSurface(window.id,owner,captureArea(area),window.layer,window.type,if(Build.VERSION.SDK_INT>=30)window.displayId else Display.DEFAULT_DISPLAY)
                     }
                     captureSurfaces=surfaces
                     val windowPackages = currentWindows.mapNotNull { window ->
@@ -588,7 +593,7 @@ class OfferAccessibilityService : AccessibilityService() {
             val number=++attempt
             if(display) {
                 displayRegion=runCatching {
-                    val metrics=(getSystemService(WINDOW_SERVICE) as WindowManager).currentWindowMetrics
+                    val metrics=captureWindowManager.currentWindowMetrics
                     val insets=metrics.windowInsets.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
                     val safe=Rect(metrics.bounds).apply{left+=insets.left;top+=insets.top;right-=insets.right;bottom-=insets.bottom}
                     Rect(bounds).takeIf{it.intersect(safe)}
