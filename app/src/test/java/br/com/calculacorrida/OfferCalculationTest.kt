@@ -4,6 +4,32 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OfferCalculationTest {
+    @Test fun uberPriorityDoesNotTurnSevenKilometersIntoSeventy() {
+        val text="""Priority Exclusivo
+R$ 19,09
+10 min • 7.0 km • Est. de R$2,73/km
+★ 4,87 (114) Verificado
++R$ 4,00 incluído
++R$ 1,79 incluída para retirada
+1 min (0.1 km)
+Rua de embarque
+9 minutos (6.9 km)
+Rua de destino
+Aceitar"""
+        for(header in listOf("7.0 km","70 km")) {
+            val raw=text.replace("7.0 km",header)
+            val offer=OfferTextParser.parse(raw,"com.ubercab.driver")!!
+            assertEquals(19.09,offer.fare,.00001);assertEquals(7.0,offer.pickupKm+offer.tripKm,.00001);assertEquals("4.87",offer.passengerRating)
+            val result=TripCalculator.calculate(offer.fare,offer.pickupKm,offer.tripKm,offer.minutes)!!
+            assertEquals(19.09/7,result.perKm,.00001);assertEquals(114.54,result.perHour,.00001)
+        }
+        val partial=text.substringBefore("1 min")+"1 min (0.1 km)\nAceitar"
+        val repaired=OfferTextParser.parse(partial.replace("7.0 km","70 km").replace("4,87","487"),"com.ubercab.driver")!!
+        assertEquals(7.0,repaired.pickupKm+repaired.tripKm,.00001);assertEquals("4.87",repaired.passengerRating)
+        assertNull(OfferTextParser.parse(text.replace("7.0 km","71 km"),"com.ubercab.driver"))
+        assertNull(OfferTextParser.parse(text.replace("7.0 km","70.0 km"),"com.ubercab.driver"))
+        assertNull(OfferTextParser.parse(text.replace("R$2,73/km","R$4,00/km"),"com.ubercab.driver"))
+    }
     @Test fun decimalThresholdMatchesTheValueShownInSettings() {
         assertEquals(4.90,TripCalculator.threshold(4.90f),0.0)
         assertEquals(1.80,TripCalculator.threshold(1.80f),0.0)

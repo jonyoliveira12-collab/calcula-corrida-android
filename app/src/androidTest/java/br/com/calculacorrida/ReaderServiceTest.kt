@@ -63,6 +63,7 @@ class ReaderServiceTest {
             }
             awaitNetwork(false)
             await(false)
+            repeat(50){if(context.getSharedPreferences("settings",0).getString("reader_status","")!!.contains("Sem internet"))return@repeat;Thread.sleep(100)}
             assertTrue(context.getSharedPreferences("settings",0).getString("reader_status","")!!.contains("Sem internet"))
             restoreNetwork()
             awaitNetwork(true)
@@ -122,6 +123,7 @@ class ReaderServiceTest {
             shell("settings put secure accessibility_enabled 1")
             activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
             await("CC starts") { hasCc() }
+            await("Settings navigation rendered") {var ready=false;instrumentation.runOnMainSync{ready=findText(activity!!.window.decorView,"Configurações")!=null};ready}
             instrumentation.runOnMainSync {
                 // Open the bank control after Android connects the service.
                 (findText(activity!!.window.decorView, "Configurações")!!.parent as View).performClick()

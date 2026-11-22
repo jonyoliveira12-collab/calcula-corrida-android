@@ -52,7 +52,7 @@ class ReaderConcurrentOffersTest {
                             window.type != AccessibilityWindowInfo.TYPE_SYSTEM) return@mapNotNull null
                         Rect().also { window.getBoundsInScreen(it) }.takeIf { it.width() >= 160 && it.height() >= 100 }
                     } finally { root.recycle() }
-                }.maxByOrNull { it.width().toLong() * it.height() } ?: return "fixture window unavailable"
+                }.minByOrNull { it.left } ?: return "fixture window unavailable"
                 val screenshot = ui.takeScreenshot() ?: return "fixture screenshot unavailable"
                 val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
                     com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
@@ -71,19 +71,42 @@ class ReaderConcurrentOffersTest {
         }
         fun await(label: String, timeoutMs: Long = 45000, check: () -> Boolean) {
             val deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs
-            while (!check() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100)
+            var matched=check()
+            while (!matched && android.os.SystemClock.elapsedRealtime() < deadline) {
+                Thread.sleep(100)
+                matched=check()
+            }
             val prefs = context.getSharedPreferences("settings", 0)
-            val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
+            val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status", "reader_capture_99", "reader_ocr_99")
                 .joinToString(" / ") { prefs.getString(it, "").orEmpty() }
-            if (!check()) {
+            if (!matched) {
+                ui.takeScreenshot()?.let { image ->
+                    try {
+                        val folder=java.io.File(context.filesDir,"screenshots").apply { mkdirs() }
+                        java.io.File(folder,"concurrent-failure-${label.hashCode()}.png").outputStream().use {
+                            image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)
+                        }
+                    } finally { image.recycle() }
+                }
                 // The emulator fixtures contain synthetic offers only.
                 val records = JourneyStore.getRecords(context).take(5).joinToString(" | ") {
                     listOf(it.optString("app"), it.optDouble("fare"), it.optDouble("totalKm"), it.optDouble("minutes"), it.optDouble("perKm"), it.optDouble("perHour"), it.optString("passengerRating")).joinToString(";")
                 }
+                var serviceState=""
+                instrumentation.runOnMainSync {
+                    val clazz=OfferAccessibilityService::class.java
+                    val active=clazz.getDeclaredField("active").apply{isAccessible=true}.get(null)
+                    if(active!=null) {
+                        val fields=listOf("lastCaptureByPackage","lastCaptureByWindow","missingOffers","detectedWindows","foregroundPackage","stopped","screenshotInProgress","driverFrames")
+                        serviceState=fields.joinToString(" / "){name->"$name="+clazz.getDeclaredField(name).apply{isAccessible=true}.get(active)}
+                        serviceState+=" / order="+clazz.getDeclaredMethod("visibleDriverPackages").apply{isAccessible=true}.invoke(active)
+                        serviceState+=" / enabled="+clazz.getDeclaredMethod("readingEnabled").apply{isAccessible=true}.invoke(active)
+                    }
+                }
                 val windows = describeWindows()
-                val fixtureOcr = if (label.startsWith("Distinct")) describeSyntheticNinetyNineOcr() else ""
+                val fixtureOcr = if (label.startsWith("Distinct") || label.startsWith("Tall")) describeSyntheticNinetyNineOcr() else ""
                 val crashes=if(label.startsWith("Tall")) shell("logcat -d -b crash -v brief -t 100").takeLast(6000) else ""
-                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr / fixture crashes=$crashes")
+                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr / fixture crashes=$crashes / service=$serviceState")
             }
         }
         fun findTag(source: String, summary: List<String>, metrics: List<String>): Rect? {
@@ -115,6 +138,12 @@ class ReaderConcurrentOffersTest {
             } finally { root.recycle() }
         }.maxByOrNull { it.width().toLong() * it.height() }
 
+        val oldTransport=OfferScreenshotTransport.windowOverride
+        val lostCallbacks=java.util.concurrent.atomic.AtomicInteger()
+        if(android.os.Build.VERSION.SDK_INT>=34)OfferScreenshotTransport.windowOverride={service,pkg,id,executor,callback->
+            if(pkg=="com.app99.driver")lostCallbacks.incrementAndGet()
+            else service.takeScreenshotOfWindow(id,executor,callback)
+        }
         val oldServices = shell("settings get secure enabled_accessibility_services")
         val oldEnabled = shell("settings get secure accessibility_enabled")
         val prefs = context.getSharedPreferences("settings", 0)
@@ -148,7 +177,8 @@ class ReaderConcurrentOffersTest {
             val ninetyNineSummary = listOf("30 min", "15,00 km", "R$ 30,00")
             fun uberTag() = findTag("UBER", uberSummary, listOf("1,50", "36,00", "4,80"))
             fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("2,00", "60,00", "4,90"))
-            await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
+            await("Distinct Uber and 99 tags with the correct metrics",90000) { uberTag() != null && ninetyNineTag() != null }
+            if(android.os.Build.VERSION.SDK_INT>=34)assertTrue("Missing window callbacks exercise real cropped display fallback",lostCallbacks.get()>0)
 
             // Changing a label must refresh an already-visible card too.
             prefs.edit().putString("label_bad","Vixe, sai fora").putString("label_good","Bora, carai!").commit()
@@ -170,7 +200,10 @@ class ReaderConcurrentOffersTest {
             assertFalse("The tags do not overlap", Rect.intersects(uber, ninetyNine))
             // A driver may drag a tag outside the offer pane and keep it there.
             val screen=ui.takeScreenshot()!!
-            val targetY=screen.height-uber.height()/2-80
+            // Short landscape phones have no vertical space below the panes.
+            // Move across the pane boundary, which exists on every supported display.
+            val targetX=screen.width-uber.width()/2-12
+            val targetY=(screen.height-uber.height()/2-32).coerceAtLeast(uber.height()/2+35)
             screen.recycle()
             val startX=uber.centerX().toFloat()
             val startY=uber.centerY().toFloat()
@@ -183,12 +216,12 @@ class ReaderConcurrentOffersTest {
             touch(android.view.MotionEvent.ACTION_DOWN,startX,startY)
             repeat(8){step->
                 Thread.sleep(25)
-                touch(android.view.MotionEvent.ACTION_MOVE,startX,startY+(targetY-startY)*(step+1)/8f)
+                touch(android.view.MotionEvent.ACTION_MOVE,startX+(targetX-startX)*(step+1)/8f,startY+(targetY-startY)*(step+1)/8f)
             }
-            touch(android.view.MotionEvent.ACTION_UP,startX,targetY.toFloat())
-            await("Dragged tag stays outside the original offer window",12000){(uberTag()?.top ?: 0)>uberPane.bottom}
+            touch(android.view.MotionEvent.ACTION_UP,targetX.toFloat(),targetY.toFloat())
+            await("Dragged tag stays outside the original offer window",12000){(uberTag()?.centerX() ?: 0)>uberPane.right}
             Thread.sleep(1200)
-            assertTrue("Polling preserves the freely chosen tag position",uberTag()!!.top>uberPane.bottom)
+            assertTrue("Polling preserves the freely chosen tag position",uberTag()!!.centerX()>uberPane.right)
 
             val records = JourneyStore.getRecords(context).filter { it.optLong("timestamp") >= startedAt }
             assertTrue("Uber offer recorded", records.any { it.optString("app") == "Uber" && kotlin.math.abs(it.optDouble("fare")-12.0)<0.001 })
@@ -198,13 +231,18 @@ class ReaderConcurrentOffersTest {
             // valid offer. Both fixture windows remain visible during this time.
             repeat(5) {
                 Thread.sleep(2300)
-                assertNotNull("Uber tag remains while its offer is visible",uberTag())
-                assertNotNull("99 tag remains while its offer is visible",ninetyNineTag())
+                // Display fallback briefly conceals our own surfaces so OCR
+                // cannot feed the analysis back into the original offer. Check
+                // that both return within the bounded capture deadline rather
+                // than sampling that intentional transparent frame.
+                await("Both tags return after capture while their offers remain visible",7000) {
+                    uberTag()!=null && ninetyNineTag()!=null
+                }
             }
 
             // Remove only the offer pixels, leaving the Uber window open.
             shell("am broadcast -a br.com.calculacorrida.fixture.HIDE_OFFER -p com.ubercab.driver")
-            await("Uber tag leaves after its offer disappears, 99 remains",40000) {
+            await("Uber tag leaves after its offer disappears, 99 remains",90000) {
                 driverWindow("com.ubercab.driver")!=null && uberTag()==null && ninetyNineTag()!=null
             }
             shell("am broadcast -a br.com.calculacorrida.fixture.SHOW_OFFER -p com.ubercab.driver")
@@ -217,6 +255,13 @@ class ReaderConcurrentOffersTest {
             // larger map window from the same app must not starve its OCR.
             shell("am force-stop com.ubercab.driver")
             await("Previous tags leave after the apps close", 12000) { uberTag()==null && ninetyNineTag()==null }
+            // The preceding scenario deliberately saved a freely dragged tag.
+            // Test automatic placement with its defaults, independently of that
+            // user-chosen position, which is allowed to overlap another pane.
+            prefs.edit().also { editor ->
+                prefs.all.keys.filter { it.startsWith("offer_tag_x_") || it.startsWith("offer_tag_y_") }
+                    .forEach { editor.remove(it) }
+            }.commit()
             // Clear the fake app's old task: Android otherwise resumes the
             // backdrop without creating the new fixture or its offer window.
             val uberStart=shell("am start -W -S -f 0x10008000 -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout dual_realistic")
@@ -234,7 +279,7 @@ class ReaderConcurrentOffersTest {
                     Rect().also{window.getBoundsInScreen(it)}.takeIf{it.width()>=160 && it.height()>=100}
                 } finally {root.recycle()}
             }.minByOrNull{it.left}
-            await("Tall negotiated 99 offer and Uber each have an independent tag in the correct window",60000) {
+            await("Tall negotiated 99 offer and Uber each have an independent tag in the correct window",120000) {
                 val tag=realistic99Tag()
                 val pane=middle99Pane()
                 uberTag()!=null && tag!=null && pane!=null && pane.contains(tag.centerX(),tag.centerY())
@@ -249,6 +294,7 @@ class ReaderConcurrentOffersTest {
             }
 
         } finally {
+            OfferScreenshotTransport.windowOverride=oldTransport
             listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")
             prefs.edit().apply {

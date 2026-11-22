@@ -103,6 +103,7 @@ object OfferTextParser {
         """([0-9]+(?:[,.][0-9]+)?)\s*min(?:uto)?s?\s*[·•]?\s*([0-9]+(?:[,.][0-9]+)?)\s*km(?=\s*(?:[·•]\s*)?Est\.?\s*(?:de\s*)?R\s*\$)""",
         RegexOption.IGNORE_CASE
     )
+    private val displayedKmRateRegex=Regex("""^\s*(?:[·•]\s*)?Est\.?\s*(?:de\s*)?R\s*\$\s*([0-9]+(?:[,.][0-9]{1,2})?)\s*/\s*km\b""",RegexOption.IGNORE_CASE)
     private val explicitTotalPrefixRegex=Regex(
         """(?:total(?:\s+d[ao]\s+(?:trajeto|viagem|percurso))?|percurso\s+total)\s*[:\-]?\s*$""",
         RegexOption.IGNORE_CASE
@@ -145,7 +146,27 @@ object OfferTextParser {
         val summaryMatch = estimatedSummary ?: summaryRegex.find(text) ?: plainHeaderTotal ?: if(compactCategory && minuteRegex.findAll(text).count()==1 && distanceRegex.findAll(text).count()==1)compactSummaryRegex.find(text) else null
         val displayedSummary = summaryMatch?.let {
             val mins = toNumber(it.groupValues[1])
-            val dist = toNumber(it.groupValues[2])
+            var dist = toNumber(it.groupValues[2])
+            if(DriverPackages.name(sourcePackage.orEmpty())=="UBER" && it==estimatedSummary && dist!=null && dist>0) {
+                val rateText=displayedKmRateRegex.find(text.substring(it.range.last+1))?.groupValues?.get(1)
+                val rate=rateText?.let(::toNumber)
+                if(rate!=null && rate>0 && rateText!=null) {
+                    val observed=dist
+                    fun precision(raw:String):Double {val separator=raw.indexOfLast{c->c=='.'||c==','};return if(separator<0)1.0 else Math.pow(10.0,-(raw.length-separator-1).toDouble())}
+                    val rateHalf=precision(rateText)/2
+                    val low=(fare-.005)/(rate+rateHalf)
+                    val high=(fare+.005)/(rate-rateHalf).coerceAtLeast(.001)
+                    fun consistent(km:Double,unit:Double)=km+unit/2+.002>=low && km-unit/2-.002<=high
+                    if(!consistent(observed,precision(it.groupValues[2]))) {
+                        // Repair only a lost separator, never infer arbitrary distance.
+                        // The displayed R$/km independently corroborates one candidate;
+                        // the detailed route rows below must agree as well when present.
+                        val digits=it.groupValues[2]
+                        val candidates=if(precision(rateText)<=.01 && digits.none{c->c=='.'||c==','})listOf(10.0,100.0).map{factor->observed/factor to 1/factor}.filter{(km,unit)->km>0&&consistent(km,unit)}.map{it.first}else emptyList()
+                        dist=candidates.singleOrNull()?:return null
+                    }
+                }
+            }
             if (mins != null && dist != null) mins to dist else null
         }
         if(deliverySummary!=null && displayedSummary!=null &&
@@ -225,7 +246,7 @@ object OfferTextParser {
         val destinationAddress = if (legMatches.size >= 2) {
             extractAddress(text.substring(legMatches[1].range.last + 1))
         } else null
-        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text), pickupAddress, destinationAddress, pickupMinutes?.takeIf { it <= totalMinutes })
+        return ParsedOffer(fare, pickupKm, tripKm, totalMinutes, extractPassengerRating(text,sourcePackage), pickupAddress, destinationAddress, pickupMinutes?.takeIf { it <= totalMinutes })
     }
 
     private fun extractAddress(segment: String): String? {
@@ -237,9 +258,9 @@ object OfferTextParser {
         return candidate.takeIf { it.length in 8..140 }
     }
 
-    private fun extractPassengerRating(text: String): String? {
+    private fun extractPassengerRating(text: String,sourcePackage:String?): String? {
         val labeled = Regex(
-            """(?:★|⭐|nota(?:\s+do\s+passageiro)?)\s*[:·-]?\s*([0-5](?:[,.][0-9]{1,2})?)""",
+            """(?:★|⭐|nota(?:\s+do\s+passageiro)?)\s*[:·-]?\s*([0-5](?:[,.][0-9]{1,2})?)(?![0-9.,])""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.get(1)
         if (labeled != null) return normalizeRating(labeled)
@@ -259,7 +280,13 @@ object OfferTextParser {
             return normalizeRating(rating)
         }
         val withCount = Regex("""(?<![0-9.,])([0-5][,.][0-9]{2})\s*\(\s*[0-9]+\s*\)""").find(text)?.groupValues?.get(1)
-        return withCount?.let(::normalizeRating)
+        if(withCount!=null)return normalizeRating(withCount)
+        if(DriverPackages.name(sourcePackage.orEmpty())=="UBER") {
+            val header=text.substring(0,legRegex.find(text)?.range?.first?:text.length)
+            val compact=Regex("""(?m)(?:^|[★⭐])\s*([45])([0-9]{2})\s*\(\s*[0-9]{1,6}\s*\)""").find(header)
+            if(compact!=null)return normalizeRating(compact.groupValues[1]+"."+compact.groupValues[2])
+        }
+        return null
     }
 
     private fun normalizeRating(value: String): String? {

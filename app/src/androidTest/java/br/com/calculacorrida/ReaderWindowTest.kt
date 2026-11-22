@@ -36,11 +36,14 @@ class ReaderWindowTest {
                 listOf("com.ubercab.driver","55,76","1","normal"),
                 listOf("com.app99.driver","32,45","0","normal"),
                 listOf("com.ubercab.driver","40,08","0","floating"),
+                listOf("com.ubercab.driver","114,54","0","priority"),
                 listOf("sinet.startup.inDriver","60,00","1","normal"),
                 listOf("com.ubercab.driver","60,00","0","moto"),
                 listOf("com.ubercab.driver","16,71","0","envios"),
                 listOf("com.ubercab.driver","16,71","0","envios_tall"),
                 listOf("com.app99.driver","60,00","0","moto99"),
+                listOf("com.app99.driver","66,67","0","pop99"),
+                listOf("com.app99.driver","70,00","0","pop99_floating"),
                 listOf("br.com.ifood.driver.app","37,50","0","delivery"))
             for((driver,expected,rotation,layout) in scenarios) {
             listOf("com.ubercab.driver","com.app99.driver","sinet.startup.inDriver","br.com.ifood.driver.app").forEach {shell("am force-stop $it")}
@@ -104,9 +107,9 @@ class ReaderWindowTest {
                 assertTrue("Full synthetic route is recorded",rows.any{kotlin.math.abs(it.optDouble("minutes")-30.0)<0.001 && kotlin.math.abs(it.optDouble("totalKm")-12.0)<0.001})
                 assertFalse("Pickup alone is never recorded as the complete offer",rows.any{kotlin.math.abs(it.optDouble("minutes")-10.0)<0.001 || kotlin.math.abs(it.optDouble("totalKm")-4.0)<0.001})
             }
-            if(layout=="moto" || layout=="moto99" || layout=="delivery" || layout.startsWith("envios")) {
-                val expectedKm=if(layout=="moto" || layout=="moto99")7.3 else if(layout.startsWith("envios"))19.1 else 5.0
-                val expectedMinutes=if(layout=="moto" || layout=="moto99")18.0 else if(layout.startsWith("envios"))32.0 else 20.0
+            if(layout=="moto" || layout=="moto99" || layout.startsWith("pop99") || layout=="delivery" || layout.startsWith("envios")) {
+                val expectedKm=if(layout=="moto" || layout=="moto99" || layout.startsWith("pop99"))7.3 else if(layout.startsWith("envios"))19.1 else 5.0
+                val expectedMinutes=if(layout=="moto" || layout=="moto99" || layout.startsWith("pop99"))18.0 else if(layout.startsWith("envios"))32.0 else 20.0
                 assertTrue("Correct complete motorcycle/delivery route was recorded",JourneyStore.getRecords(context).any{
                     (layout=="envios_tall" || it.optLong("timestamp")>=drawnAt) && kotlin.math.abs(it.optDouble("totalKm")-expectedKm)<.001 &&
                     kotlin.math.abs(it.optDouble("minutes")-expectedMinutes)<.001

@@ -51,7 +51,7 @@ class DriverRefreshTest {
         fun views(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{views(v.getChildAt(it))}else emptyList()
         fun labels()=views(activity!!.window.decorView).filterIsInstance<TextView>()
         fun click(title:String){inst.runOnMainSync{labels().first{it.text.toString().startsWith(title)}.performClick()};inst.waitForIdleSync()}
-        fun await(condition:()->Boolean){val end=SystemClock.elapsedRealtime()+10000;while(!condition()&&SystemClock.elapsedRealtime()<end)Thread.sleep(100);assertTrue(condition())}
+        fun await(condition:()->Boolean){val end=SystemClock.elapsedRealtime()+10000;var matched=condition();while(!matched&&SystemClock.elapsedRealtime()<end){Thread.sleep(100);matched=condition()};assertTrue(matched)}
         fun shell(command:String)=ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(command)).use{it.readBytes()}
         fun screen(name:String){inst.waitForIdleSync();Thread.sleep(250);inst.uiAutomation.takeScreenshot()?.let{image->val dir=java.io.File(context.filesDir,"screenshots").apply{mkdirs()};java.io.File(dir,name).outputStream().use{image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};image.recycle()}}
         fun has(value:String):Boolean {var found=false;inst.runOnMainSync{found=labels().any{it.text.toString().startsWith(value)}};return found}
@@ -86,7 +86,17 @@ class DriverRefreshTest {
             // Finishing the visible activity cancels microphone capture, never sends.
             inst.runOnMainSync{activity!!.finish()};inst.waitForIdleSync()
             assertEquals(0,sent.get())
+            await{activity!!.isDestroyed}
+            shell("wm user-rotation lock 0")
             shell("wm size 1280x800");shell("wm density 160")
+            var stableFrames=0
+            await {
+                val image=inst.uiAutomation.takeScreenshot()
+                val ready=image!=null && image.width==1280 && image.height==800 && context.resources.displayMetrics.densityDpi==160
+                image?.recycle()
+                stableFrames=if(ready)stableFrames+1 else 0
+                stableFrames>=3
+            }
             activity=inst.startActivitySync(Intent(context,FriendsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));inst.waitForIdleSync()
             await{has("CONVERSAR E VER MAPA")};Thread.sleep(150);click("CONVERSAR E VER MAPA");await{has("Boa viagem!")}
             screen("friends-tablet-gray.png")
@@ -97,7 +107,7 @@ class DriverRefreshTest {
             inst.runOnMainSync{activity!!.finish()}
             activity=inst.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));inst.waitForIdleSync();screen("dashboard-holiday.png")
         } finally {
-            inst.runOnMainSync{activity?.finish()};shell("wm size reset");shell("wm density reset");FriendsDependencies.gateway=oldFactory;AppAppearance.setTheme(context,previousTheme)
+            inst.runOnMainSync{activity?.finish()};shell("wm size reset");shell("wm density reset");shell("wm user-rotation free");FriendsDependencies.gateway=oldFactory;AppAppearance.setTheme(context,previousTheme)
             val edit=prefs.edit().clear();for((key,value)in previous)when(value){is String->edit.putString(key,value);is Boolean->edit.putBoolean(key,value);is Long->edit.putLong(key,value);is Int->edit.putInt(key,value);is Float->edit.putFloat(key,value)};edit.commit()
         }
     }

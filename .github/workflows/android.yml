@@ -12,6 +12,26 @@ on:
         type: boolean
         required: false
         default: false
+      px_only:
+        description: Check PX lifecycle, actual media and message recorder without unrelated UI scenarios
+        type: boolean
+        required: false
+        default: false
+      local_px_qa:
+        description: Verify actual PCM and recorder coexistence against a disposable local RTC server
+        type: boolean
+        required: false
+        default: false
+      tablet_only:
+        description: Recheck only the tablet after the phone profiles passed
+        type: boolean
+        required: false
+        default: false
+      concurrent_only:
+        description: Recheck concurrent-offer placement and chat audio after test-fixture changes
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -34,7 +54,13 @@ jobs:
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
       - name: Test and compile without signing secrets
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease
+        run: |
+          if [[ "${{ inputs.concurrent_only }}" == "true" || "${{ inputs.px_only }}" == "true" ]]; then
+            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
+          else
+            gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug :app:bundleRelease
+          fi
+          tar -cf native-fixtures.tar app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk reader-fixture/build/outputs/apk
 
       - name: Check automatic reader configuration
         run: python .github/scripts/audit_apk.py app/build/outputs/apk/debug/app-debug.apk
@@ -44,6 +70,13 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='br.com.calculacorrida.avaliacao051'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "targetSdkVersion:'36'"
       - uses: actions/upload-artifact@v4
+        with:
+          name: JHONDRIVER-native-fixtures
+          path: native-fixtures.tar
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.concurrent_only && !inputs.px_only }}
         with:
           name: JHONDRIVER-unsigned-bundle-for-verification
           path: app/build/outputs/bundle/release/app-release.aab
@@ -65,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [33, 36]
+        include: ${{ fromJSON(inputs.tablet_only && '[{"api":36,"form":"tablet"}]' || '[{"api":36,"form":"tablet"},{"api":33,"form":"phone"},{"api":36,"form":"phone"}]') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -82,10 +115,20 @@ jobs:
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
       - name: Fetch private synthetic voice fixture
-        if: github.ref == 'refs/heads/feat/px-radio' && inputs.live_px_qa
+        if: github.ref == 'refs/heads/fix/px-design-and-99' && inputs.live_px_qa && matrix.form == 'phone'
         env:
           PX_API_LEVEL: ${{ matrix.api }}
         run: python .github/scripts/fetch_px_qa.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER-native-fixtures
+      - name: Extract compiled native fixtures
+        run: tar -xf native-fixtures.tar
+      - name: Start isolated local PX media fixture
+        if: inputs.local_px_qa
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/start_local_px.py
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -96,9 +139,9 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
+          profile: ${{ matrix.form == 'tablet' && 'pixel_c' || 'pixel_4' }}
           disable-animations: true
           script: |
-            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell pm grant br.com.calculacorrida.avaliacao051 android.permission.POST_NOTIFICATIONS
@@ -109,18 +152,20 @@ jobs:
             adb install -r reader-fixture/build/outputs/apk/indrive/debug/reader-fixture-indrive-debug.apk
             adb install -r reader-fixture/build/outputs/apk/ifood/debug/reader-fixture-ifood-debug.apk
             if [ -f "$RUNNER_TEMP/px-qa.json" ]; then adb shell run-as br.com.calculacorrida.avaliacao051 mkdir -p files; adb exec-in run-as br.com.calculacorrida.avaliacao051 sh -c 'cat > files/px-qa.json' < "$RUNNER_TEMP/px-qa.json"; rm "$RUNNER_TEMP/px-qa.json"; fi
-            adb shell am instrument -w -r -e class br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            if [ -f "$RUNNER_TEMP/px-local/fixture.json" ]; then adb shell run-as br.com.calculacorrida.avaliacao051 mkdir -p files; adb exec-in run-as br.com.calculacorrida.avaliacao051 sh -c 'cat > files/px-local.json' < "$RUNNER_TEMP/px-local/fixture.json"; fi
+            adb shell am instrument -w -r -e class ${{ inputs.px_only && 'br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.PxLocalMediaTest,br.com.calculacorrida.AudioMessageTest' || inputs.concurrent_only && 'br.com.calculacorrida.ReaderConcurrentOffersTest,br.com.calculacorrida.AudioMessageTest' || 'br.com.calculacorrida.PxRadioTest,br.com.calculacorrida.PxLocalMediaTest,br.com.calculacorrida.ReaderConcurrentOffersTest,br.com.calculacorrida.PxLiveNetworkTest,br.com.calculacorrida.AudioMessageTest,br.com.calculacorrida.UnifiedDesignTest,br.com.calculacorrida.FriendsDesignTest,br.com.calculacorrida.DriverRefreshTest,br.com.calculacorrida.AppAppearanceTest,br.com.calculacorrida.FriendsPrivacyTest,br.com.calculacorrida.FriendsServiceTest,br.com.calculacorrida.ReaderServiceTest,br.com.calculacorrida.LoginControlsTest,br.com.calculacorrida.OfferCardTest,br.com.calculacorrida.OfferOverlayAnimationTest,br.com.calculacorrida.OfferDashboardTest,br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderPrivacyTest,br.com.calculacorrida.OfferNotificationTest' }} br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            adb logcat -d > px-logcat.txt
+            if [ -f "$RUNNER_TEMP/px-local/server.log" ]; then cp "$RUNNER_TEMP/px-local/server.log" px-server.log; fi
             adb exec-out run-as br.com.calculacorrida.avaliacao051 tar -cf - files/screenshots > card-previews.tar
             grep -E '^OK \([0-9]+ tests?\)' instrumentation.txt
-            adb shell wm size 960x1536
-            adb shell wm density 160
-            adb shell am instrument -w -r -e class br.com.calculacorrida.ReaderWindowTest,br.com.calculacorrida.ReaderConcurrentOffersTest br.com.calculacorrida.avaliacao051.test/androidx.test.runner.AndroidJUnitRunner | tee tablet-instrumentation.txt
-            grep -E '^OK \([0-9]+ tests?\)' tablet-instrumentation.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: card-previews-${{ matrix.api }}
-          path: card-previews.tar
+          name: card-previews-${{ matrix.api }}-${{ matrix.form }}
+          path: |
+            card-previews.tar
+            px-logcat.txt
+            px-server.log
           if-no-files-found: error
 
   publish:

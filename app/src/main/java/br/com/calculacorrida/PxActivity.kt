@@ -12,6 +12,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.View
+import android.graphics.Color
 import android.view.MotionEvent
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -24,46 +27,78 @@ class PxActivity:AppCompatActivity(){
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     private lateinit var root:LinearLayout
     private lateinit var status:TextView
-    private lateinit var talk:Button
+    private lateinit var talk:PxTalkButton
+    private lateinit var channelName:TextView
+    private lateinit var talkLabel:TextView
+    private lateinit var voiceSignal:PxVoiceIndicator
+    private lateinit var connectionBadge:TextView
+    private lateinit var holdModeButton:Button
+    private lateinit var tapModeButton:Button
+    private lateinit var muteButton:Button
     private lateinit var cards:LinearLayout
+    private lateinit var contacts:LinearLayout
+    private lateinit var privateTab:Button
+    private lateinit var groupTab:Button
+    private var renderedChannel=""
+    private var soundPreview:PxSounds?=null
     private lateinit var client:PxGateway
     private var channels=listOf<JSONObject>()
     private var friends=listOf<JSONObject>()
     private var busy=false
+    private var channelFilter="private"
     private var pending:JSONObject?=null
     private var bluetoothAsked=false
     private val colors get()=AppAppearance.palette(this)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
     private fun column()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
     private fun text(value:String,size:Float=15f,bold:Boolean=false)=TextView(this).apply{text=value;textSize=size;setTextColor(colors.text);if(bold)typeface=Typeface.DEFAULT_BOLD;setPadding(0,dp(6),0,dp(6))}
-    private fun button(label:String,action:()->Unit)=Button(this).apply{text=label;isAllCaps=false;textSize=14f;setOnClickListener{action()}}
+    private fun surface(fill:Int=colors.panel,radius:Int=18)=GradientDrawable().apply{setColor(fill);cornerRadius=dp(radius).toFloat();setStroke(dp(1),this@PxActivity.colors.border)}
+    private fun button(label:String,action:()->Unit)=Button(this).apply{text=label;isAllCaps=false;textSize=13f;minHeight=dp(46);minimumHeight=dp(46);setPadding(dp(12),dp(3),dp(12),dp(3));setTextColor(colors.text);backgroundTintList=null;background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33efbe41),surface(colors.input,13),null);setOnClickListener{action()}}
+    private fun row()=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
     override fun onCreate(saved:Bundle?){AppAppearance.apply(this);super.onCreate(saved);AppAppearance.styleWindow(this);volumeControlStream=AudioManager.STREAM_MUSIC
         if(!SessionManager(this).isLoggedIn()){startActivity(Intent(this,LoginActivity::class.java));finish();return}
         client=PxDependencies.gateway(this)
         val page=column().apply{setBackgroundColor(colors.background)}
-        root=column().apply{setPadding(dp(18),dp(16),dp(18),dp(20))}
-        root.addView(text("Rádio PX",30f,true));root.addView(text("Converse ao vivo com amigos e grupos privados. Entre no canal para ouvir; segure para falar.",15f))
-        status=text("PX desligado",17f,true);root.addView(status)
-        root.addView(text("O PX tem uma bolinha própria com o nome do canal. A bolinha JD continua independente.",13f))
-        talk=button("Segure para falar"){}.apply{contentDescription="Segure para transmitir no PX e solte para encerrar";isEnabled=false;setOnTouchListener{_,e->when(e.actionMasked){MotionEvent.ACTION_DOWN->{PxService.press();true};MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->{PxService.release();true};else->true}}};root.addView(talk)
-        root.addView(button("Sair / desligar PX"){startService(Intent(this,PxService::class.java).setAction(PxService.STOP))})
-        root.addView(button("Permitir bolinha PX fora do aplicativo"){startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))})
-        root.addView(button("Conversa privada com amigo"){chooseFriend{peer->work{val result=client.call("private",JSONObject().put("peer",peer.getString("id")));reload();channels.find{it.optString("id")==result.optString("channel")}?.let{channel->runOnUiThread{enter(channel)}}}}})
-        root.addView(button("Criar grupo privado"){val input=EditText(this).apply{hint="Nome do grupo";filters=arrayOf(android.text.InputFilter.LengthFilter(40))};AlertDialog.Builder(this).setTitle("Novo grupo PX").setView(input).setPositiveButton("Criar"){_,_->val name=input.text.toString().trim();if(name.isNotEmpty())work{client.call("group",JSONObject().put("name",name));reload()}}.setNegativeButton("Cancelar",null).show()})
-        root.addView(button("Atualizar canais"){work{reload()}})
+        root=column().apply{setPadding(dp(20),dp(14),dp(20),dp(20))}
+        val heading=row();heading.addView(text("Rádio PX",28f,true),LinearLayout.LayoutParams(0,-2,1f));connectionBadge=text("● Desligado",12f,true).apply{setTextColor(colors.muted)};heading.addView(connectionBadge);heading.addView(button("⋯"){viewOptions()},LinearLayout.LayoutParams(dp(48),dp(44)).apply{leftMargin=dp(8)});root.addView(heading)
+        val tabs=row();privateTab=button("Privado"){channelFilter="private";drawChannels()};tabs.addView(privateTab,LinearLayout.LayoutParams(0,dp(44),1f).apply{rightMargin=dp(5)});groupTab=button("Grupos"){channelFilter="group";drawChannels()};tabs.addView(groupTab,LinearLayout.LayoutParams(0,dp(44),1f).apply{leftMargin=dp(5)});root.addView(tabs,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+        val radio=column().apply{gravity=Gravity.CENTER_HORIZONTAL;setPadding(dp(20),dp(14),dp(20),dp(14));background=PxConsoleBackground(this@PxActivity)}
+        radio.addView(text("EM CONTATO",10f,true).apply{letterSpacing=.22f;setPadding(0,dp(2),0,dp(2));setTextColor(colors.muted);gravity=Gravity.CENTER})
+        channelName=text("Escolha seu canal",28f,true).apply{setPadding(0,dp(2),0,dp(2));gravity=Gravity.CENTER};radio.addView(channelName)
+        status=text("Converse com seus amigos em tempo real",13f).apply{setPadding(0,dp(2),0,dp(2));setTextColor(colors.muted);gravity=Gravity.CENTER};radio.addView(status)
+        talk=PxTalkButton(this).apply{isEnabled=false;setOnTouchListener{v,e->when(e.actionMasked){MotionEvent.ACTION_DOWN->{v.isPressed=true;v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(!PxService.status.value.tapToTalk)PxService.press();true};MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->{v.isPressed=false;if(e.actionMasked==MotionEvent.ACTION_CANCEL)PxService.release()else{if(PxService.status.value.tapToTalk)PxService.toggle()else PxService.release();v.performClick()};true};else->true}}};radio.addView(talk,LinearLayout.LayoutParams(dp(144),dp(144)).apply{topMargin=dp(6)})
+        talkLabel=text("Segure para falar",16f,true).apply{setPadding(0,dp(2),0,dp(2));setTextColor(colors.gold);gravity=Gravity.CENTER};radio.addView(talkLabel)
+        voiceSignal=PxVoiceIndicator(this);radio.addView(voiceSignal,LinearLayout.LayoutParams(-1,dp(24)).apply{topMargin=dp(4)})
+        val mode=row();listOf("Segurar para falar" to false,"Tocar para iniciar/parar" to true).forEach{(label,tap)->val control=button(label){PxService.setTapMode(this,tap)};if(tap)tapModeButton=control else holdModeButton=control;mode.addView(control,LinearLayout.LayoutParams(0,dp(46),1f))};radio.addView(mode)
+        val controls=row();muteButton=button("Silenciar"){if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(if(PxService.status.value.audioInterrupted)PxService.RESUME_AUDIO else PxService.MUTE))};controls.addView(muteButton,LinearLayout.LayoutParams(0,dp(46),1f).apply{rightMargin=dp(6)});controls.addView(button("Sair do canal"){if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(PxService.STOP))},LinearLayout.LayoutParams(0,dp(46),1f).apply{leftMargin=dp(6)});radio.addView(controls,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)});root.addView(radio,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
+        contacts=row();root.addView(HorizontalScrollView(this).apply{addView(contacts);isHorizontalScrollBarEnabled=false},LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
+        val actions=row();actions.addView(button("+ Conversa privada"){chooseFriend{peer->work{val result=client.call("private",JSONObject().put("peer",peer.getString("id")));reload();channels.find{it.optString("id")==result.optString("channel")}?.let{channel->runOnUiThread{enter(channel)}}}}},LinearLayout.LayoutParams(0,dp(48),1f).apply{rightMargin=dp(6)})
+        actions.addView(button("+ Criar grupo"){val input=EditText(this).apply{hint="Nome do grupo";filters=arrayOf(android.text.InputFilter.LengthFilter(40))};AlertDialog.Builder(this).setTitle("Novo grupo PX").setView(input).setPositiveButton("Criar"){_,_->val name=input.text.toString().trim();if(name.isNotEmpty())work{client.call("group",JSONObject().put("name",name));reload()}}.setNegativeButton("Cancelar",null).show()},LinearLayout.LayoutParams(0,dp(48),1f).apply{leftMargin=dp(6)});root.addView(actions,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(16);bottomMargin=dp(10)})
         cards=column();root.addView(cards)
-        val scroll=ScrollView(this).apply{addView(root);isFillViewport=true};page.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        val scroll=ScrollView(this).apply{addView(root,android.widget.FrameLayout.LayoutParams(-1,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL));isFillViewport=true;isVerticalScrollBarEnabled=false};scroll.addOnLayoutChangeListener{_,l,_,r,_,_,_,_,_->val target=minOf(r-l,dp(740));if(target>0&&root.layoutParams.width!=target)root.layoutParams=root.layoutParams.apply{width=target}};page.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         val bar=LinearLayout(this);DriverNavigation.fill(this,bar,"PX");page.addView(bar,LinearLayout.LayoutParams(-1,dp(72)));setContentView(page)
-        scope.launch{PxService.status.collect{value->status.text=if(value.active)"${value.name}\n${value.status}"else value.status;talk.isEnabled=value.connected;talk.text=if(value.talking)"Transmitindo • solte para parar"else "Segure para falar";talk.setTextColor(if(value.talking)android.graphics.Color.rgb(0,120,65)else colors.gold)}}
+        scope.launch{PxService.status.collect{value->
+            channelName.text=if(value.active)value.name else "Escolha seu canal";status.text=if(value.active)value.status else "Entre em uma conversa para começar"
+            connectionBadge.text=if(value.connected)"● Conectado"else if(value.active)"● Conectando"else "● Desligado";connectionBadge.setTextColor(if(value.connected)colors.green else colors.muted)
+            listOf(holdModeButton to !value.tapToTalk,tapModeButton to value.tapToTalk).forEach{(control,selected)->control.isSelected=selected;control.background=surface(if(selected)colors.gold else colors.input,13);control.setTextColor(if(selected)Color.rgb(28,24,16)else colors.text)}
+            voiceSignal.active=value.talking||value.speaker.isNotBlank();talk.isEnabled=value.connected&&!value.audioInterrupted;talk.transmitting=value.talking;talk.requesting=value.requesting;talk.text=if(value.talking){if(value.tapToTalk)"Transmitindo • toque para parar"else"Transmitindo • solte para parar"}else if(value.tapToTalk)"Toque para falar"else "Segure para falar";talk.contentDescription=talk.text
+            talkLabel.text=when{value.audioInterrupted->"Microfone liberado para outro aplicativo";value.talking->if(value.tapToTalk)"Falando • toque para parar"else"Falando • solte para parar";value.requesting->"Preparando sua fala…";!value.connected->"Entre em um canal";else->if(value.tapToTalk)"Toque para falar"else"Segure para falar"};talkLabel.setTextColor(if(value.talking)colors.green else colors.gold);muteButton.text=if(value.audioInterrupted)"Retomar áudio"else if(value.muted)"Voltar a ouvir"else "Silenciar";muteButton.isEnabled=value.connected
+            val renderKey=value.channel+value.connected;if(renderedChannel!=renderKey){renderedChannel=renderKey;drawChannels()}
+        }}
         work{reload()}
     }
+    private fun viewOptions(){val labels=arrayOf("Som do rádio PX","Bolinha fora do aplicativo","Atualizar canais","Desligar PX");AlertDialog.Builder(this).setTitle("Opções do PX").setItems(labels){_,which->when(which){0->chooseSound();1->startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")));2->work{reload()};3->if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(PxService.STOP))}}.setNegativeButton("Fechar",null).show()}
+    private fun chooseSound(){val keys=listOf("traditional","digital","off");val prefs=getSharedPreferences("px_audio",MODE_PRIVATE);val selected=keys.indexOf(prefs.getString("sound","traditional")?:"traditional").coerceAtLeast(0);AlertDialog.Builder(this).setTitle("Som do rádio PX").setSingleChoiceItems(arrayOf("PX tradicional • clique e chiado","Rádio digital • toque duplo","Silencioso"),selected){dialog,index->prefs.edit().putString("sound",keys[index]).apply();soundPreview?.close();soundPreview=if(index==2)null else PxSounds(this).also{it.previewWhenReady()};dialog.dismiss()}.setNegativeButton("Cancelar",null).show()}
     private fun work(block:()->Unit){if(busy)return;busy=true;scope.launch{try{withContext(Dispatchers.IO){block()}}catch(error:Exception){Toast.makeText(this@PxActivity,error.message?:"Não foi possível conectar.",Toast.LENGTH_LONG).show()}finally{busy=false;if(!isFinishing)drawChannels()}}}
     private fun reload(){val data=client.call("list").optJSONArray("channels");channels=if(data==null)emptyList()else(0 until data.length()).map{data.getJSONObject(it)};val list=FriendsDependencies.gateway(this,null).call("snapshot").optJSONArray("friends");friends=if(list==null)emptyList()else(0 until list.length()).map{list.getJSONObject(it)}.filter{it.optString("state")=="accepted"}}
     private fun chooseFriend(action:(JSONObject)->Unit){if(friends.isEmpty()){Toast.makeText(this,"Adicione um amigo na aba Amigos e aguarde o aceite.",Toast.LENGTH_LONG).show();return};AlertDialog.Builder(this).setTitle("Escolha um amigo").setItems(friends.map{it.optString("name","Motorista")}.toTypedArray()){_,i->action(friends[i])}.setNegativeButton("Cancelar",null).show()}
     private fun change(action:String,channel:JSONObject,peer:String?=null){work{client.call(action,JSONObject().put("channel",channel.getString("id")).apply{if(peer!=null)put("peer",peer)});reload()}}
-    private fun drawChannels(){cards.removeAllViews();cards.addView(text("Seus canais",21f,true));if(channels.isEmpty())cards.addView(text("Ainda não há canais. Escolha um amigo ou crie um grupo.",14f))
-        for(channel in channels){val panel=column().apply{setPadding(dp(14),dp(10),dp(14),dp(10));background=GradientDrawable().apply{setColor(this@PxActivity.colors.panel);cornerRadius=dp(14).toFloat();setStroke(dp(1),this@PxActivity.colors.border)}};panel.addView(text(channel.optString("name","Conversa PX"),19f,true));panel.addView(text(if(channel.optString("kind")=="group")"Grupo privado • só entra quem aceitar o convite"else"Conversa privada entre amigos",13f))
-            if(channel.optBoolean("accepted")){panel.addView(button("Entrar no canal"){enter(channel)});if(channel.optBoolean("owner")&&channel.optString("kind")=="group"){panel.addView(button("Convidar amigo"){chooseFriend{change("invite",channel,it.getString("id"))}});panel.addView(button("Remover participante"){val members=channel.optJSONArray("members");val others=if(members==null)emptyList()else(0 until members.length()).map{members.getJSONObject(it)}.filter{it.optString("id")!=PxClient.identity(SessionManager(this).getAccessToken())?.substringBefore(":")};AlertDialog.Builder(this).setTitle("Remover do grupo").setItems(others.map{it.optString("name")}.toTypedArray()){_,i->change("remove",channel,others[i].getString("id"))}.setNegativeButton("Cancelar",null).show()});panel.addView(button("Encerrar grupo"){AlertDialog.Builder(this).setMessage("Encerrar este grupo e desconectar os participantes?").setPositiveButton("Encerrar"){_,_->change("close",channel)}.setNegativeButton("Cancelar",null).show()})}else if(channel.optString("kind")=="group")panel.addView(button("Sair do grupo"){change("exit",channel)})}
+    private fun drawChannels(){
+        listOf(privateTab to "private",groupTab to "group").forEach{(tab,kind)->val selected=channelFilter==kind;tab.background=surface(if(selected)colors.gold else colors.input,22);tab.setTextColor(if(selected)Color.rgb(28,24,16)else colors.text)}
+        contacts.removeAllViews();for(peer in friends.take(10)){val name=peer.optString("name","Amigo");val avatar=text(name.take(1).uppercase()+"\n"+name.substringBefore(" "),12f,true).apply{gravity=Gravity.CENTER;background=surface(colors.panel,18);setPadding(dp(8),dp(8),dp(8),dp(8))};contacts.addView(avatar,LinearLayout.LayoutParams(dp(76),dp(64)).apply{rightMargin=dp(9)})}
+        cards.removeAllViews();cards.addView(text(if(channelFilter=="group")"Grupos PX"else "Conversas privadas",19f,true));if(channels.none{it.optString("kind")==channelFilter})cards.addView(text("Sua próxima conversa começa aqui. Adicione um amigo ou crie um grupo privado.",14f))
+        for(channel in channels.filter{it.optString("kind")==channelFilter}){val panel=column().apply{setPadding(dp(14),dp(10),dp(14),dp(10));background=GradientDrawable().apply{setColor(this@PxActivity.colors.panel);cornerRadius=dp(14).toFloat();setStroke(dp(1),this@PxActivity.colors.border)}};panel.addView(text(channel.optString("name","Conversa PX"),19f,true));panel.addView(text(if(channel.optString("kind")=="group")"Grupo privado • só entra quem aceitar o convite"else"Conversa privada entre amigos",13f))
+            if(channel.optBoolean("accepted")){val current=PxService.status.value.connected&&PxService.status.value.channel==channel.optString("id");panel.addView(button(if(current)"Canal atual"else "Entrar no canal"){enter(channel)}.apply{isEnabled=!current});if(channel.optBoolean("owner")&&channel.optString("kind")=="group"){panel.addView(button("Convidar amigo"){chooseFriend{change("invite",channel,it.getString("id"))}});panel.addView(button("Remover participante"){val members=channel.optJSONArray("members");val others=if(members==null)emptyList()else(0 until members.length()).map{members.getJSONObject(it)}.filter{it.optString("id")!=PxClient.identity(SessionManager(this).getAccessToken())?.substringBefore(":")};AlertDialog.Builder(this).setTitle("Remover do grupo").setItems(others.map{it.optString("name")}.toTypedArray()){_,i->change("remove",channel,others[i].getString("id"))}.setNegativeButton("Cancelar",null).show()});panel.addView(button("Encerrar grupo"){AlertDialog.Builder(this).setMessage("Encerrar este grupo e desconectar os participantes?").setPositiveButton("Encerrar"){_,_->change("close",channel)}.setNegativeButton("Cancelar",null).show()})}else if(channel.optString("kind")=="group")panel.addView(button("Sair do grupo"){change("exit",channel)})}
             else{panel.addView(text("Convite recebido. O áudio só fica disponível depois de aceitar e entrar.",14f));panel.addView(button("Aceitar convite"){change("accept",channel)});panel.addView(button("Recusar convite"){change("exit",channel)})}
             cards.addView(panel,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
         }
@@ -75,6 +110,7 @@ class PxActivity:AppCompatActivity(){
         ContextCompat.startForegroundService(this,Intent(this,PxService::class.java).setAction(PxService.JOIN).putExtra("channel",channel.getString("id")).putExtra("name",channel.optString("name")))
     }
     override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,results:IntArray){super.onRequestPermissionsResult(requestCode,permissions,results);if(requestCode==901){val channel=pending;pending=null;if(ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&channel!=null)enter(channel)else Toast.makeText(this,"Permita microfone e notificações para entrar no rádio.",Toast.LENGTH_LONG).show()}}
-    override fun onPause(){PxService.release();super.onPause()}
-    override fun onDestroy(){scope.cancel();super.onDestroy()}
+    override fun onResume(){super.onResume();PxService.setUiVisible(true)}
+    override fun onPause(){PxService.release();PxService.setUiVisible(false);super.onPause()}
+    override fun onDestroy(){soundPreview?.close();soundPreview=null;scope.cancel();super.onDestroy()}
 }
