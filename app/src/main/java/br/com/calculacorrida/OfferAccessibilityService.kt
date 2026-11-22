@@ -64,7 +64,7 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var captureSurfaces:List<CaptureSurface> = emptyList()
     private val displayFallbackUntil=mutableMapOf<Pair<String,Int>,Long>()
     private val captureWindowManager:WindowManager by lazy {
-        val display=(getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
+        val display=requireNotNull((getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).getDisplay(Display.DEFAULT_DISPLAY))
         val uiContext=if(Build.VERSION.SDK_INT>=30)createDisplayContext(display).createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,null) else this
         uiContext.getSystemService(WINDOW_SERVICE) as WindowManager
     }
