@@ -2,6 +2,13 @@ package br.com.calculacorrida
 
 /** A readable upright route needs another live frame, not three rotations of the same image. */
 object OfferCapturePolicy {
+    /** An analysis overlay is an output, never a fresh incoming offer. */
+    fun isReaderCard(text:String):Boolean {
+        val compact=text.lowercase(java.util.Locale.ROOT).replace(Regex("\\s+"),"")
+        return (compact.contains("r$/km") || compact.contains("rs/km")) &&
+            (compact.contains("r$/hora") || compact.contains("rs/hora")) &&
+            Regex("\\bnota\\b",RegexOption.IGNORE_CASE).containsMatchIn(text)
+    }
     fun needsRotationRetry(text:String):Boolean {
         val fare=Regex("""r\s*\$\s*\d""",RegexOption.IGNORE_CASE).containsMatchIn(text)
         val time=Regex("""\d+\s*min(?:uto)?s?\b""",RegexOption.IGNORE_CASE).containsMatchIn(text)

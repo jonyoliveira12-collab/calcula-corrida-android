@@ -539,7 +539,7 @@ class OfferAccessibilityService : AccessibilityService() {
     // de acessibilidade. Nesses casos, fazemos OCR da tela ANTES do aceite.
     private fun requestOfferScreenshot(pkg: String) {
         if (Build.VERSION.SDK_INT < 30) { readerStatus("Neste Android a leitura depende do texto acessível da oferta"); return }
-        if (screenshotInProgress || pkg !in visibleDriverPackages() || !readingEnabled()) return
+        if (screenshotInProgress || draggingTags.isNotEmpty() || pkg !in visibleDriverPackages() || !readingEnabled()) return
         // Try eligible windows in turn. A large map/utility overlay from one
         // driver must not permanently hide a smaller offer window from OCR.
         val target=driverCandidates[pkg].orEmpty().filter{isOfferSized(it.bounds) && (Build.VERSION.SDK_INT>=34 || !isOccludedByDriverWindow(it))}
@@ -560,14 +560,28 @@ class OfferAccessibilityService : AccessibilityService() {
         screenshotInProgress = true
         val requestTime=now
         var attempt=0
-        var hiddenViews:List<Pair<View,Float>> = emptyList()
+        var hiddenViews:List<Pair<View,WindowManager.LayoutParams>> = emptyList()
         var hiddenAreas:Set<CaptureArea> = emptySet()
         var displayRegion:Rect?=null
         fun restoreViews() {
             val views=hiddenViews
             hiddenViews=emptyList()
             if(views.isNotEmpty()) {
-                val restore={views.forEach{(view,alpha)->view.alpha=alpha}}
+                val restore={
+                    if(!stopped)views.forEach{(view,params)->
+                        val owned=view===bubble || overlays.values.any{it===view}
+                        if(owned && !view.isAttachedToWindow) {
+                            if(!readingEnabled())view.visibility=View.GONE
+                            val added=runCatching{(getSystemService(WINDOW_SERVICE) as WindowManager).addView(view,params)}.isSuccess
+                            if(!added) {
+                                if(view===bubble){bubble=null;bubbleParams=null}
+                                overlays.entries.firstOrNull{it.value===view}?.key?.let{source->
+                                    overlays.remove(source);overlayParams.remove(source);acceptedSignatures.remove(source)
+                                }
+                            }
+                        }
+                    }
+                }
                 if(Looper.myLooper()==Looper.getMainLooper())restore() else readerHandler.post{restore()}
             }
         }
@@ -599,7 +613,10 @@ class OfferAccessibilityService : AccessibilityService() {
                     display.getRealSize(size)
                     Rect(bounds).takeIf{it.intersect(0,0,size.x,size.y)}
                 }.getOrNull()
-                hiddenViews=(listOfNotNull(bubble)+overlays.values).distinct().filter{it.isAttachedToWindow}.map{it to it.alpha}
+                hiddenViews=buildList {
+                    bubble?.let{view->bubbleParams?.let{params->if(view.isAttachedToWindow)add(view to params)}}
+                    overlays.forEach{(source,view)->overlayParams[source]?.let{params->if(view.isAttachedToWindow)add(view to params)}}
+                }.distinctBy{it.first}
                 hiddenAreas=hiddenViews.mapNotNull{(view,_)->
                     if(view.width<=0 || view.height<=0)null else {
                         val location=IntArray(2);view.getLocationOnScreen(location)
@@ -615,7 +632,10 @@ class OfferAccessibilityService : AccessibilityService() {
                 if(!validDisplay()) {
                     finish("Oferta encoberta ou janela atualizando; aguardando captura segura")
                 } else {
-                    hiddenViews.forEach{(view,_)->view.alpha=0f}
+                    // Removing the windows avoids compositor-delayed alpha
+                    // changes leaving an old analysis inside the screenshot.
+                    hiddenViews.forEach{(view,_)->runCatching{(getSystemService(WINDOW_SERVICE) as WindowManager).removeViewImmediate(view)}}
+                    if(hiddenViews.any{it.first.isAttachedToWindow})finish("Aguardando retirada dos controles da captura")
                 }
             }
             if(!display || screenshotInProgress) {
@@ -731,6 +751,11 @@ class OfferAccessibilityService : AccessibilityService() {
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = OfferTextParser.normalizeOcrText(visionText.text)
+                                if(OfferCapturePolicy.isReaderCard(recognized)) {
+                                    displayFallbackUntil[pkg to windowId]=android.os.SystemClock.elapsedRealtime()+60000L
+                                    recognitionStatus(pkg,"Análise anterior descartada; relendo a oferta original")
+                                    return@addOnSuccessListener
+                                }
                                 val offer = if (IncomingOfferPolicy.isIncoming(pkg,recognized))
                                     OfferTextParser.parse(recognized,pkg) else null
                                 recognitionStatus(pkg,"Imagem ${image.width}×${image.height} • rotação ${angles[index]} • ${recognized.length} caracteres • oferta=${offer!=null} • ${android.os.SystemClock.elapsedRealtime()-ocrStarted} ms")

@@ -42,4 +42,11 @@ class OfferCapturePolicyTest {
         assertFalse(IncomingOfferPolicy.isIncoming(pkg,"R$ 12,50 Percurso total: 5 km Tempo estimado da rota: 20 min"))
         assertNull(OfferTextParser.parse(text+"\nPercurso total: 8 km",pkg))
     }
+
+    @org.junit.Test fun analysisOverlaysCannotBecomeFreshOffers() {
+        org.junit.Assert.assertTrue(OfferCapturePolicy.isReaderCard("99 30 min • 15,00 km • R$30,00 R$/Km 2,00 R$/Hora 60,00 Nota 4,90"))
+        org.junit.Assert.assertTrue(OfferCapturePolicy.isReaderCard("R S / Km 2,00 R S / Hora 60,00 Nota"))
+        org.junit.Assert.assertFalse(OfferCapturePolicy.isReaderCard("Priority R$19,09 10 min • 7.0 km Est. de R$2,73/km 4,87 (114)"))
+        org.junit.Assert.assertFalse(OfferCapturePolicy.isReaderCard("99Pop R$21,00 Dinheiro 2min (600m) 16min (6,7km)"))
+    }
 }
