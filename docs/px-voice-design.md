@@ -1,6 +1,6 @@
 # PX — comportamento proposto
 
-Estado: especificação de produto e compatibilidade. Não implementado nem publicado no APK.
+Estado: implementado; atualização de segundo plano e modos de fala em validação para 0.9.2.
 
 ## Uso
 
@@ -8,8 +8,11 @@ Estado: especificação de produto e compatibilidade. Não implementado nem publ
 - Selecionar conversa de voz privada com amigo aceito ou grupo privado por convite.
 - Entrar e sair do canal explicitamente. Os participantes escolhem participar da escuta.
 - Um único canal ativo por aparelho, com nome do destinatário/grupo sempre visível.
-- Uma pessoa transmite por vez. Pedido de fala recusado se o canal estiver ocupado.
-- Na tela PX: segurar para falar, soltar para parar; ouvir os demais enquanto conectado.
+- No modo direto, participantes autorizados podem transmitir simultaneamente, sem pedido HTTP por fala.
+- Na tela PX e na bolinha: escolher segurar/soltar ou tocar para iniciar e tocar novamente para parar. A escolha é salva. Ambos transmitem ao vivo; não geram mensagem de áudio gravada.
+- Apagar a tela encerra qualquer transmissão, mas mantém canal e escuta ativos no serviço em primeiro plano. O serviço mantém CPU ativa durante o PX; sair libera esse recurso.
+- Perda de foco de áudio interrompe o microfone e silencia o PX, sem sair do canal. Recuperar foco retoma somente escuta; o microfone exige novo gesto. Reconexão de transporte também não expulsa do grupo.
+- O áudio de escuta usa modo normal/mídia, sem manter o aparelho em modo de chamada. Antes de transmitir, gravação ativa de outro aplicativo impede abertura do microfone do PX. A captura silenciada pelo sistema encerra a fala.
 - Fora do aplicativo: bolinha PX própria e independente, com o nome da pessoa ou do grupo. Não reutilizar nem alterar a bolinha JD do leitor. A bolinha PX aparece somente após ativar o rádio e entrar explicitamente no canal; desaparece ao sair/desligar. Segurar solicita a fala; soltar/cancelar encerra a transmissão. Arrastar move somente a bolinha PX e cancela o gesto de fala.
 - Estado da bolinha PX e notificação identificam canal, conexão, quem fala e microfone ativo. Nenhuma transmissão apenas por entrar no canal.
 - Perda do toque, ACTION_CANCEL, desconexão, saída do canal, troca de conta, revogação de convite ou parada do serviço encerram a captura e liberam a vez de fala.

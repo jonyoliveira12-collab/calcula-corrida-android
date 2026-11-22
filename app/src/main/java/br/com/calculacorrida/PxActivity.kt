@@ -32,6 +32,8 @@ class PxActivity:AppCompatActivity(){
     private lateinit var talkLabel:TextView
     private lateinit var voiceSignal:PxVoiceIndicator
     private lateinit var connectionBadge:TextView
+    private lateinit var holdModeButton:Button
+    private lateinit var tapModeButton:Button
     private lateinit var muteButton:Button
     private lateinit var cards:LinearLayout
     private lateinit var contacts:LinearLayout
@@ -67,7 +69,7 @@ class PxActivity:AppCompatActivity(){
         talk=PxTalkButton(this).apply{isEnabled=false;setOnTouchListener{v,e->when(e.actionMasked){MotionEvent.ACTION_DOWN->{v.isPressed=true;v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);if(!PxService.status.value.tapToTalk)PxService.press();true};MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->{v.isPressed=false;if(e.actionMasked==MotionEvent.ACTION_CANCEL)PxService.release()else{if(PxService.status.value.tapToTalk)PxService.toggle()else PxService.release();v.performClick()};true};else->true}}};radio.addView(talk,LinearLayout.LayoutParams(dp(144),dp(144)).apply{topMargin=dp(6)})
         talkLabel=text("Segure para falar",16f,true).apply{setPadding(0,dp(2),0,dp(2));setTextColor(colors.gold);gravity=Gravity.CENTER};radio.addView(talkLabel)
         voiceSignal=PxVoiceIndicator(this);radio.addView(voiceSignal,LinearLayout.LayoutParams(-1,dp(24)).apply{topMargin=dp(4)})
-        val mode=row();listOf("Segurar para falar" to false,"Tocar para iniciar/parar" to true).forEach{(label,tap)->mode.addView(button(label){PxService.setTapMode(this,tap)},LinearLayout.LayoutParams(0,dp(46),1f))};radio.addView(mode)
+        val mode=row();listOf("Segurar para falar" to false,"Tocar para iniciar/parar" to true).forEach{(label,tap)->val control=button(label){PxService.setTapMode(this,tap)};if(tap)tapModeButton=control else holdModeButton=control;mode.addView(control,LinearLayout.LayoutParams(0,dp(46),1f))};radio.addView(mode)
         val controls=row();muteButton=button("Silenciar"){if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(PxService.MUTE))};controls.addView(muteButton,LinearLayout.LayoutParams(0,dp(46),1f).apply{rightMargin=dp(6)});controls.addView(button("Sair do canal"){if(PxService.status.value.active)startService(Intent(this,PxService::class.java).setAction(PxService.STOP))},LinearLayout.LayoutParams(0,dp(46),1f).apply{leftMargin=dp(6)});radio.addView(controls,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)});root.addView(radio,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
         contacts=row();root.addView(HorizontalScrollView(this).apply{addView(contacts);isHorizontalScrollBarEnabled=false},LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
         val actions=row();actions.addView(button("+ Conversa privada"){chooseFriend{peer->work{val result=client.call("private",JSONObject().put("peer",peer.getString("id")));reload();channels.find{it.optString("id")==result.optString("channel")}?.let{channel->runOnUiThread{enter(channel)}}}}},LinearLayout.LayoutParams(0,dp(48),1f).apply{rightMargin=dp(6)})
@@ -78,6 +80,7 @@ class PxActivity:AppCompatActivity(){
         scope.launch{PxService.status.collect{value->
             channelName.text=if(value.active)value.name else "Escolha seu canal";status.text=if(value.active)value.status else "Entre em uma conversa para começar"
             connectionBadge.text=if(value.connected)"● Conectado"else if(value.active)"● Conectando"else "● Desligado";connectionBadge.setTextColor(if(value.connected)colors.green else colors.muted)
+            listOf(holdModeButton to !value.tapToTalk,tapModeButton to value.tapToTalk).forEach{(control,selected)->control.isSelected=selected;control.background=surface(if(selected)colors.gold else colors.input,13);control.setTextColor(if(selected)Color.rgb(28,24,16)else colors.text)}
             voiceSignal.active=value.talking||value.speaker.isNotBlank();talk.isEnabled=value.connected&&!value.audioInterrupted;talk.transmitting=value.talking;talk.requesting=value.requesting;talk.text=if(value.talking){if(value.tapToTalk)"Transmitindo • toque para parar"else"Transmitindo • solte para parar"}else if(value.tapToTalk)"Toque para falar"else "Segure para falar";talk.contentDescription=talk.text
             talkLabel.text=when{value.audioInterrupted->"Microfone liberado para outro aplicativo";value.talking->if(value.tapToTalk)"Falando • toque para parar"else"Falando • solte para parar";value.requesting->"Preparando sua fala…";!value.connected->"Entre em um canal";else->if(value.tapToTalk)"Toque para falar"else"Segure para falar"};talkLabel.setTextColor(if(value.talking)colors.green else colors.gold);muteButton.text=if(value.muted)"Voltar a ouvir"else "Silenciar";muteButton.isEnabled=value.connected
             val renderKey=value.channel+value.connected;if(renderedChannel!=renderKey){renderedChannel=renderKey;drawChannels()}
