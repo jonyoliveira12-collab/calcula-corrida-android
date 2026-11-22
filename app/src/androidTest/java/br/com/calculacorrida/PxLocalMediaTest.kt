@@ -68,7 +68,7 @@ class PxLocalMediaTest {
             assertEquals("Receiver stayed in the same room",io.livekit.android.room.Room.State.CONNECTED,receiver.state)
             phase.set(2);runBlocking{assertTrue(sender.microphone(true))};assertTrue("Audio resumes without rejoining",second.await(15,TimeUnit.SECONDS));runBlocking{sender.microphone(false)}
         } finally {
-            runCatching{recorder?.stop()};recorder?.release();sender.close();receiver.disconnect();receiver.release();scope.cancel();audio.mode=oldMode
+            runCatching{recorder?.stop()};recorder?.release();receiver.disconnect();receiver.release();sender.close();scope.cancel();audio.mode=oldMode
             PxDependencies.gateway=oldGateway;FriendsDependencies.gateway=oldFriends
             inst.runOnMainSync{activity?.finish();session.edit().clear().apply();val edit=session.edit();original.forEach{(k,v)->when(v){is String->edit.putString(k,v);is Boolean->edit.putBoolean(k,v);is Int->edit.putInt(k,v);is Long->edit.putLong(k,v)}};edit.apply()}
         }
