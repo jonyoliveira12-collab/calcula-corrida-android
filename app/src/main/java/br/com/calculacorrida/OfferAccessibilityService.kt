@@ -560,7 +560,7 @@ class OfferAccessibilityService : AccessibilityService() {
         screenshotInProgress = true
         val requestTime=now
         var attempt=0
-        var hiddenViews:List<Pair<View,WindowManager.LayoutParams>> = emptyList()
+        var hiddenViews:List<Triple<View,WindowManager.LayoutParams,Float>> = emptyList()
         var hiddenAreas:Set<CaptureArea> = emptySet()
         var displayRegion:Rect?=null
         fun restoreViews() {
@@ -568,18 +568,10 @@ class OfferAccessibilityService : AccessibilityService() {
             hiddenViews=emptyList()
             if(views.isNotEmpty()) {
                 val restore={
-                    if(!stopped)views.forEach{(view,params)->
-                        val owned=view===bubble || overlays.values.any{it===view}
-                        if(owned && !view.isAttachedToWindow) {
-                            if(!readingEnabled())view.visibility=View.GONE
-                            val added=runCatching{(getSystemService(WINDOW_SERVICE) as WindowManager).addView(view,params)}.isSuccess
-                            if(!added) {
-                                if(view===bubble){bubble=null;bubbleParams=null}
-                                overlays.entries.firstOrNull{it.value===view}?.key?.let{source->
-                                    overlays.remove(source);overlayParams.remove(source);acceptedSignatures.remove(source)
-                                }
-                            }
-                        }
+                    views.forEach{(view,params,alpha)->
+                        params.alpha=alpha
+                        if(!stopped && view.isAttachedToWindow && (view===bubble || overlays.values.any{it===view}))
+                            runCatching{(getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view,params)}
                     }
                 }
                 if(Looper.myLooper()==Looper.getMainLooper())restore() else readerHandler.post{restore()}
@@ -614,10 +606,10 @@ class OfferAccessibilityService : AccessibilityService() {
                     Rect(bounds).takeIf{it.intersect(0,0,size.x,size.y)}
                 }.getOrNull()
                 hiddenViews=buildList {
-                    bubble?.let{view->bubbleParams?.let{params->if(view.isAttachedToWindow)add(view to params)}}
-                    overlays.forEach{(source,view)->overlayParams[source]?.let{params->if(view.isAttachedToWindow)add(view to params)}}
+                    bubble?.let{view->bubbleParams?.let{params->if(view.isAttachedToWindow)add(Triple(view,params,params.alpha))}}
+                    overlays.forEach{(source,view)->overlayParams[source]?.let{params->if(view.isAttachedToWindow)add(Triple(view,params,params.alpha))}}
                 }.distinctBy{it.first}
-                hiddenAreas=hiddenViews.mapNotNull{(view,_)->
+                hiddenAreas=hiddenViews.mapNotNull{(view,_,_)->
                     if(view.width<=0 || view.height<=0)null else {
                         val location=IntArray(2);view.getLocationOnScreen(location)
                         CaptureArea(location[0],location[1],location[0]+view.width,location[1]+view.height)
@@ -632,10 +624,15 @@ class OfferAccessibilityService : AccessibilityService() {
                 if(!validDisplay()) {
                     finish("Oferta encoberta ou janela atualizando; aguardando captura segura")
                 } else {
-                    // Removing the windows avoids compositor-delayed alpha
-                    // changes leaving an old analysis inside the screenshot.
-                    hiddenViews.forEach{(view,_)->runCatching{(getSystemService(WINDOW_SERVICE) as WindowManager).removeViewImmediate(view)}}
-                    if(hiddenViews.any{it.first.isAttachedToWindow})finish("Aguardando retirada dos controles da captura")
+                    // Window alpha is applied by the compositor itself. Keep
+                    // window IDs and geometry stable while excluding old card
+                    // surfaces, rather than detaching or fading view content.
+                    var hidden=true
+                    hiddenViews.forEach{(view,params,_)->
+                        params.alpha=0f
+                        if(runCatching{(getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(view,params)}.isFailure)hidden=false
+                    }
+                    if(!hidden)finish("Aguardando ocultação dos controles da captura")
                 }
             }
             if(!display || screenshotInProgress) {
