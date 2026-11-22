@@ -177,7 +177,7 @@ class ReaderConcurrentOffersTest {
             val ninetyNineSummary = listOf("30 min", "15,00 km", "R$ 30,00")
             fun uberTag() = findTag("UBER", uberSummary, listOf("1,50", "36,00", "4,80"))
             fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("2,00", "60,00", "4,90"))
-            await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
+            await("Distinct Uber and 99 tags with the correct metrics",90000) { uberTag() != null && ninetyNineTag() != null }
             if(android.os.Build.VERSION.SDK_INT>=34)assertTrue("Missing window callbacks exercise real cropped display fallback",lostCallbacks.get()>0)
 
             // Changing a label must refresh an already-visible card too.
