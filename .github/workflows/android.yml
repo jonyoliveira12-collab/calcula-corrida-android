@@ -46,6 +46,7 @@ jobs:
       - name: Test and compile without signing secrets
         run: |
           if [[ "${{ inputs.concurrent_only }}" == "true" ]]; then
+            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
           else
             gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug :app:bundleRelease
           fi
@@ -126,7 +127,6 @@ jobs:
           profile: ${{ matrix.form == 'tablet' && 'pixel_c' || 'pixel_4' }}
           disable-animations: true
           script: |
-            gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell pm grant br.com.calculacorrida.avaliacao051 android.permission.POST_NOTIFICATIONS
