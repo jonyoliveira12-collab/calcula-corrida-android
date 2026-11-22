@@ -79,7 +79,7 @@ class PxRadioTest {
         fun waitFor(message:String,test:()->Boolean){val end=SystemClock.elapsedRealtime()+12000;while(!test()&&SystemClock.elapsedRealtime()<end)Thread.sleep(60);assertTrue(message,test())}
         private fun shell(cmd:String){android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(cmd)).use{it.readBytes()}}
         private fun find(view:View,label:String):Button?{if(view is Button&&view.text.toString()==label)return view;if(view is ViewGroup)for(i in 0 until view.childCount)find(view.getChildAt(i),label)?.let{return it};return null}
-        fun screen(on:Boolean){shell("input keyevent ${if(on)224 else 223}")}
+        fun screen(on:Boolean){shell("input keyevent ${if(on)224 else 223}");if(on)shell("wm dismiss-keyguard")}
         fun setup(){
             screen(true);audioPrefs.edit().putBoolean("tap_to_talk",false).commit()
             main{context.stopService(Intent(context,PxService::class.java))};Thread.sleep(150)
