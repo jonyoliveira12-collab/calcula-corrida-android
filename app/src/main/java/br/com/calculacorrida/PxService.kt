@@ -67,6 +67,7 @@ class PxService:Service() {
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         when(intent?.action){
             STOP->shutdown("PX desligado")
+            RESUME_AUDIO->{if(state.value.active)room?.resumeAudio()}
             END_TALK->releaseTalk()
             MUTE->{if(!state.value.active){stopSelf();return START_NOT_STICKY};state.value=state.value.copy(muted=!state.value.muted);applyVolumes();notice();paintBubble()}
             JOIN->{
@@ -142,7 +143,7 @@ class PxService:Service() {
     override fun onConfigurationChanged(config:android.content.res.Configuration){super.onConfigurationChanged(config);releaseTalk();removeBubble();showBubble()}
     override fun onDestroy(){wakeLock?.let{if(it.isHeld)it.release()};wakeLock=null;radioSounds?.close();radioSounds=null;stopping=true;held=false;removeBubble();room?.close();room=null;scope.cancel();getSharedPreferences("user_session",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(prefsListener);getSharedPreferences("settings",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(prefsListener);runCatching{unregisterReceiver(receiver)};val channel=activeChannel;val conn=connection;state.value=State(status=state.value.status);if(channel.isNotBlank()&&conn.isNotBlank())Thread{runCatching{client.call("leave",JSONObject().put("channel",channel).put("connection",conn))}}.start();super.onDestroy();instance=null}
     companion object{
-        const val END_TALK="br.com.calculacorrida.PX_END_TALK";const val JOIN="br.com.calculacorrida.PX_JOIN";const val STOP="br.com.calculacorrida.PX_STOP";const val MUTE="br.com.calculacorrida.PX_MUTE";private const val CHANNEL="jd_px_voice";private const val NOTICE=904
+        const val RESUME_AUDIO="br.com.calculacorrida.PX_RESUME_AUDIO";const val END_TALK="br.com.calculacorrida.PX_END_TALK";const val JOIN="br.com.calculacorrida.PX_JOIN";const val STOP="br.com.calculacorrida.PX_STOP";const val MUTE="br.com.calculacorrida.PX_MUTE";private const val CHANNEL="jd_px_voice";private const val NOTICE=904
         private val state=MutableStateFlow(State());val status=state.asStateFlow()
         @Volatile private var instance:PxService?=null
         @Volatile private var uiVisible=false

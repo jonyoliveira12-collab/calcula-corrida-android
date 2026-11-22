@@ -15,6 +15,7 @@ internal interface PxVoice {
     val mayPublish:Boolean
     suspend fun connect(url:String,token:String)
     suspend fun microphone(enabled:Boolean):Boolean
+    fun resumeAudio() {}
     fun volumes(muted:Boolean)
     fun close()
 }
@@ -57,6 +58,7 @@ internal class LivePxVoice(context:Context,scope:CoroutineScope,event:(String,St
         room.localParticipant.trackPublications.values.toList().forEach{publication->(publication.track as? LocalAudioTrack)?.let{it.stopPrewarm();room.localParticipant.unpublishTrack(it,true)}}
         microphoneTrack=null;true
     }
+    override fun resumeAudio(){room.audioSwitchHandler?.stop();room.audioSwitchHandler?.start()}
     override fun volumes(muted:Boolean){room.remoteParticipants.values.forEach{p->p.trackPublications.values.forEach{publication->(publication.track as? RemoteAudioTrack)?.setVolume(if(muted)0.0 else 1.0)}}}
     override fun close(){audio.unregisterAudioRecordingCallback(recordingCallback);runCatching{microphoneTrack?.stopPrewarm()};runCatching{microphoneTrack?.stop()};microphoneTrack=null;room.disconnect();room.release()}
 }
