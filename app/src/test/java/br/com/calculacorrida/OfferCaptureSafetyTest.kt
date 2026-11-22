@@ -27,7 +27,11 @@ class OfferCaptureSafetyTest {
         assertFalse(OfferCaptureSafety.allows(target,listOf(target.copy(area=CaptureArea(300,100,550,900))),"reader",emptySet()))
         assertFalse(OfferCaptureSafety.allows(target.copy(owner="private.chat"),listOf(target.copy(owner="private.chat")),"reader",emptySet()))
     }
-    @Test fun windowsBehindTheDriverDoNotContributePixels() {
-        assertTrue(allowed(CaptureSurface(20,"private.chat",CaptureArea(0,0,900,1000),1,1)))
+    @Test fun transparentEdgesCannotExposeAnotherAppsPixelsBehindTheOffer() {
+        assertFalse(allowed(CaptureSurface(20,"private.chat",CaptureArea(0,0,900,1000),1,1)))
+        assertTrue(allowed(CaptureSurface(20,"com.app99.driver",CaptureArea(0,0,900,1000),1,1)))
+    }
+    @Test fun emptyWindowsCannotOccludeAnOffer() {
+        assertTrue(allowed(CaptureSurface(20,null,CaptureArea(400,300,400,500),5,3)))
     }
 }

@@ -35,7 +35,7 @@ public class OfferFixtureActivity extends Activity {
         final String layout=getIntent().getStringExtra("layout");
         final boolean realistic="dual_realistic".equals(layout);
         final boolean dual="dual".equals(layout) || realistic;
-        final boolean floating=dual || "floating".equals(layout) || "priority".equals(layout) || "pop99_floating".equals(layout) || layout!=null && layout.startsWith("envios");
+        final boolean floating=dual || "fallback".equals(layout) || "floating".equals(layout) || "priority".equals(layout) || "pop99_floating".equals(layout) || layout!=null && layout.startsWith("envios");
         View offer=new View(this) {
             final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
             boolean marked=false;
@@ -129,7 +129,10 @@ public class OfferFixtureActivity extends Activity {
                 icon.gravity=Gravity.TOP|Gravity.LEFT;
                 View bubble=new View(this);bubble.setBackgroundColor(Color.GRAY);wm.addView(bubble,icon);
             }
-            startActivity(new android.content.Intent().setClassName("br.com.calculacorrida.fixture.backdrop","br.com.calculacorrida.fixture.OfferFixtureActivity"));
+            // Cropped display fallback must never sample an unrelated app below
+            // transparent offer edges. These scenarios use the driver's own base.
+            if(!(dual && getPackageName().equals("com.app99.driver")) && !"fallback".equals(layout))
+                startActivity(new android.content.Intent().setClassName("br.com.calculacorrida.fixture.backdrop","br.com.calculacorrida.fixture.OfferFixtureActivity"));
         } else setContentView(offer);
     }
 

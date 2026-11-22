@@ -51,7 +51,7 @@ class ReaderPrivacyTest {
             shell("settings put secure accessibility_enabled 1")
             await("OCR model initialized", 30000) { settings.getBoolean("reader_model_ready", false) }
             val beforeOffer = System.currentTimeMillis()
-            shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout floating")
+            shell("am start -W -n com.ubercab.driver/br.com.calculacorrida.fixture.OfferFixtureActivity --es layout fallback")
             await("Floating offer read before bank", 25000) { settings.getLong("reader_last_detection", 0) >= beforeOffer }
             await("CC visible before bank") { hasCc() }
 
