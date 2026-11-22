@@ -92,10 +92,21 @@ class ReaderConcurrentOffersTest {
                 val records = JourneyStore.getRecords(context).take(5).joinToString(" | ") {
                     listOf(it.optString("app"), it.optDouble("fare"), it.optDouble("totalKm"), it.optDouble("minutes"), it.optDouble("perKm"), it.optDouble("perHour"), it.optString("passengerRating")).joinToString(";")
                 }
+                var serviceState=""
+                instrumentation.runOnMainSync {
+                    val clazz=OfferAccessibilityService::class.java
+                    val active=clazz.getDeclaredField("active").apply{isAccessible=true}.get(null)
+                    if(active!=null) {
+                        val fields=listOf("lastCaptureByPackage","lastCaptureByWindow","missingOffers","detectedWindows","foregroundPackage","stopped","screenshotInProgress","driverFrames")
+                        serviceState=fields.joinToString(" / "){name->"$name="+clazz.getDeclaredField(name).apply{isAccessible=true}.get(active)}
+                        serviceState+=" / order="+clazz.getDeclaredMethod("visibleDriverPackages").apply{isAccessible=true}.invoke(active)
+                        serviceState+=" / enabled="+clazz.getDeclaredMethod("readingEnabled").apply{isAccessible=true}.invoke(active)
+                    }
+                }
                 val windows = describeWindows()
                 val fixtureOcr = if (label.startsWith("Distinct") || label.startsWith("Tall")) describeSyntheticNinetyNineOcr() else ""
                 val crashes=if(label.startsWith("Tall")) shell("logcat -d -b crash -v brief -t 100").takeLast(6000) else ""
-                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr / fixture crashes=$crashes")
+                fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr / fixture crashes=$crashes / service=$serviceState")
             }
         }
         fun findTag(source: String, summary: List<String>, metrics: List<String>): Rect? {

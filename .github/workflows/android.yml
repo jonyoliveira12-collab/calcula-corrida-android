@@ -44,7 +44,12 @@ jobs:
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36'
           fi
       - name: Test and compile without signing secrets
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease
+        run: |
+          if [[ "${{ inputs.concurrent_only }}" == "true" ]]; then
+          else
+            gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :reader-fixture:assembleDebug :app:bundleRelease
+          fi
+          tar -cf native-fixtures.tar app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk reader-fixture/build/outputs/apk
 
       - name: Check automatic reader configuration
         run: python .github/scripts/audit_apk.py app/build/outputs/apk/debug/app-debug.apk
@@ -54,6 +59,13 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='br.com.calculacorrida.avaliacao051'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "targetSdkVersion:'36'"
       - uses: actions/upload-artifact@v4
+        with:
+          name: JHONDRIVER-native-fixtures
+          path: native-fixtures.tar
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.concurrent_only }}
         with:
           name: JHONDRIVER-unsigned-bundle-for-verification
           path: app/build/outputs/bundle/release/app-release.aab
@@ -96,6 +108,11 @@ jobs:
         env:
           PX_API_LEVEL: ${{ matrix.api }}
         run: python .github/scripts/fetch_px_qa.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: JHONDRIVER-native-fixtures
+      - name: Extract compiled native fixtures
+        run: tar -xf native-fixtures.tar
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
