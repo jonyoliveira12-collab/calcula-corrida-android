@@ -63,11 +63,6 @@ class OfferAccessibilityService : AccessibilityService() {
     private data class DriverFrame(val id:Int,val bounds:Rect,val text:String,val fareBounds:Rect?,val score:Long,val layer:Int=0)
     @Volatile private var captureSurfaces:List<CaptureSurface> = emptyList()
     private val displayFallbackUntil=mutableMapOf<Pair<String,Int>,Long>()
-    private val captureWindowManager:WindowManager by lazy {
-        val display=requireNotNull((getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).getDisplay(Display.DEFAULT_DISPLAY))
-        val uiContext=if(Build.VERSION.SDK_INT>=30)createDisplayContext(display).createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,null) else this
-        uiContext.getSystemService(WINDOW_SERVICE) as WindowManager
-    }
     private fun captureArea(bounds:Rect)=CaptureArea(bounds.left,bounds.top,bounds.right,bounds.bottom)
     private val windowExecutor=Executors.newSingleThreadExecutor()
     private val windowRefreshPending=java.util.concurrent.atomic.AtomicBoolean(false)
@@ -596,10 +591,13 @@ class OfferAccessibilityService : AccessibilityService() {
             val number=++attempt
             if(display) {
                 displayRegion=runCatching {
-                    val metrics=captureWindowManager.currentWindowMetrics
-                    val insets=metrics.windowInsets.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
-                    val safe=Rect(metrics.bounds).apply{left+=insets.left;top+=insets.top;right-=insets.right;bottom-=insets.bottom}
-                    Rect(bounds).takeIf{it.intersect(safe)}
+                    // Display screenshots use physical display coordinates. A
+                    // cached WindowContext can retain old bounds after rotation.
+                    val display=requireNotNull((getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).getDisplay(Display.DEFAULT_DISPLAY))
+                    val size=android.graphics.Point()
+                    @Suppress("DEPRECATION")
+                    display.getRealSize(size)
+                    Rect(bounds).takeIf{it.intersect(0,0,size.x,size.y)}
                 }.getOrNull()
                 hiddenViews=(listOfNotNull(bubble)+overlays.values).distinct().filter{it.isAttachedToWindow}.map{it to it.alpha}
                 hiddenAreas=hiddenViews.mapNotNull{(view,_)->
@@ -608,6 +606,12 @@ class OfferAccessibilityService : AccessibilityService() {
                         CaptureArea(location[0],location[1],location[0]+view.width,location[1]+view.height)
                     }
                 }.toSet()
+                val source=captureSurfaces.firstOrNull{it.id==windowId && it.owner==pkg}
+                val region=displayRegion
+                displayRegion=if(source!=null && region!=null) {
+                    OfferCaptureSafety.uncoveredArea(source.copy(area=captureArea(region)),captureSurfaces,packageName,hiddenAreas,Build.VERSION.SDK_INT>=34)
+                        ?.let{Rect(it.left,it.top,it.right,it.bottom)}
+                } else null
                 if(!validDisplay()) {
                     finish("Oferta encoberta ou janela atualizando; aguardando captura segura")
                 } else {
@@ -714,7 +718,16 @@ class OfferAccessibilityService : AccessibilityService() {
         try {
                         textRecognizer.process(InputImage.fromBitmap(image, angles[index]))
                             .addOnSuccessListener { visionText ->
-                                if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) return@addOnSuccessListener
+                                if (stopped || lastScreenshotAt!=requestTime) return@addOnSuccessListener
+                                if(!captureStillValid(pkg,windowId,bounds)) {
+                                    val reason=when {
+                                        android.os.SystemClock.elapsedRealtime()-snapshotAt>2000L -> "Consulta da janela expirou durante OCR; repetindo"
+                                        !readingEnabled() -> "Leitura pausada durante OCR"
+                                        else -> "A janela da oferta mudou durante OCR; repetindo"
+                                    }
+                                    recognitionStatus(pkg,reason)
+                                    return@addOnSuccessListener
+                                }
                                 val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
                                 if (!prefs.getBoolean("copilot_enabled", false) && !prefs.getBoolean("traffic_enabled", false)) return@addOnSuccessListener
                                 val recognized = OfferTextParser.normalizeOcrText(visionText.text)

@@ -43,6 +43,19 @@ class OfferCaptureSafetyTest {
         assertTrue(OfferCaptureSafety.allows(target,listOf(target,below),"reader",emptySet(),false))
         assertFalse(OfferCaptureSafety.allows(target,listOf(target,below.copy(layer=5)),"reader",emptySet(),false))
     }
+    @Test fun foreignCornerControlsAreRemovedInsteadOfBeingRead() {
+        val cover=CaptureSurface(20,"private.controls",CaptureArea(500,100,600,180),5,3)
+        val surfaces=listOf(target,cover)
+        val crop=OfferCaptureSafety.uncoveredArea(target,surfaces,"reader",emptySet())!!
+        assertFalse(crop.overlaps(cover.area))
+        assertTrue(target.area.contains(crop))
+        assertTrue(OfferCaptureSafety.allows(target.copy(area=crop),surfaces,"reader",emptySet()))
+    }
+    @Test fun fullyCoveredOrForeignBackgroundWindowsHaveNoSafeCrop() {
+        val cover=CaptureSurface(20,"private.chat",target.area,5,1)
+        assertNull(OfferCaptureSafety.uncoveredArea(target,listOf(target,cover),"reader",emptySet()))
+        assertNull(OfferCaptureSafety.uncoveredArea(target,listOf(target,cover.copy(layer=1)),"reader",emptySet()))
+    }
     @Test fun anotherDisplaysCoordinatesCannotAuthorizeACapture() {
         val external=target.copy(display=1)
         assertFalse(OfferCaptureSafety.allows(external,listOf(external),"reader",emptySet()))
