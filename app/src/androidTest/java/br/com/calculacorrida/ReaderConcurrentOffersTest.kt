@@ -138,6 +138,12 @@ class ReaderConcurrentOffersTest {
             } finally { root.recycle() }
         }.maxByOrNull { it.width().toLong() * it.height() }
 
+        val oldTransport=OfferScreenshotTransport.windowOverride
+        val lostCallbacks=java.util.concurrent.atomic.AtomicInteger()
+        if(android.os.Build.VERSION.SDK_INT>=34)OfferScreenshotTransport.windowOverride={service,pkg,id,executor,callback->
+            if(pkg=="com.app99.driver")lostCallbacks.incrementAndGet()
+            else service.takeScreenshotOfWindow(id,executor,callback)
+        }
         val oldServices = shell("settings get secure enabled_accessibility_services")
         val oldEnabled = shell("settings get secure accessibility_enabled")
         val prefs = context.getSharedPreferences("settings", 0)
@@ -172,6 +178,7 @@ class ReaderConcurrentOffersTest {
             fun uberTag() = findTag("UBER", uberSummary, listOf("1,50", "36,00", "4,80"))
             fun ninetyNineTag() = findTag("99", ninetyNineSummary, listOf("2,00", "60,00", "4,90"))
             await("Distinct Uber and 99 tags with the correct metrics") { uberTag() != null && ninetyNineTag() != null }
+            if(android.os.Build.VERSION.SDK_INT>=34)assertTrue("Missing window callbacks exercise real cropped display fallback",lostCallbacks.get()>0)
 
             // Changing a label must refresh an already-visible card too.
             prefs.edit().putString("label_bad","Vixe, sai fora").putString("label_good","Bora, carai!").commit()
@@ -282,6 +289,7 @@ class ReaderConcurrentOffersTest {
             }
 
         } finally {
+            OfferScreenshotTransport.windowOverride=oldTransport
             listOf("com.ubercab.driver", "com.app99.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             shell("wm user-rotation free")
             prefs.edit().apply {

@@ -30,6 +30,8 @@ class ReaderPrivacyTest {
                 .joinToString(" / ") { context.getSharedPreferences("settings", 0).getString(it, "").orEmpty() }
             assertTrue("$label: $diagnostic", predicate())
         }
+        val oldTransport=OfferScreenshotTransport.windowOverride
+        if(android.os.Build.VERSION.SDK_INT>=34)OfferScreenshotTransport.windowOverride={_,_,_,_,_->}
         val settings = context.getSharedPreferences("settings", 0)
         val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
         var focusWindow: android.widget.TextView? = null
@@ -84,11 +86,13 @@ class ReaderPrivacyTest {
             assertEquals("No driver screenshot while bank is visible", lastCapture, settings.getLong("reader_last_capture", 0))
             assertEquals("No driver offer processed while bank is visible", lastDetection, settings.getLong("reader_last_detection", 0))
 
+            instrumentation.runOnMainSync {focusWindow?.let{wm.removeView(it)};focusWindow=null}
             shell("am force-stop com.nu.production")
             await("Protection lifted after bank closes") { !settings.getBoolean("reader_privacy_protected", true) }
             await("CC returns after bank closes") { hasCc() }
             await("Offer reading resumes", 25000) { settings.getLong("reader_last_detection", 0) > lastDetection }
         } finally {
+            OfferScreenshotTransport.windowOverride=oldTransport
             instrumentation.runOnMainSync { focusWindow?.let { wm.removeView(it) } }
             listOf("com.nu.production", "com.ubercab.driver", "br.com.calculacorrida.fixture.backdrop").forEach { shell("am force-stop $it") }
             settings.edit().putBoolean("copilot_enabled", false).putBoolean("traffic_enabled", false).commit()

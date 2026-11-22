@@ -61,6 +61,9 @@ class OfferAccessibilityService : AccessibilityService() {
     @Volatile private var lastScreenshotAt = 0L
     private val readerHandler = Handler(Looper.getMainLooper())
     private data class DriverFrame(val id:Int,val bounds:Rect,val text:String,val fareBounds:Rect?,val score:Long,val layer:Int=0)
+    @Volatile private var captureSurfaces:List<CaptureSurface> = emptyList()
+    private val displayFallbackUntil=mutableMapOf<Pair<String,Int>,Long>()
+    private fun captureArea(bounds:Rect)=CaptureArea(bounds.left,bounds.top,bounds.right,bounds.bottom)
     private val windowExecutor=Executors.newSingleThreadExecutor()
     private val windowRefreshPending=java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var driverFrames:Map<String,DriverFrame> = emptyMap()
@@ -364,7 +367,15 @@ class OfferAccessibilityService : AccessibilityService() {
                     // Inspect only package identities first; never inspect the bank's
                     // node text. A driver window can coexist with the bank in split
                     // screen or as a floating card, even when it has input focus.
-                    val windowPackages = windows.mapNotNull { window ->
+                    val currentWindows=windows
+                    val surfaces=currentWindows.map { window ->
+                        val root=window.root
+                        val owner=try{root?.packageName?.toString()}finally{root?.recycle()}
+                        val area=Rect().also{window.getBoundsInScreen(it)}
+                        CaptureSurface(window.id,owner,captureArea(area),window.layer,window.type)
+                    }
+                    captureSurfaces=surfaces
+                    val windowPackages = currentWindows.mapNotNull { window ->
                         if(window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && window.type!=android.view.accessibility.AccessibilityWindowInfo.TYPE_SYSTEM)return@mapNotNull null
                         val root=window.root ?: return@mapNotNull null
                         try {
@@ -418,6 +429,7 @@ class OfferAccessibilityService : AccessibilityService() {
                     if(!stopped) {
                         val available=snapshot.flatMap{(pkg,frames)->frames.map{pkg to it.id}}.toSet()
                         lastCaptureByWindow.keys.retainAll(available)
+                        displayFallbackUntil.keys.retainAll(available)
                         val observedAt=android.os.SystemClock.elapsedRealtime()
                         detectedWindows.entries.toList().forEach { (pkg,id) ->
                             if(snapshot[pkg].orEmpty().any{it.id==id})missingSourceWindows.remove(pkg)
@@ -547,81 +559,114 @@ class OfferAccessibilityService : AccessibilityService() {
         getSharedPreferences("settings",MODE_PRIVATE).edit().putString("reader_last_app",driverAppName(pkg)).putLong("reader_last_capture",System.currentTimeMillis()).apply()
         screenshotInProgress = true
         val requestTime=now
-        val captureViews=if(Build.VERSION.SDK_INT<34)(listOfNotNull(bubble)+overlays.values).distinct().map{it to it.alpha} else emptyList()
-        fun restoreCaptureViews() {
-            if(captureViews.isNotEmpty())readerHandler.post {captureViews.forEach{(view,alpha)->view.alpha=alpha}}
-        }
-        captureStatus(pkg,"Solicitando imagem da janela ${bounds.width()}×${bounds.height()}")
-        readerHandler.postDelayed({
-            if(screenshotInProgress && lastScreenshotAt==requestTime) {
-                screenshotInProgress=false
-                restoreCaptureViews()
-                readerStatus("Captura demorou; repetindo automaticamente")
+        var attempt=0
+        var hiddenViews:List<Pair<View,Float>> = emptyList()
+        var hiddenAreas:Set<CaptureArea> = emptySet()
+        fun restoreViews() {
+            val views=hiddenViews
+            hiddenViews=emptyList()
+            if(views.isNotEmpty()) {
+                val restore={views.forEach{(view,alpha)->view.alpha=alpha}}
+                if(Looper.myLooper()==Looper.getMainLooper())restore() else readerHandler.post{restore()}
             }
-        },12000L)
-        try {
-            val callback = object : AccessibilityService.TakeScreenshotCallback {
-                    override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
-                        restoreCaptureViews()
-                        if(lastScreenshotAt==requestTime)captureStatus(pkg,"Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms")
-                        var bitmap: Bitmap? = null
-                        try {
-                            val hardwareBuffer = result.hardwareBuffer
-                            bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, result.colorSpace)
-                                ?.copy(Bitmap.Config.ARGB_8888, false)
-                        } catch (_: Exception) {
-                        }
-                        try { result.hardwareBuffer.close() } catch (_: Exception) {}
-                        val captured = bitmap
-                        if (stopped || lastScreenshotAt!=requestTime || !captureStillValid(pkg, windowId, bounds)) {
-                            captured?.recycle()
-                            if(lastScreenshotAt==requestTime) screenshotInProgress = false
-                            return
-                        }
-                        if (captured == null) {
-                            readerStatus("Falha ao converter a imagem da janela")
-                            if(lastScreenshotAt==requestTime) screenshotInProgress = false
-                            return
-                        }
-                        // Android 11–13 only provides a display screenshot. Discard everything
-                        // outside the current, allowlisted driver window before invoking OCR.
-                        val offerImage = if(Build.VERSION.SDK_INT<34) {
-                            val region=Rect(bounds)
-                            if(!region.intersect(0,0,captured.width,captured.height) || !isOfferSized(region)) {
-                                captured.recycle()
-                                if(lastScreenshotAt==requestTime)screenshotInProgress=false
-                                return
-                            }
-                            val cropped=Bitmap.createBitmap(captured,region.left,region.top,region.width(),region.height())
-                            if(cropped!==captured)captured.recycle()
-                            cropped
-                        } else captured
-                        readerHandler.post { recognizeCaptured(pkg,windowId,bounds,offerImage,requestTime) }
+        }
+        fun validDisplay():Boolean {
+            if(!captureStillValid(pkg,windowId,bounds))return false
+            val target=captureSurfaces.firstOrNull{it.id==windowId && it.owner==pkg} ?: return false
+            if(target.area!=captureArea(bounds))return false
+            return OfferCaptureSafety.allows(target,captureSurfaces,packageName,hiddenAreas)
+        }
+        fun finish(message:String?=null) {
+            restoreViews()
+            if(lastScreenshotAt==requestTime)screenshotInProgress=false
+            if(message!=null)readerStatus(message)
+        }
+        lateinit var begin:(Boolean)->Unit
+        begin={ display ->
+            val number=++attempt
+            if(display) {
+                hiddenViews=(listOfNotNull(bubble)+overlays.values).distinct().filter{it.isAttachedToWindow}.map{it to it.alpha}
+                hiddenAreas=hiddenViews.mapNotNull{(view,_)->
+                    if(view.width<=0 || view.height<=0)null else {
+                        val location=IntArray(2);view.getLocationOnScreen(location)
+                        CaptureArea(location[0],location[1],location[0]+view.width,location[1]+view.height)
                     }
-
-                    override fun onFailure(errorCode: Int) {
-                        restoreCaptureViews()
-                        if(lastScreenshotAt==requestTime)captureStatus(pkg,"Falha da captura: código $errorCode")
-                        if(lastScreenshotAt==requestTime) screenshotInProgress = false
-                        readerStatus("Captura indisponível (código $errorCode). A leitura por texto continua ativa.")
+                }.toSet()
+                if(!validDisplay()) {
+                    finish("Oferta encoberta ou janela atualizando; aguardando captura segura")
+                } else {
+                    hiddenViews.forEach{(view,_)->view.alpha=0f}
+                }
+            }
+            if(!display || screenshotInProgress) {
+                captureStatus(pkg,if(display)"Captura alternativa limitada à oferta ${bounds.width()}×${bounds.height()}" else "Solicitando imagem da janela ${bounds.width()}×${bounds.height()}")
+                fun current()=lastScreenshotAt==requestTime && attempt==number && !stopped
+                fun fallback() {
+                    if(!current())return
+                    if(!display && Build.VERSION.SDK_INT>=34) {
+                        displayFallbackUntil[pkg to windowId]=android.os.SystemClock.elapsedRealtime()+60000L
+                        begin(true)
+                    } else finish("Captura demorou; repetindo automaticamente")
+                }
+                val received=java.util.concurrent.atomic.AtomicBoolean(false)
+                readerHandler.postDelayed({if(current() && screenshotInProgress && !received.get())fallback()},if(display)5000L else 1800L)
+                val callback=object:AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(result:AccessibilityService.ScreenshotResult) {
+                        received.set(true)
+                        if(!current()) {runCatching{result.hardwareBuffer.close()};return}
+                        var captured:Bitmap?=null
+                        try {
+                            if(captureStillValid(pkg,windowId,bounds) && (!display || validDisplay())) {
+                                captured=Bitmap.wrapHardwareBuffer(result.hardwareBuffer,result.colorSpace)?.copy(Bitmap.Config.ARGB_8888,false)
+                            }
+                        } catch(_:Exception) {} finally {runCatching{result.hardwareBuffer.close()}}
+                        val image=captured
+                        readerHandler.post {
+                            if(!current()) {image?.recycle();return@post}
+                            restoreViews()
+                            if(image==null || !captureStillValid(pkg,windowId,bounds) || (display && !validDisplay())) {
+                                image?.recycle();finish();return@post
+                            }
+                            captureStatus(pkg,"Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms${if(display)" • alternativa recortada" else ""}")
+                            val offerImage=if(display) {
+                                val region=Rect(bounds)
+                                if(!region.intersect(0,0,image.width,image.height) || region!=bounds) {
+                                    image.recycle();finish();return@post
+                                }
+                                val crop=Bitmap.createBitmap(image,region.left,region.top,region.width(),region.height())
+                                if(crop!==image)image.recycle()
+                                crop
+                            } else image
+                            // OCR has its own deadline. A slow recognition must
+                            // never be mistaken for a missing screenshot callback.
+                            readerHandler.postDelayed({if(current() && screenshotInProgress)finish("Reconhecimento demorou; repetindo leitura")},30000L)
+                            recognizeCaptured(pkg,windowId,bounds,offerImage,requestTime)
+                        }
+                    }
+                    override fun onFailure(errorCode:Int) {
+                        received.set(true)
+                        readerHandler.post {
+                            if(!current())return@post
+                            if(!display && errorCode==AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERNAL_ERROR)fallback()
+                            else {
+                                captureStatus(pkg,"Falha da captura: código $errorCode")
+                                finish("Captura indisponível; leitura por texto continua ativa")
+                            }
+                        }
                     }
                 }
-            if (Build.VERSION.SDK_INT >= 34) takeScreenshotOfWindow(windowId, screenshotCallbackExecutor, callback)
-            else {
-                captureViews.forEach{(view,_)->view.alpha=0f}
-                readerHandler.postDelayed({
-                    if(lastScreenshotAt!=requestTime || !captureStillValid(pkg,windowId,bounds)) {
-                        restoreCaptureViews()
-                        if(lastScreenshotAt==requestTime)screenshotInProgress=false
-                    } else try { takeScreenshot(Display.DEFAULT_DISPLAY,screenshotCallbackExecutor,callback) }
-                    catch(_:Exception) {restoreCaptureViews();if(lastScreenshotAt==requestTime)screenshotInProgress=false}
-                },100L)
+                try {
+                    if(display)readerHandler.postDelayed({
+                        if(current() && validDisplay()) {
+                            try {takeScreenshot(Display.DEFAULT_DISPLAY,screenshotCallbackExecutor,callback)}
+                            catch(_:Exception){finish("Não foi possível capturar a oferta")}
+                        } else if(current())finish()
+                    },100L)
+                    else OfferScreenshotTransport.window(this,pkg,windowId,screenshotCallbackExecutor,callback)
+                } catch(_:Exception) {finish("Não foi possível capturar a oferta")}
             }
-        } catch (_: Exception) {
-            if(lastScreenshotAt==requestTime) screenshotInProgress = false
-            restoreCaptureViews()
-            readerStatus("Não foi possível capturar a oferta; leitura por texto continua ativa")
         }
+        begin(Build.VERSION.SDK_INT<34 || (displayFallbackUntil[pkg to windowId]?:0L)>now)
     }
 
     private fun prepareOfferRegion(pkg:String,bitmap:Bitmap,bodyOnly:Boolean=false):Bitmap {
