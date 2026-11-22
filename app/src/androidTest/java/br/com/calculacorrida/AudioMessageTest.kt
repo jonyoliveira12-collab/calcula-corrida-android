@@ -164,6 +164,9 @@ class AudioMessageTest {
         chat.click("▶ OUVIR ÁUDIO");chat.await{chat.playing()}
         val file=chat.field<File>("playbackFile")!!
         chat.inst.runOnMainSync{chat.activity.finish()};chat.inst.waitForIdleSync()
+        // finish() schedules lifecycle callbacks; wait for onPause/onDestroy,
+        // rather than treating an idle queue as a completed Activity teardown.
+        chat.await{chat.field<MediaPlayer>("player")==null && !file.exists()}
         assertNull(chat.field<MediaPlayer>("player"));assertFalse("Leaving deletes private playback bytes",file.exists())
     }
     @Test fun changingAccountCannotPlayAnOldUnsentRecording()=withChat {chat->

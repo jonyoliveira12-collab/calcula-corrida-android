@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      tablet_only:
+        description: Recheck only the tablet after the phone profiles passed
+        type: boolean
+        required: false
+        default: false
       concurrent_only:
         description: Recheck concurrent-offer placement and chat audio after test-fixture changes
         type: boolean
@@ -70,13 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - api: 36
-            form: tablet
-          - api: 33
-            form: phone
-          - api: 36
-            form: phone
+        include: ${{ fromJSON(inputs.tablet_only && '[{"api":36,"form":"tablet"}]' || '[{"api":36,"form":"tablet"},{"api":33,"form":"phone"},{"api":36,"form":"phone"}]') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

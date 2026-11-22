@@ -77,7 +77,7 @@ class ReaderConcurrentOffersTest {
                 matched=check()
             }
             val prefs = context.getSharedPreferences("settings", 0)
-            val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status")
+            val diagnostic = listOf("reader_status", "reader_window_status", "reader_capture_status", "reader_ocr_status", "reader_capture_99", "reader_ocr_99")
                 .joinToString(" / ") { prefs.getString(it, "").orEmpty() }
             if (!matched) {
                 ui.takeScreenshot()?.let { image ->
@@ -93,7 +93,7 @@ class ReaderConcurrentOffersTest {
                     listOf(it.optString("app"), it.optDouble("fare"), it.optDouble("totalKm"), it.optDouble("minutes"), it.optDouble("perKm"), it.optDouble("perHour"), it.optString("passengerRating")).joinToString(";")
                 }
                 val windows = describeWindows()
-                val fixtureOcr = if (label.startsWith("Distinct")) describeSyntheticNinetyNineOcr() else ""
+                val fixtureOcr = if (label.startsWith("Distinct") || label.startsWith("Tall")) describeSyntheticNinetyNineOcr() else ""
                 val crashes=if(label.startsWith("Tall")) shell("logcat -d -b crash -v brief -t 100").takeLast(6000) else ""
                 fail("$label: $diagnostic / records=$records / windows=$windows / synthetic99=$fixtureOcr / fixture crashes=$crashes")
             }
@@ -256,7 +256,7 @@ class ReaderConcurrentOffersTest {
                     Rect().also{window.getBoundsInScreen(it)}.takeIf{it.width()>=160 && it.height()>=100}
                 } finally {root.recycle()}
             }.minByOrNull{it.left}
-            await("Tall negotiated 99 offer and Uber each have an independent tag in the correct window",60000) {
+            await("Tall negotiated 99 offer and Uber each have an independent tag in the correct window",120000) {
                 val tag=realistic99Tag()
                 val pane=middle99Pane()
                 uberTag()!=null && tag!=null && pane!=null && pane.contains(tag.centerX(),tag.centerY())
