@@ -231,8 +231,13 @@ class ReaderConcurrentOffersTest {
             // valid offer. Both fixture windows remain visible during this time.
             repeat(5) {
                 Thread.sleep(2300)
-                assertNotNull("Uber tag remains while its offer is visible",uberTag())
-                assertNotNull("99 tag remains while its offer is visible",ninetyNineTag())
+                // Display fallback briefly conceals our own surfaces so OCR
+                // cannot feed the analysis back into the original offer. Check
+                // that both return within the bounded capture deadline rather
+                // than sampling that intentional transparent frame.
+                await("Both tags return after capture while their offers remain visible",7000) {
+                    uberTag()!=null && ninetyNineTag()!=null
+                }
             }
 
             // Remove only the offer pixels, leaving the Uber window open.
