@@ -34,6 +34,13 @@ class PxLocalMediaTest {
         val sender=LivePxVoice(context,scope){_,_->};val receiver=LiveKit.create(context)
         receiver.audioSwitchHandler?.manageAudioFocus=false
         receiver.audioSwitchHandler?.audioMode=AudioManager.MODE_NORMAL
+        fun stats(room:io.livekit.android.room.Room,publisher:Boolean):String {
+            val ready=CountDownLatch(1);var detail="not returned"
+            val callback=livekit.org.webrtc.RTCStatsCollectorCallback{report->detail=report.statsMap.values.filter{it.type in listOf("transport","candidate-pair","inbound-rtp","outbound-rtp")}.joinToString{it.type+":"+it.members.filterKeys{key->key in listOf("state","nominated","bytesSent","bytesReceived","packetsSent","packetsReceived","dtlsState","iceState")}};ready.countDown()}
+            if(publisher)room.getPublisherRTCStats(callback)else room.getSubscriberRTCStats(callback)
+            ready.await(3,TimeUnit.SECONDS);return detail
+        }
+        fun senderStats():String=runCatching{val field=LivePxVoice::class.java.getDeclaredField("room");field.isAccessible=true;stats(field.get(sender)as io.livekit.android.room.Room,true)}.getOrDefault("unavailable")
         val first=CountDownLatch(5);val second=CountDownLatch(5);val phase=java.util.concurrent.atomic.AtomicInteger()
         try {
             PxDependencies.gateway={object:PxGateway{override fun currentAccount()=true;override fun call(action:String,data:JSONObject)=JSONObject().put("channels",JSONArray())}}
@@ -45,7 +52,8 @@ class PxLocalMediaTest {
             runBlocking{withTimeout(45000){sender.connect(data.getString("url"),data.getString("a"));receiver.connect(data.getString("url"),data.getString("b"));while(!sender.mayPublish)delay(50)}}
             assertEquals("Listening radio does not hold call mode",AudioManager.MODE_NORMAL,audio.mode)
             assertTrue("Joining never starts recorder",audio.activeRecordingConfigurations.isEmpty())
-            phase.set(1);runBlocking{assertTrue(sender.microphone(true))};assertTrue("Remote receives actual PCM",first.await(15,TimeUnit.SECONDS))
+            phase.set(1);runBlocking{assertTrue(sender.microphone(true))};val received=first.await(25,TimeUnit.SECONDS)
+            assertTrue("Remote receives actual PCM; mode=${audio.mode}; recorders=${audio.activeRecordingConfigurations.size}; sender=${senderStats()}; receiver=${stats(receiver,false)}",received)
             runBlocking{sender.microphone(false);withTimeout(8000){while(audio.activeRecordingConfigurations.isNotEmpty())delay(100)}}
             val size=AudioRecord.getMinBufferSize(16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(4096)
             recorder=AudioRecord(MediaRecorder.AudioSource.MIC,16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,size*2)
