@@ -562,6 +562,7 @@ class OfferAccessibilityService : AccessibilityService() {
         var attempt=0
         var hiddenViews:List<Pair<View,Float>> = emptyList()
         var hiddenAreas:Set<CaptureArea> = emptySet()
+        var displayRegion:Rect?=null
         fun restoreViews() {
             val views=hiddenViews
             hiddenViews=emptyList()
@@ -574,7 +575,8 @@ class OfferAccessibilityService : AccessibilityService() {
             if(!captureStillValid(pkg,windowId,bounds))return false
             val target=captureSurfaces.firstOrNull{it.id==windowId && it.owner==pkg} ?: return false
             if(target.area!=captureArea(bounds))return false
-            return OfferCaptureSafety.allows(target,captureSurfaces,packageName,hiddenAreas)
+            val region=displayRegion ?: return false
+            return OfferCaptureSafety.allows(target.copy(area=captureArea(region)),captureSurfaces,packageName,hiddenAreas)
         }
         fun finish(message:String?=null) {
             restoreViews()
@@ -585,6 +587,12 @@ class OfferAccessibilityService : AccessibilityService() {
         begin={ display ->
             val number=++attempt
             if(display) {
+                displayRegion=runCatching {
+                    val metrics=(getSystemService(WINDOW_SERVICE) as WindowManager).currentWindowMetrics
+                    val insets=metrics.windowInsets.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout())
+                    val safe=Rect(metrics.bounds).apply{left+=insets.left;top+=insets.top;right-=insets.right;bottom-=insets.bottom}
+                    Rect(bounds).takeIf{it.intersect(safe)}
+                }.getOrNull()
                 hiddenViews=(listOfNotNull(bubble)+overlays.values).distinct().filter{it.isAttachedToWindow}.map{it to it.alpha}
                 hiddenAreas=hiddenViews.mapNotNull{(view,_)->
                     if(view.width<=0 || view.height<=0)null else {
@@ -629,8 +637,9 @@ class OfferAccessibilityService : AccessibilityService() {
                             }
                             captureStatus(pkg,"Imagem recebida em ${android.os.SystemClock.elapsedRealtime()-requestTime} ms${if(display)" • alternativa recortada" else ""}")
                             val offerImage=if(display) {
-                                val region=Rect(bounds)
-                                if(!region.intersect(0,0,image.width,image.height) || region!=bounds) {
+                                val expectedRegion=displayRegion ?: run{image.recycle();finish();return@post}
+                                val region=Rect(expectedRegion)
+                                if(!region.intersect(0,0,image.width,image.height) || region!=expectedRegion) {
                                     image.recycle();finish();return@post
                                 }
                                 val crop=Bitmap.createBitmap(image,region.left,region.top,region.width(),region.height())

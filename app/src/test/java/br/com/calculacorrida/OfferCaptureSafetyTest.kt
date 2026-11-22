@@ -31,6 +31,13 @@ class OfferCaptureSafetyTest {
         assertFalse(allowed(CaptureSurface(20,"private.chat",CaptureArea(0,0,900,1000),1,1)))
         assertTrue(allowed(CaptureSurface(20,"com.app99.driver",CaptureArea(0,0,900,1000),1,1)))
     }
+    @Test fun aContainedCropCanExcludeStatusAndNavigationPixels() {
+        val full=target.copy(area=CaptureArea(300,0,600,1000))
+        val bars=listOf(CaptureSurface(30,"com.android.systemui",CaptureArea(0,0,900,24),10,3),
+            CaptureSurface(31,"com.android.systemui",CaptureArea(0,960,900,1000),10,3))
+        assertFalse(OfferCaptureSafety.allows(full,listOf(full)+bars,"reader",emptySet()))
+        assertTrue(OfferCaptureSafety.allows(full.copy(area=CaptureArea(300,24,600,960)),listOf(full)+bars,"reader",emptySet()))
+    }
     @Test fun emptyWindowsCannotOccludeAnOffer() {
         assertTrue(allowed(CaptureSurface(20,null,CaptureArea(400,300,400,500),5,3)))
     }
