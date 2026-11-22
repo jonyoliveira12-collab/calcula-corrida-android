@@ -8,14 +8,14 @@ internal data class CaptureSurface(val id:Int,val owner:String?,val area:Capture
 
 /** Display fallback is allowed only for an unchanged, unobscured driver window. */
 internal object OfferCaptureSafety {
-    fun allows(target:CaptureSurface,surfaces:List<CaptureSurface>,readerOwner:String,hiddenReaderAreas:Set<CaptureArea>):Boolean {
+    fun allows(target:CaptureSurface,surfaces:List<CaptureSurface>,readerOwner:String,hiddenReaderAreas:Set<CaptureArea>,strictBackgroundOwnership:Boolean=true):Boolean {
         if(target.display!=0 || target.owner==null || DriverPackages.name(target.owner)==null)return false
         if(surfaces.none{it.id==target.id && it.owner==target.owner && it.display==target.display && it.area.contains(target.area)})return false
         return surfaces.none { other ->
             // Rounded/transparent offer edges may expose a lower window too.
             // Only the same driver's background may sit behind the crop.
             other.id!=target.id && other.display==target.display && other.area.overlaps(target.area) &&
-                (other.layer>target.layer || other.owner!=target.owner) &&
+                (other.layer>target.layer || (strictBackgroundOwnership && other.owner!=target.owner)) &&
                 !(other.owner==readerOwner && other.kind==3 && other.area in hiddenReaderAreas)
         }
     }

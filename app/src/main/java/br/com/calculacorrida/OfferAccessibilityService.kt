@@ -581,7 +581,10 @@ class OfferAccessibilityService : AccessibilityService() {
             val target=captureSurfaces.firstOrNull{it.id==windowId && it.owner==pkg} ?: return false
             if(target.area!=captureArea(bounds))return false
             val region=displayRegion ?: return false
-            return OfferCaptureSafety.allows(target.copy(area=captureArea(region)),captureSurfaces,packageName,hiddenAreas)
+            // Android 11–13 retain their existing bounded display-reading path.
+            // The newly introduced modern fallback additionally rejects foreign
+            // backgrounds that might show through rounded offer corners.
+            return OfferCaptureSafety.allows(target.copy(area=captureArea(region)),captureSurfaces,packageName,hiddenAreas,Build.VERSION.SDK_INT>=34)
         }
         fun finish(message:String?=null) {
             restoreViews()
